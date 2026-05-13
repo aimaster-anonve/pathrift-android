@@ -1,19 +1,15 @@
 package com.pathrift.anonve.android.game.towers
 
+import com.pathrift.anonve.android.core.engine.EconomyConstants
+
 /**
- * Bolt Tower — Fast single-target electrical damage.
- * Best for: high-frequency damage on Runners.
- *
- * Stats:
- *   Damage: 20 per hit
- *   Speed: 1.2 attacks/sec
- *   Range: 3 tiles
- *   Cost: 100 gold
+ * Bolt Tower — Fast single-target. iOS parity.
+ * Damage: 20, Speed: 1.2/s, Range: 192px (≈3 tiles)
  */
 class BoltTower : Tower() {
     override val type = TowerType.BOLT
     override val displayName = "Bolt Tower"
-    override val cost = 100
+    override val cost = EconomyConstants.TowerCost.BOLT
     override val damagePerHit = 20
     override val attacksPerSecond = 1.2f
     override val rangeTiles = 3.0f

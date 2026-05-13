@@ -4,60 +4,163 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PointF
 import android.graphics.RectF
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import com.pathrift.anonve.android.game.enemies.EnemyInstance
 import com.pathrift.anonve.android.game.enemies.EnemyType
-import com.pathrift.anonve.android.game.towers.Tower
 import com.pathrift.anonve.android.game.towers.TowerType
+import kotlin.math.sqrt
 
 /**
- * Custom SurfaceView that handles all game rendering via Android Canvas API.
- * Renders the grid, towers, enemies, health bars, and path highlights at ~60fps.
+ * GameRenderer — Canvas-based SurfaceView renderer. iOS parity for all 6 enemy types,
+ * level badges, range circles, boss variants, Rift Shift flash, and path rendering.
  */
 class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
 
+    // ---- Game state (updated externally) ----
+    var enemies: List<EnemyInstance> = emptyList()
+    var towerInstances: Map<Int, TowerInstance> = emptyMap()
+    var slotPositions: List<PointF> = emptyList()
+    var slotOccupied: Map<Int, Boolean> = emptyMap()
+    var selectedSlotId: Int? = null
+    var riftShiftActive: Boolean = false
+
     // ---- Paints ----
     private val backgroundPaint = Paint().apply { color = Color.parseColor("#0A0A0F") }
-    private val gridEmptyPaint = Paint().apply {
-        color = Color.parseColor("#12121A")
+
+    // Grid tiles (checkerboard)
+    private val gridPaint1 = Paint().apply { color = Color.parseColor("#11111A"); style = Paint.Style.FILL }
+    private val gridPaint2 = Paint().apply { color = Color.parseColor("#16161F"); style = Paint.Style.FILL }
+    private val gridBorderPaint = Paint().apply {
+        color = Color.parseColor("#262633")
+        style = Paint.Style.STROKE
+        strokeWidth = 0.5f
+        alpha = 76
+    }
+
+    // Path
+    private val pathFillPaint = Paint().apply {
+        color = Color.parseColor("#473820")
         style = Paint.Style.FILL
     }
-    private val gridBorderPaint = Paint().apply {
-        color = Color.parseColor("#1E1E2E")
+    private val pathStrokePaint = Paint().apply {
+        color = Color.parseColor("#7F6128")
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+        alpha = 178
+    }
+
+    // Tower slot
+    private val slotEmptyPaint = Paint().apply {
+        color = Color.parseColor("#0D2640")
+        style = Paint.Style.FILL
+        alpha = 216
+    }
+    private val slotBorderPaint = Paint().apply {
+        color = Color.parseColor("#00C7FF")
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f
+        alpha = 153
+    }
+    private val slotCrossPaint = Paint().apply {
+        color = Color.parseColor("#00C7FF")
+        style = Paint.Style.FILL
+        alpha = 178
+    }
+
+    // Tower colors
+    private val towerBoltPaint = Paint().apply { color = Color.parseColor("#00C8FF"); style = Paint.Style.FILL }
+    private val towerBlastPaint = Paint().apply { color = Color.parseColor("#FF6B00"); style = Paint.Style.FILL }
+    private val towerFrostPaint = Paint().apply { color = Color.parseColor("#8B4FFF"); style = Paint.Style.FILL }
+
+    // Tower range ring — semi-transparent blue halo
+    private val towerRangePaint = Paint().apply {
+        color = Color.parseColor("#00C7FF")
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+        alpha = 60
+    }
+    private val towerRangeFillPaint = Paint().apply {
+        color = Color.parseColor("#00C7FF")
+        style = Paint.Style.FILL
+        alpha = 15
+    }
+
+    // Level badge
+    private val badgeBgPaint = Paint().apply {
+        color = Color.parseColor("#0D0D26")
+        style = Paint.Style.FILL
+        alpha = 242
+    }
+    private val badgeBorderPaint = Paint().apply {
+        color = Color.parseColor("#00C8FF")
         style = Paint.Style.STROKE
         strokeWidth = 1f
     }
-    private val pathPaint = Paint().apply {
-        color = Color.parseColor("#1A1A28")
-        style = Paint.Style.FILL
-    }
-    private val towerBoltPaint = Paint().apply { color = Color.parseColor("#00C8FF") }
-    private val towerBlastPaint = Paint().apply { color = Color.parseColor("#FF6B00") }
-    private val towerFrostPaint = Paint().apply { color = Color.parseColor("#8B4FFF") }
-    private val towerRangePaint = Paint().apply {
-        color = Color.parseColor("#FFFFFF")
-        alpha = 30
-        style = Paint.Style.STROKE
-        strokeWidth = 2f
-    }
-    private val enemyRunnerPaint = Paint().apply { color = Color.parseColor("#FF2D55") }
-    private val enemyTankPaint = Paint().apply { color = Color.parseColor("#FF6B00") }
-    private val healthBarBgPaint = Paint().apply { color = Color.parseColor("#333333") }
-    private val healthBarFgPaint = Paint().apply { color = Color.parseColor("#30D158") }
-    private val healthBarLowPaint = Paint().apply { color = Color.parseColor("#FF2D55") }
-    private val textPaint = Paint().apply {
-        color = Color.WHITE
-        textSize = 24f
+    private val badgeTextPaint = Paint().apply {
+        color = Color.parseColor("#00C8FF")
+        textSize = 18f
         isAntiAlias = true
+        isFakeBoldText = true
     }
 
-    // ---- Game State (updated externally from Compose) ----
-    var gridTiles: List<GridTile> = emptyList()
-    var towers: Map<TileCoordinate, Tower> = emptyMap()
-    var enemies: List<EnemyInstance> = emptyList()
-    var selectedTile: TileCoordinate? = null
+    // Enemy paints
+    private val enemyRunnerPaint = Paint().apply { color = Color.parseColor("#FF2D55"); style = Paint.Style.FILL }
+    private val enemyTankPaint = Paint().apply { color = Color.parseColor("#FF6B00"); style = Paint.Style.FILL }
+    private val enemyShieldBodyPaint = Paint().apply { color = Color.parseColor("#3380E6"); style = Paint.Style.FILL }
+    private val enemyShieldRingPaint = Paint().apply {
+        color = Color.parseColor("#7FCCFF")
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+        alpha = 229
+    }
+    private val enemySwarmPaint = Paint().apply { color = Color.parseColor("#FFBF00"); style = Paint.Style.FILL }
+    private val enemyGhostPaint = Paint().apply {
+        color = Color.parseColor("#B3E6B3")
+        style = Paint.Style.FILL
+        alpha = 191   // 0.75 alpha
+    }
+    private val enemyBossVariantPaints = listOf(
+        Paint().apply { color = Color.parseColor("#6633FF"); style = Paint.Style.FILL },  // 0 Rift Guardian — purple
+        Paint().apply { color = Color.parseColor("#666678"); style = Paint.Style.FILL },  // 1 Iron Colossus — grey
+        Paint().apply { color = Color.parseColor("#CC4D00"); style = Paint.Style.FILL },  // 2 Swarm Queen — dark orange
+        Paint().apply { color = Color.parseColor("#0099CC"); style = Paint.Style.FILL },  // 3 Phase Runner — cyan
+        Paint().apply { color = Color.parseColor("#330066"); style = Paint.Style.FILL },  // 4 Void Titan — dark purple
+    )
+    private val bossStrokePaints = listOf(
+        Paint().apply { color = Color.parseColor("#9966FF"); style = Paint.Style.STROKE; strokeWidth = 3f },
+        Paint().apply { color = Color.parseColor("#B3B3CC"); style = Paint.Style.STROKE; strokeWidth = 3f },
+        Paint().apply { color = Color.parseColor("#FF9933"); style = Paint.Style.STROKE; strokeWidth = 3f },
+        Paint().apply { color = Color.parseColor("#00CCFF"); style = Paint.Style.STROKE; strokeWidth = 2f },
+        Paint().apply { color = Color.parseColor("#7F00CC"); style = Paint.Style.STROKE; strokeWidth = 4f },
+    )
+
+    // Health bar
+    private val hpBgPaint = Paint().apply { color = Color.parseColor("#333333"); style = Paint.Style.FILL }
+    private val hpGreenPaint = Paint().apply { color = Color.parseColor("#30D158"); style = Paint.Style.FILL }
+    private val hpYellowPaint = Paint().apply { color = Color.parseColor("#FFD60A"); style = Paint.Style.FILL }
+    private val hpRedPaint = Paint().apply { color = Color.parseColor("#FF2D55"); style = Paint.Style.FILL }
+
+    // Rift Shift overlay
+    private val riftFlashPaint = Paint().apply {
+        color = Color.parseColor("#8C4FFF")
+        style = Paint.Style.FILL
+        alpha = 38
+    }
+
+    // Path start/end indicators
+    private val startPaint = Paint().apply { color = Color.parseColor("#00993D"); style = Paint.Style.FILL; alpha = 229 }
+    private val endPaint = Paint().apply { color = Color.parseColor("#CC1A29"); style = Paint.Style.FILL; alpha = 229 }
+    private val indicatorTextPaint = Paint().apply {
+        color = Color.WHITE
+        textSize = 20f
+        isAntiAlias = true
+        isFakeBoldText = true
+        textAlign = Paint.Align.CENTER
+    }
 
     private var renderThread: RenderThread? = null
     private var isRunning = false
@@ -72,9 +175,7 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         renderThread = RenderThread(holder).also { it.start() }
     }
 
-    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-        // Handle orientation/size changes if needed
-    }
+    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         isRunning = false
@@ -82,54 +183,125 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         renderThread = null
     }
 
+    // ---- Drawing ----
+
     private fun drawFrame(canvas: Canvas) {
-        val w = canvas.width.toFloat()
-        val h = canvas.height.toFloat()
+        val W = canvas.width.toFloat()
+        val H = canvas.height.toFloat()
 
-        canvas.drawRect(0f, 0f, w, h, backgroundPaint)
+        canvas.drawRect(0f, 0f, W, H, backgroundPaint)
 
-        val tileW = w / GridSystem.COLS
-        val tileH = h / GridSystem.ROWS
+        drawCheckerGrid(canvas, W, H)
+        drawPath(canvas, W, H)
+        drawTowerSlots(canvas)
+        drawTowers(canvas)
+        drawEnemies(canvas)
 
-        // Grid tiles
-        gridTiles.forEach { tile ->
-            val left = tile.coordinate.col * tileW
-            val top = tile.coordinate.row * tileH
-            val rect = RectF(left, top, left + tileW, top + tileH)
+        if (riftShiftActive) {
+            canvas.drawRect(0f, 0f, W, H, riftFlashPaint)
+        }
+    }
 
-            val fillPaint = when (tile.type) {
-                TileType.PATH -> pathPaint
-                else -> gridEmptyPaint
-            }
-            canvas.drawRect(rect, fillPaint)
-            canvas.drawRect(rect, gridBorderPaint)
-
-            if (tile.coordinate == selectedTile && tile.type == TileType.EMPTY) {
-                val highlightPaint = Paint().apply {
-                    color = Color.parseColor("#00C8FF")
-                    alpha = 60
-                    style = Paint.Style.FILL
-                }
-                canvas.drawRect(rect, highlightPaint)
+    // Checkerboard grid background
+    private fun drawCheckerGrid(canvas: Canvas, W: Float, H: Float) {
+        val cols = GridSystem.COLS
+        val rows = GridSystem.ROWS
+        val tileW = W / cols
+        val tileH = H / rows
+        for (col in 0 until cols) {
+            for (row in 0 until rows) {
+                val left = col * tileW
+                val top = row * tileH
+                val paint = if ((col + row) % 2 == 0) gridPaint1 else gridPaint2
+                canvas.drawRect(left, top, left + tileW, top + tileH, paint)
+                canvas.drawRect(left, top, left + tileW, top + tileH, gridBorderPaint)
             }
         }
+    }
 
-        // Towers
-        towers.forEach { (coord, tower) ->
-            val cx = coord.col * tileW + tileW / 2
-            val cy = coord.row * tileH + tileH / 2
-            val radius = tileW.coerceAtMost(tileH) * 0.35f
+    // Render the Z-shaped waypoint path as thick segments + joints
+    private fun drawPath(canvas: Canvas, W: Float, H: Float) {
+        val wps = PathSystem.waypoints
+        if (wps.size < 2) return
+        val thickness = 24f
 
-            val rangeRadius = tower.rangeTiles * tileW
-            canvas.drawCircle(cx, cy, rangeRadius, towerRangePaint)
+        for (i in 1 until wps.size) {
+            val from = wps[i - 1]
+            val to = wps[i]
+            val dx = to.x - from.x
+            val dy = to.y - from.y
+            val len = sqrt(dx * dx + dy * dy)
+            if (len < 1f) continue
 
-            val towerPaint = when (tower.type) {
-                TowerType.BOLT -> towerBoltPaint
+            canvas.save()
+            canvas.translate((from.x + to.x) / 2f, (from.y + to.y) / 2f)
+            val angle = Math.toDegrees(Math.atan2(dy.toDouble(), dx.toDouble())).toFloat()
+            canvas.rotate(angle)
+            canvas.drawRect(-len / 2f, -thickness / 2f, len / 2f, thickness / 2f, pathFillPaint)
+            canvas.drawRect(-len / 2f, -thickness / 2f, len / 2f, thickness / 2f, pathStrokePaint)
+            canvas.restore()
+        }
+
+        // Corner joints
+        for (wp in wps) {
+            canvas.drawCircle(wp.x, wp.y, thickness / 2f, pathFillPaint)
+        }
+
+        // Start indicator
+        wps.firstOrNull()?.let { first ->
+            val cx = first.x + 20f
+            canvas.drawCircle(cx, first.y, 14f, startPaint)
+            canvas.drawText("▶", cx, first.y + 7f, indicatorTextPaint)
+        }
+
+        // End indicator
+        wps.lastOrNull()?.let { last ->
+            val cx = last.x - 20f
+            canvas.drawCircle(cx, last.y, 14f, endPaint)
+            canvas.drawText("✕", cx, last.y + 7f, indicatorTextPaint)
+        }
+    }
+
+    // Tower slot backgrounds (only unoccupied)
+    private fun drawTowerSlots(canvas: Canvas) {
+        for ((idx, pos) in slotPositions.withIndex()) {
+            if (slotOccupied[idx] == true) continue
+            val half = 23f
+            canvas.drawRoundRect(
+                RectF(pos.x - half, pos.y - half, pos.x + half, pos.y + half),
+                8f, 8f, slotEmptyPaint
+            )
+            canvas.drawRoundRect(
+                RectF(pos.x - half, pos.y - half, pos.x + half, pos.y + half),
+                8f, 8f, slotBorderPaint
+            )
+            // Cross
+            canvas.drawRect(pos.x - 1f, pos.y - 9f, pos.x + 1f, pos.y + 9f, slotCrossPaint)
+            canvas.drawRect(pos.x - 9f, pos.y - 1f, pos.x + 9f, pos.y + 1f, slotCrossPaint)
+        }
+    }
+
+    // Towers with diamond shape, range ring for selected, level badge
+    private fun drawTowers(canvas: Canvas) {
+        for ((slotId, inst) in towerInstances) {
+            val cx = inst.position.x
+            val cy = inst.position.y
+            val radius = 22f
+
+            // Range ring for selected tower
+            if (selectedSlotId == slotId) {
+                val rangePixels = inst.tower.rangeTiles * GridSystem.TILE_SIZE_DP
+                canvas.drawCircle(cx, cy, rangePixels, towerRangeFillPaint)
+                canvas.drawCircle(cx, cy, rangePixels, towerRangePaint)
+            }
+
+            // Tower body (diamond)
+            val towerPaint = when (inst.tower.type) {
+                TowerType.BOLT  -> towerBoltPaint
                 TowerType.BLAST -> towerBlastPaint
                 TowerType.FROST -> towerFrostPaint
             }
-
-            val path = android.graphics.Path().apply {
+            val path = Path().apply {
                 moveTo(cx, cy - radius)
                 lineTo(cx + radius, cy)
                 lineTo(cx, cy + radius)
@@ -138,34 +310,184 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             }
             canvas.drawPath(path, towerPaint)
 
-            val label = tower.type.name.first().toString()
-            textPaint.textSize = radius * 0.9f
-            val textWidth = textPaint.measureText(label)
-            canvas.drawText(label, cx - textWidth / 2, cy + radius * 0.3f, textPaint)
-        }
+            // Type label
+            val label = inst.tower.type.name.first().toString()
+            val labelPaint = Paint(indicatorTextPaint).apply { textSize = radius * 0.85f }
+            canvas.drawText(label, cx, cy + radius * 0.30f, labelPaint)
 
-        // Enemies
-        enemies.forEach { enemy ->
-            val px = enemy.pathProgress * tileW
-            val py = enemy.pathRow * tileH + tileH / 2
-
-            val (paint, radius) = when (enemy.type) {
-                EnemyType.RUNNER -> enemyRunnerPaint to tileW * 0.25f
-                EnemyType.TANK -> enemyTankPaint to tileW * 0.38f
+            // Level badge (bottom-right of tower)
+            if (inst.level > 1) {
+                drawLevelBadge(canvas, cx + 14f, cy + 14f, inst.level)
             }
-
-            canvas.drawCircle(px, py, radius, paint)
-
-            val barW = radius * 2.5f
-            val barH = 6f
-            val barLeft = px - barW / 2
-            val barTop = py - radius - barH - 4f
-
-            canvas.drawRect(barLeft, barTop, barLeft + barW, barTop + barH, healthBarBgPaint)
-            val hpRatio = enemy.currentHp.toFloat() / enemy.maxHp.toFloat()
-            val fgPaint = if (hpRatio > 0.4f) healthBarFgPaint else healthBarLowPaint
-            canvas.drawRect(barLeft, barTop, barLeft + barW * hpRatio, barTop + barH, fgPaint)
         }
+    }
+
+    private fun drawLevelBadge(canvas: Canvas, cx: Float, cy: Float, level: Int) {
+        val r = 9f
+        canvas.drawCircle(cx, cy, r, badgeBgPaint)
+
+        // Color escalation: blue → purple → orange
+        val (border, text) = when {
+            level < 3  -> Color.parseColor("#00C8FF") to Color.parseColor("#00C8FF")
+            level < 6  -> Color.parseColor("#8C50FF") to Color.parseColor("#8C50FF")
+            else       -> Color.parseColor("#FF6B00") to Color.parseColor("#FF6B00")
+        }
+        val bp = Paint(badgeBorderPaint).apply { color = border }
+        canvas.drawCircle(cx, cy, r, bp)
+
+        val tp = Paint(badgeTextPaint).apply {
+            color = text
+            textSize = 14f
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText(level.toString(), cx, cy + 5f, tp)
+    }
+
+    // All 6 enemy types with distinct visuals
+    private fun drawEnemies(canvas: Canvas) {
+        for (enemy in enemies) {
+            if (!enemy.isAlive) continue
+            val pos = PathSystem.positionAt(enemy.pathProgress)
+            val px = pos.x
+            val py = pos.y
+
+            when (enemy.type) {
+                EnemyType.RUNNER -> drawRunnerEnemy(canvas, px, py, enemy)
+                EnemyType.TANK   -> drawTankEnemy(canvas, px, py, enemy)
+                EnemyType.SHIELD -> drawShieldEnemy(canvas, px, py, enemy)
+                EnemyType.SWARM  -> drawSwarmEnemy(canvas, px, py, enemy)
+                EnemyType.GHOST  -> drawGhostEnemy(canvas, px, py, enemy)
+                EnemyType.BOSS   -> drawBossEnemy(canvas, px, py, enemy)
+            }
+        }
+    }
+
+    private fun drawRunnerEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
+        val r = 11f
+        canvas.drawCircle(cx, cy, r, enemyRunnerPaint)
+        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 24f, barHeight = 5f)
+    }
+
+    private fun drawTankEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
+        val r = 17f
+        canvas.drawCircle(cx, cy, r, enemyTankPaint)
+        // Armor indicator — inner darker ring
+        val innerPaint = Paint(enemyTankPaint).apply { color = Color.parseColor("#4D1F00") }
+        canvas.drawCircle(cx, cy, r * 0.55f, innerPaint)
+        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 34f, barHeight = 6f)
+    }
+
+    private fun drawShieldEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
+        val r = 12f
+        // Body — blue
+        val bodyColor = if (e.shieldBroken) Color.parseColor("#E64D1A") else Color.parseColor("#3380E6")
+        canvas.drawCircle(cx, cy, r, Paint().apply { color = bodyColor; style = Paint.Style.FILL })
+
+        // Shield ring — cyan halo (only if shield active)
+        if (!e.shieldBroken && e.shieldHp > 0f) {
+            canvas.drawCircle(cx, cy, r + 5f, enemyShieldRingPaint)
+        }
+        drawHealthBar(canvas, cx, cy, r + 5f, e.currentHp, e.maxHp, barWidth = 28f, barHeight = 5f)
+    }
+
+    private fun drawSwarmEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
+        val r = 7f
+        canvas.drawCircle(cx, cy, r, enemySwarmPaint)
+        // Swarm: small orange-yellow dot — tiny health bar
+        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 16f, barHeight = 3f)
+    }
+
+    private fun drawGhostEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
+        val r = 13f
+        // Semi-transparent green
+        canvas.drawCircle(cx, cy, r, enemyGhostPaint)
+        // Inner glow
+        val glowPaint = Paint().apply {
+            color = Color.parseColor("#CCFFCC")
+            style = Paint.Style.FILL
+            alpha = 153
+        }
+        canvas.drawCircle(cx, cy, r * 0.54f, glowPaint)
+        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 28f, barHeight = 5f)
+    }
+
+    private fun drawBossEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
+        val variant = e.bossVariant
+        val bodyPaint = enemyBossVariantPaints[variant]
+        val strokePaint = bossStrokePaints[variant]
+
+        when (variant) {
+            1 -> {
+                // Iron Colossus — grey square
+                val half = 19f
+                val rect = RectF(cx - half, cy - half, cx + half, cy + half)
+                canvas.drawRoundRect(rect, 5f, 5f, bodyPaint)
+                canvas.drawRoundRect(rect, 5f, 5f, strokePaint)
+            }
+            2 -> {
+                // Swarm Queen — orange pulsing circle with sacs
+                canvas.drawCircle(cx, cy, 20f, bodyPaint)
+                canvas.drawCircle(cx, cy, 20f, strokePaint)
+                // Spawn sac indicators
+                val sacPaint = Paint().apply { color = Color.parseColor("#FFAA00"); style = Paint.Style.FILL; alpha = 204 }
+                for (angle in listOf(0f, 90f, 180f, 270f)) {
+                    val rad = Math.toRadians(angle.toDouble())
+                    val sx = cx + (Math.cos(rad) * 18).toFloat()
+                    val sy = cy + (Math.sin(rad) * 18).toFloat()
+                    canvas.drawCircle(sx, sy, 5f, sacPaint)
+                }
+            }
+            3 -> {
+                // Phase Runner — cyan angular body
+                val path = Path().apply {
+                    moveTo(cx, cy - 15f)
+                    lineTo(cx + 10f, cy)
+                    lineTo(cx, cy + 15f)
+                    lineTo(cx - 10f, cy)
+                    close()
+                }
+                canvas.drawPath(path, bodyPaint)
+                canvas.drawPath(path, strokePaint)
+            }
+            4 -> {
+                // Void Titan — dark purple concentric circles
+                canvas.drawCircle(cx, cy, 26f, bodyPaint)
+                canvas.drawCircle(cx, cy, 26f, strokePaint)
+                val innerPaint = Paint().apply { color = Color.parseColor("#4D0080"); style = Paint.Style.FILL }
+                canvas.drawCircle(cx, cy, 14f, innerPaint)
+            }
+            else -> {
+                // 0: Rift Guardian — purple circle with outer ring
+                canvas.drawCircle(cx, cy, 22f, bodyPaint)
+                canvas.drawCircle(cx, cy, 22f, strokePaint)
+                val corePaint = Paint().apply { color = Color.parseColor("#CC66FF"); style = Paint.Style.FILL }
+                canvas.drawCircle(cx, cy, 10f, corePaint)
+            }
+        }
+
+        // Boss wide health bar
+        drawHealthBar(canvas, cx, cy, 26f, e.currentHp, e.maxHp, barWidth = 56f, barHeight = 7f)
+    }
+
+    private fun drawHealthBar(
+        canvas: Canvas,
+        cx: Float, cy: Float,
+        enemyRadius: Float,
+        currentHp: Float, maxHp: Float,
+        barWidth: Float, barHeight: Float
+    ) {
+        val barLeft = cx - barWidth / 2f
+        val barTop = cy - enemyRadius - barHeight - 4f
+
+        canvas.drawRect(barLeft, barTop, barLeft + barWidth, barTop + barHeight, hpBgPaint)
+
+        val ratio = if (maxHp > 0f) (currentHp / maxHp).coerceIn(0f, 1f) else 0f
+        val fgPaint = when {
+            ratio > 0.6f -> hpGreenPaint
+            ratio > 0.3f -> hpYellowPaint
+            else         -> hpRedPaint
+        }
+        canvas.drawRect(barLeft, barTop, barLeft + barWidth * ratio, barTop + barHeight, fgPaint)
     }
 
     inner class RenderThread(private val surfaceHolder: SurfaceHolder) : Thread("PathriftRenderThread") {
@@ -173,9 +495,7 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             while (isRunning) {
                 val canvas = surfaceHolder.lockCanvas() ?: continue
                 try {
-                    synchronized(surfaceHolder) {
-                        drawFrame(canvas)
-                    }
+                    synchronized(surfaceHolder) { drawFrame(canvas) }
                 } finally {
                     surfaceHolder.unlockCanvasAndPost(canvas)
                 }

@@ -5,7 +5,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,20 +27,23 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.pathrift.anonve.android.core.ui.BlastTowerColor
+import com.pathrift.anonve.android.core.ui.BoltTowerColor
+import com.pathrift.anonve.android.core.ui.FrostTowerColor
 import com.pathrift.anonve.android.core.ui.GameEvent
-import com.pathrift.anonve.android.core.ui.GamePhase
 import com.pathrift.anonve.android.core.ui.GameViewModel
 import com.pathrift.anonve.android.core.ui.PathriftBackground
 import com.pathrift.anonve.android.core.ui.PathriftDanger
@@ -51,13 +53,11 @@ import com.pathrift.anonve.android.core.ui.PathriftSurface
 import com.pathrift.anonve.android.core.ui.PathriftSurfaceVariant
 import com.pathrift.anonve.android.core.ui.PathriftTextPrimary
 import com.pathrift.anonve.android.core.ui.PathriftTextSecondary
-import com.pathrift.anonve.android.core.ui.UiGameState
-import com.pathrift.anonve.android.core.ui.BlastTowerColor
-import com.pathrift.anonve.android.core.ui.BoltTowerColor
-import com.pathrift.anonve.android.core.ui.FrostTowerColor
+import com.pathrift.anonve.android.game.GamePhase
 import com.pathrift.anonve.android.game.GameRenderer
+import com.pathrift.anonve.android.game.GameState
 import com.pathrift.anonve.android.game.GridSystem
-import com.pathrift.anonve.android.game.TileCoordinate
+import com.pathrift.anonve.android.game.PathSystem
 import com.pathrift.anonve.android.game.towers.BlastTower
 import com.pathrift.anonve.android.game.towers.BoltTower
 import com.pathrift.anonve.android.game.towers.FrostTower
@@ -74,15 +74,20 @@ fun GameScreen(
     gameViewModel: GameViewModel = viewModel()
 ) {
     val state by gameViewModel.state.collectAsState()
+    val enemies by gameViewModel.enemies.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+
+    // Tower type the player has selected to place
+    var selectedTowerType by remember { mutableStateOf<TowerType?>(null) }
 
     LaunchedEffect(Unit) {
         gameViewModel.events.collect { event ->
             when (event) {
                 is GameEvent.RunEnded -> onRunEnded(event.score, event.wave)
                 is GameEvent.ShowMessage -> snackbarHostState.showSnackbar(event.message)
-                is GameEvent.WaveStarted -> { /* visual feedback handled by HUD state */ }
-                is GameEvent.WaveCompleted -> { /* handled by ShowMessage */ }
+                is GameEvent.WaveStarted -> {}
+                is GameEvent.WaveCompleted -> {}
+                is GameEvent.RiftShift -> {}
             }
         }
     }
@@ -94,15 +99,18 @@ fun GameScreen(
     ) {
         GameCanvasView(
             state = state,
-            onTileTapped = { coord -> gameViewModel.selectTile(coord) },
+            gameViewModel = gameViewModel,
+            selectedTowerType = selectedTowerType,
+            onTowerPlaced = { selectedTowerType = null },
             modifier = Modifier.fillMaxSize()
         )
 
         CombatHUD(
             state = state,
-            onTowerSelect = gameViewModel::selectTowerType,
+            selectedTowerType = selectedTowerType,
+            onTowerSelect = { selectedTowerType = it },
             onNextWave = gameViewModel::startNextWave,
-            onClearSelection = gameViewModel::clearTowerSelection,
+            onClearSelection = { selectedTowerType = null },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -119,34 +127,38 @@ fun GameScreen(
 
 @Composable
 private fun GameCanvasView(
-    state: UiGameState,
-    onTileTapped: (TileCoordinate) -> Unit,
+    state: GameState,
+    gameViewModel: GameViewModel,
+    selectedTowerType: TowerType?,
+    onTowerPlaced: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val gameSurface = remember { GameRenderer(context) }
+    val enemies by gameViewModel.enemies.collectAsState()
 
-    gameSurface.gridTiles = state.gridTiles
-    gameSurface.towers = state.towers
-    gameSurface.enemies = state.enemies
-    gameSurface.selectedTile = state.selectedTile
+    // Sync renderer state
+    gameSurface.enemies = enemies
+    gameSurface.towerInstances = gameViewModel.game.towers
+    gameSurface.slotPositions = PathSystem.slotPositions
+    gameSurface.slotOccupied = gameViewModel.game.towers.keys.associateWith { true }
+    gameSurface.selectedSlotId = state.selectedTowerSlotId
+    gameSurface.riftShiftActive = state.riftShiftActive
 
-    Box(
-        modifier = modifier.pointerInput(Unit) {
-            detectTapGestures { offset ->
-                val tileW = size.width.toFloat() / GridSystem.COLS
-                val tileH = size.height.toFloat() / GridSystem.ROWS
-                val col = (offset.x / tileW).toInt().coerceIn(0, GridSystem.COLS - 1)
-                val row = (offset.y / tileH).toInt().coerceIn(0, GridSystem.ROWS - 1)
-                onTileTapped(TileCoordinate(col, row))
-            }
-        }
-    ) {
+    Box(modifier = modifier) {
         AndroidView(
-            factory = {
-                FrameLayout(context).apply {
+            factory = { ctx ->
+                FrameLayout(ctx).apply {
                     addView(gameSurface)
                 }
+            },
+            update = { frame ->
+                // Provide screen dimensions to engine (once non-zero)
+                if (frame.width > 0 && frame.height > 0) {
+                    gameViewModel.initLayout(frame.width.toFloat(), frame.height.toFloat())
+                }
+                // Sync enemy positions on each frame
+                gameViewModel.syncEnemyPositions()
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -159,7 +171,8 @@ private fun GameCanvasView(
 
 @Composable
 private fun CombatHUD(
-    state: UiGameState,
+    state: GameState,
+    selectedTowerType: TowerType?,
     onTowerSelect: (TowerType) -> Unit,
     onNextWave: () -> Unit,
     onClearSelection: () -> Unit,
@@ -180,7 +193,7 @@ private fun CombatHUD(
 
         TowerPanel(
             playerGold = state.gold,
-            selectedType = state.selectedTowerType,
+            selectedType = selectedTowerType,
             onTowerSelect = onTowerSelect,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
@@ -189,7 +202,7 @@ private fun CombatHUD(
 
         BottomActionBar(
             phase = state.phase,
-            selectedTowerType = state.selectedTowerType,
+            selectedTowerType = selectedTowerType,
             wave = state.wave,
             onNextWave = onNextWave,
             onClearSelection = onClearSelection,
@@ -220,12 +233,13 @@ private fun TopStatusBar(
         StatChip(label = "SCORE", value = "$score", valueColor = PathriftTextPrimary)
         Spacer(Modifier.weight(1f))
 
+        // Life indicators — up to 5 (iOS has 5)
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            repeat(3) { idx ->
+            repeat(5) { idx ->
                 val filled = idx < lives
                 Box(
                     modifier = Modifier
-                        .size(12.dp)
+                        .size(10.dp)
                         .clip(CircleShape)
                         .background(if (filled) PathriftDanger else PathriftSurfaceVariant)
                 )
@@ -292,12 +306,13 @@ private fun BottomActionBar(
                 }
             }
 
-            val waveButtonEnabled = phase != GamePhase.WAVE_ACTIVE
+            val waveButtonEnabled = phase != GamePhase.WAVE_ACTIVE && phase != GamePhase.GAME_OVER
             val waveButtonLabel = when (phase) {
-                GamePhase.PRE_WAVE -> if (wave == 0) "Start" else "Next Wave"
+                GamePhase.PRE_WAVE    -> if (wave == 0) "Start" else "Next Wave"
                 GamePhase.WAVE_ACTIVE -> "Wave in Progress..."
-                GamePhase.BETWEEN_WAVES -> "Next Wave"
-                GamePhase.RUN_ENDED -> "Run Ended"
+                GamePhase.DECISION    -> "Next Wave"
+                GamePhase.RIFT_SHIFT  -> "Rift Shifting..."
+                GamePhase.GAME_OVER   -> "Run Ended"
             }
 
             Button(
@@ -376,8 +391,8 @@ private fun TowerCard(
     val borderColor = if (isSelected) option.color else PathriftSurfaceVariant
     val bgColor = when {
         isSelected -> option.color.copy(alpha = 0.15f)
-        canAfford -> PathriftSurfaceVariant
-        else -> PathriftSurfaceVariant.copy(alpha = 0.4f)
+        canAfford  -> PathriftSurfaceVariant
+        else       -> PathriftSurfaceVariant.copy(alpha = 0.4f)
     }
     val textAlpha = if (canAfford) 1f else 0.4f
 

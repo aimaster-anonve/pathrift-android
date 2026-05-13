@@ -1,14 +1,15 @@
 package com.pathrift.anonve.android.game
 
+import android.graphics.PointF
+import com.pathrift.anonve.android.game.towers.TowerType
+
 /**
- * Represents a position on the game grid.
- * @param col Column index (0-based, 0 to COLS-1)
- * @param row Row index (0-based, 0 to ROWS-1)
+ * Represents a position on the legacy grid (kept for backward compatibility).
  */
 data class TileCoordinate(val col: Int, val row: Int)
 
 /**
- * Represents a tile on the grid.
+ * Tile type for the background grid rendering.
  */
 data class GridTile(
     val coordinate: TileCoordinate,
@@ -16,88 +17,98 @@ data class GridTile(
 )
 
 enum class TileType {
-    EMPTY,      // Can place a tower
-    PATH,       // Enemy path - cannot place tower
-    OCCUPIED    // Tower placed here
+    EMPTY,
+    PATH,
+    OCCUPIED
 }
 
 /**
- * Core grid system for the 12x8 game board.
- * Manages tile state, path definition, and placement validation.
+ * Tower slot state — mirrors iOS TowerSlotState.
+ */
+sealed class TowerSlotState {
+    object Empty : TowerSlotState()
+    data class Occupied(val towerType: TowerType, val level: Int = 1, val totalInvested: Int = 0) : TowerSlotState()
+    object Locked : TowerSlotState()
+
+    val isOccupied: Boolean get() = this is Occupied
+    val occupiedTowerType: TowerType? get() = (this as? Occupied)?.towerType
+}
+
+/**
+ * A tower slot — position-based, not tile-based (mirrors iOS TowerSlot).
+ */
+data class TowerSlot(
+    val id: Int,
+    val position: PointF,
+    val state: TowerSlotState = TowerSlotState.Empty
+)
+
+/**
+ * GridSystem — manages tower slot positions derived from PathSystem layout.
+ * Also keeps the legacy tile grid for background rendering.
+ *
+ * iOS parity: updateSlots(), placeTower(), removeTower(), slot(at:).
  */
 class GridSystem {
 
     companion object {
         const val COLS = 12
-        const val ROWS = 8
+        const val ROWS = 20
         const val TILE_SIZE_DP = 64
-
-        /**
-         * Hardcoded L-shaped path for Phase 1.
-         * Enemies enter from the left (col=0, row=4) and exit at the right (col=11, row=1).
-         * The path forms an L: straight right to col 6, then up to row 1, then right to col 11.
-         */
-        val PATH_NODES: List<TileCoordinate> = buildList {
-            for (col in 0..6) add(TileCoordinate(col, 4))
-            for (row in 3 downTo 1) add(TileCoordinate(6, row))
-            for (col in 6..11) add(TileCoordinate(col, 1))
-        }
     }
 
-    private val grid: Array<Array<GridTile>> = Array(ROWS) { row ->
-        Array(COLS) { col ->
-            GridTile(TileCoordinate(col, row))
-        }
+    private var _slots: MutableList<TowerSlot> = mutableListOf()
+    val slots: List<TowerSlot> get() = _slots.toList()
+
+    // ---- Slot API (mirrors iOS GridSystem) ----
+
+    /** Replace all slots with positions derived from PathSystem layout. */
+    fun updateSlots(positions: List<PointF>) {
+        _slots = positions.mapIndexed { idx, pos ->
+            TowerSlot(id = idx, position = pos, state = TowerSlotState.Empty)
+        }.toMutableList()
     }
 
-    init {
-        markPathTiles()
-    }
+    fun slot(at: Int): TowerSlot? = _slots.firstOrNull { it.id == at }
 
-    private fun markPathTiles() {
-        PATH_NODES.forEach { coord ->
-            if (isValid(coord)) {
-                grid[coord.row][coord.col] = grid[coord.row][coord.col].copy(type = TileType.PATH)
-            }
-        }
-    }
+    private fun slotIndex(id: Int): Int = _slots.indexOfFirst { it.id == id }
 
-    fun getTile(coord: TileCoordinate): GridTile? {
-        if (!isValid(coord)) return null
-        return grid[coord.row][coord.col]
-    }
-
-    fun canPlaceTower(coord: TileCoordinate): Boolean {
-        val tile = getTile(coord) ?: return false
-        return tile.type == TileType.EMPTY
-    }
-
-    fun placeTower(coord: TileCoordinate): Boolean {
-        if (!canPlaceTower(coord)) return false
-        grid[coord.row][coord.col] = grid[coord.row][coord.col].copy(type = TileType.OCCUPIED)
+    fun placeTower(type: TowerType, at: Int, cost: Int = 0): Boolean {
+        val idx = slotIndex(at)
+        if (idx < 0) return false
+        if (_slots[idx].state.isOccupied) return false
+        _slots[idx] = _slots[idx].copy(state = TowerSlotState.Occupied(type, level = 1, totalInvested = cost))
         return true
     }
 
-    fun removeTower(coord: TileCoordinate) {
-        if (!isValid(coord)) return
-        if (grid[coord.row][coord.col].type == TileType.OCCUPIED) {
-            grid[coord.row][coord.col] = grid[coord.row][coord.col].copy(type = TileType.EMPTY)
-        }
+    fun removeTower(at: Int) {
+        val idx = slotIndex(at)
+        if (idx < 0) return
+        _slots[idx] = _slots[idx].copy(state = TowerSlotState.Empty)
     }
 
-    fun getAllTiles(): List<GridTile> = grid.flatMap { it.toList() }
+    fun upgradeTower(at: Int, upgradeCost: Int) {
+        val idx = slotIndex(at)
+        if (idx < 0) return
+        val cur = _slots[idx].state as? TowerSlotState.Occupied ?: return
+        _slots[idx] = _slots[idx].copy(
+            state = cur.copy(
+                level = cur.level + 1,
+                totalInvested = cur.totalInvested + upgradeCost
+            )
+        )
+    }
 
-    fun reset() {
+    fun availableSlots(): List<TowerSlot> = _slots.filter { it.state == TowerSlotState.Empty }
+    fun occupiedSlots(): List<TowerSlot> = _slots.filter { it.state.isOccupied }
+
+    // ---- Legacy background tile grid (for renderer) ----
+
+    fun getAllTiles(): List<GridTile> = buildList {
         for (row in 0 until ROWS) {
             for (col in 0 until COLS) {
-                val coord = TileCoordinate(col, row)
-                val tileType = if (PATH_NODES.contains(coord)) TileType.PATH else TileType.EMPTY
-                grid[row][col] = GridTile(coord, tileType)
+                add(GridTile(TileCoordinate(col, row), TileType.EMPTY))
             }
         }
-    }
-
-    private fun isValid(coord: TileCoordinate): Boolean {
-        return coord.col in 0 until COLS && coord.row in 0 until ROWS
     }
 }

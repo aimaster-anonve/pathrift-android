@@ -2,28 +2,44 @@ package com.pathrift.anonve.android.game.enemies
 
 enum class EnemyType {
     RUNNER,
-    TANK
+    TANK,
+    BOSS,
+    SHIELD,
+    SWARM,
+    GHOST
 }
 
 /**
  * Runtime instance of an enemy currently active on the battlefield.
- * Immutable data class — all state mutations produce new copies.
+ * Mutable data holder — extended to support all 6 enemy types with iOS parity.
  *
- * @param id Unique identifier (nanosecond timestamp at spawn)
- * @param pathNodeIndex Current target node in GridSystem.PATH_NODES
- * @param pathProgress Current X position (in tile units) along the path
- * @param pathRow Current Y position (in tile units) along the path
+ * @param id           Unique identifier (nanosecond timestamp at spawn)
+ * @param pathProgress Normalized [0,1] progress along the continuous waypoint path
  * @param armorReduction Fraction of incoming damage absorbed (0f = no armor)
+ * @param shieldHp     ShieldEnemy only — remaining shield absorption HP
+ * @param shieldBroken ShieldEnemy only — true after shield is destroyed
+ * @param slowEndTime  System.currentTimeMillis() timestamp when slow expires (0 = not slowed)
+ * @param bossVariant  BossEnemy only — variant index 0-4
  */
 data class EnemyInstance(
     val id: Long,
     val type: EnemyType,
-    val maxHp: Int,
-    val currentHp: Int,
-    val speed: Float,
+    val maxHp: Float,
+    val currentHp: Float,
+    val baseSpeed: Float,
+    val currentSpeed: Float,
     val goldReward: Int,
     val armorReduction: Float = 0f,
-    val pathNodeIndex: Int,
-    val pathProgress: Float,
-    val pathRow: Float
-)
+    val pathProgress: Float = 0f,
+    val hasReachedEnd: Boolean = false,
+    // Shield enemy
+    val shieldHp: Float = 0f,
+    val shieldBroken: Boolean = false,
+    // Slow state
+    val slowEndTime: Long = 0L,
+    // Boss
+    val bossVariant: Int = 0
+) {
+    val isAlive: Boolean get() = currentHp > 0f && !hasReachedEnd
+    val isDead: Boolean get() = currentHp <= 0f
+}

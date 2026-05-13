@@ -1,20 +1,14 @@
 package com.pathrift.anonve.android.game.enemies
 
+import com.pathrift.anonve.android.core.engine.EconomyConstants
+
 /**
- * Runner — Fast, low-HP scout enemy.
- * Threat: speed. Counter: Bolt Tower or Frost Tower to slow + kill.
- *
- * Stats:
- *   HP: 50
- *   Speed: 150 units/sec
- *   Gold reward: 5
- *   Armor: none
+ * Runner — Fast, low-HP scout enemy. iOS parity.
+ * HP: 50, Speed: 110, Armor: none
  */
 object RunnerEnemy {
-    const val HP = 50
-    const val SPEED = 150f
-    const val GOLD_REWARD = 5
+    const val HP = 50f
+    const val SPEED = 110f
+    const val GOLD_REWARD = EconomyConstants.EnemyGoldReward.RUNNER
     const val ARMOR_REDUCTION = 0f
-    const val DISPLAY_NAME = "Runner"
-    const val DESCRIPTION = "Fast scout. Low HP, no armor. Overwhelms in numbers."
 }
