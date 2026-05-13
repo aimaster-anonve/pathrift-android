@@ -2,6 +2,7 @@ package com.pathrift.anonve.android.game
 
 import android.graphics.PointF
 import kotlin.math.sqrt
+import kotlin.math.pow
 
 enum class PathLayer { GROUND, BRIDGE }
 
@@ -98,7 +99,8 @@ object PathSystem {
             waypointLayers = List(waypoints.size) { PathLayer.GROUND }
 
             val rawSlots = computeSlots(y1, y2, y3, xL, xR, W, H, currentWave)
-            slotPositions = guaranteePathCoverage(rawSlots, waypoints, currentWave)
+            val filteredSlots = rawSlots.filter { isSlotClearOfPath(it, waypoints, clearance = 36f) }
+            slotPositions = guaranteePathCoverage(filteredSlots, waypoints, currentWave)
         } else {
             // Crossing/complex layouts (indices 12–17)
             val crossIdx = idx - layoutParams.size
@@ -114,7 +116,8 @@ object PathSystem {
             }
 
             val rawSlots = computeSlotsForCrossing(W, H, currentWave)
-            slotPositions = guaranteePathCoverage(rawSlots, waypoints, currentWave)
+            val filteredSlots = rawSlots.filter { isSlotClearOfPath(it, waypoints, clearance = 36f) }
+            slotPositions = guaranteePathCoverage(filteredSlots, waypoints, currentWave)
         }
     }
 
@@ -146,6 +149,30 @@ object PathSystem {
             acc += seg
         }
         return waypoints.lastOrNull() ?: PointF(0f, 0f)
+    }
+
+    // ---- Path-clearance helpers ----
+
+    private fun distanceFromPointToSegment(px: Float, py: Float, ax: Float, ay: Float, bx: Float, by: Float): Float {
+        val abx = bx - ax; val aby = by - ay
+        val apx = px - ax; val apy = py - ay
+        val lenSq = abx * abx + aby * aby
+        if (lenSq == 0f) return sqrt(apx * apx + apy * apy)
+        val t = ((apx * abx + apy * aby) / lenSq).coerceIn(0f, 1f)
+        val cx = ax + t * abx; val cy = ay + t * aby
+        return sqrt((px - cx).pow(2) + (py - cy).pow(2))
+    }
+
+    private fun isSlotClearOfPath(slot: PointF, waypoints: List<PointF>, clearance: Float = 36f): Boolean {
+        for (i in 1 until waypoints.size) {
+            val dist = distanceFromPointToSegment(
+                slot.x, slot.y,
+                waypoints[i-1].x, waypoints[i-1].y,
+                waypoints[i].x, waypoints[i].y
+            )
+            if (dist < clearance) return false
+        }
+        return true
     }
 
     // ---- Slot computation (mirrors iOS GameScene.computeSlots) ----

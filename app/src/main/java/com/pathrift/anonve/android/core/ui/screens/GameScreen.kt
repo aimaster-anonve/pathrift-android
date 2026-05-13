@@ -337,13 +337,7 @@ private fun CombatHUD(
                         fontSize = 16.sp, fontWeight = FontWeight.Black,
                         color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
                     )
-                    // Progress bar
-                    LinearProgressIndicator(
-                        progress = { state.waveProgress.toFloat() },
-                        modifier = Modifier.weight(1f).height(5.dp).clip(RoundedCornerShape(3.dp)),
-                        color = PathriftNeonBlue,
-                        trackColor = Color.White.copy(alpha = 0.1f)
-                    )
+                    Spacer(Modifier.weight(1f))
                     // Lives
                     for (i in 0 until 3) {
                         Icon(
@@ -681,6 +675,13 @@ private fun TowerSelectionPanel(
         ) {
             Box(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp).size(36.dp, 4.dp).align(Alignment.CenterHorizontally).background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
 
+            val sortedTowers = remember {
+                TowerType.values().sortedWith(
+                    compareByDescending<TowerType> { viewModel.isTowerUnlocked(it) }
+                        .thenBy { it.diamondCost }
+                )
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -691,7 +692,7 @@ private fun TowerSelectionPanel(
                     contentPadding = PaddingValues(end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(TowerType.values().toList()) { type ->
+                    items(sortedTowers) { type ->
                         val isUnlocked = viewModel.isTowerUnlocked(type)
                         val canAffordGold = state.gold >= towerGoldCost(type)
                         val canAffordDiamonds = state.diamonds >= type.diamondCost || type.diamondCost == 0

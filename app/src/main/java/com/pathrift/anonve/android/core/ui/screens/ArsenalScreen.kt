@@ -321,13 +321,17 @@ fun upgradeRow(
             TextButton(
                 onClick = onUpgrade,
                 enabled = diamonds >= cost,
-                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                modifier = Modifier.height(28.dp)
             ) {
                 Text(
-                    "+${cost}◆",
+                    text = "+${cost}♦",
                     color = if (diamonds >= cost) color else Color.Gray,
                     fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip
                 )
             }
         } else {

@@ -164,9 +164,6 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         alpha = 38
     }
 
-    // Path start/end indicators
-    private val startPaint = Paint().apply { color = Color.parseColor("#00993D"); style = Paint.Style.FILL; alpha = 229 }
-    private val endPaint = Paint().apply { color = Color.parseColor("#CC1A29"); style = Paint.Style.FILL; alpha = 229 }
     private val indicatorTextPaint = Paint().apply {
         color = Color.WHITE
         textSize = 20f
@@ -298,19 +295,85 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             }
         }
 
-        // Start indicator
-        wps.firstOrNull()?.let { first ->
-            val cx = first.x + 20f
-            canvas.drawCircle(cx, first.y, 14f, startPaint)
-            canvas.drawText("▶", cx, first.y + 7f, indicatorTextPaint)
+        // Elite entry / exit indicators
+        if (wps.isNotEmpty()) {
+            drawEntryIndicator(canvas, wps[0])
+            drawExitIndicator(canvas, wps[wps.size - 1])
         }
+    }
 
-        // End indicator
-        wps.lastOrNull()?.let { last ->
-            val cx = last.x - 20f
-            canvas.drawCircle(cx, last.y, 14f, endPaint)
-            canvas.drawText("✕", cx, last.y + 7f, indicatorTextPaint)
+    private fun drawEntryIndicator(canvas: Canvas, pos: PointF) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // Outer glow fill
+        paint.color = android.graphics.Color.argb(20, 0, 230, 77)
+        paint.style = Paint.Style.FILL
+        canvas.drawCircle(pos.x, pos.y, 22f, paint)
+
+        // Glow ring
+        paint.color = android.graphics.Color.argb(128, 0, 230, 77)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2f
+        canvas.drawCircle(pos.x, pos.y, 20f, paint)
+
+        // Inner filled dot
+        paint.color = android.graphics.Color.argb(255, 0, 230, 77)
+        paint.style = Paint.Style.FILL
+        canvas.drawCircle(pos.x, pos.y, 8f, paint)
+
+        // "IN" badge background
+        val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(204, 0, 230, 77)
+            style = Paint.Style.FILL
         }
+        val badgeRect = RectF(pos.x - 14f, pos.y - 36f, pos.x + 14f, pos.y - 22f)
+        canvas.drawRoundRect(badgeRect, 4f, 4f, badgePaint)
+
+        // "IN" label
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.BLACK
+            textSize = 10f
+            textAlign = Paint.Align.CENTER
+            isFakeBoldText = true
+        }
+        canvas.drawText("IN", pos.x, pos.y - 26f, textPaint)
+    }
+
+    private fun drawExitIndicator(canvas: Canvas, pos: PointF) {
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+        // Outer glow fill
+        paint.color = android.graphics.Color.argb(20, 255, 34, 34)
+        paint.style = Paint.Style.FILL
+        canvas.drawCircle(pos.x, pos.y, 22f, paint)
+
+        // Glow ring
+        paint.color = android.graphics.Color.argb(128, 255, 34, 34)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 2f
+        canvas.drawCircle(pos.x, pos.y, 20f, paint)
+
+        // Inner filled dot
+        paint.color = android.graphics.Color.argb(255, 255, 34, 34)
+        paint.style = Paint.Style.FILL
+        canvas.drawCircle(pos.x, pos.y, 8f, paint)
+
+        // "OUT" badge background
+        val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(204, 255, 34, 34)
+            style = Paint.Style.FILL
+        }
+        val badgeRect = RectF(pos.x - 16f, pos.y - 36f, pos.x + 16f, pos.y - 22f)
+        canvas.drawRoundRect(badgeRect, 4f, 4f, badgePaint)
+
+        // "OUT" label
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            textSize = 10f
+            textAlign = Paint.Align.CENTER
+            isFakeBoldText = true
+        }
+        canvas.drawText("OUT", pos.x, pos.y - 26f, textPaint)
     }
 
     /** Compute perpendicular offset vector for bridge rail rendering. */
