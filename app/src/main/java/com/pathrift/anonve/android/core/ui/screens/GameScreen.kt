@@ -1,11 +1,12 @@
 package com.pathrift.anonve.android.core.ui.screens
 
 import android.widget.FrameLayout
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,11 +16,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -33,8 +44,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,23 +58,19 @@ import com.pathrift.anonve.android.core.ui.BoltTowerColor
 import com.pathrift.anonve.android.core.ui.FrostTowerColor
 import com.pathrift.anonve.android.core.ui.GameEvent
 import com.pathrift.anonve.android.core.ui.GameViewModel
+import com.pathrift.anonve.android.core.ui.LanguageManager
 import com.pathrift.anonve.android.core.ui.PathriftBackground
 import com.pathrift.anonve.android.core.ui.PathriftDanger
-import com.pathrift.anonve.android.core.ui.PathriftGold
 import com.pathrift.anonve.android.core.ui.PathriftNeonBlue
+import com.pathrift.anonve.android.core.ui.PathriftOrange
+import com.pathrift.anonve.android.core.ui.PathriftPurple
 import com.pathrift.anonve.android.core.ui.PathriftSurface
-import com.pathrift.anonve.android.core.ui.PathriftSurfaceVariant
 import com.pathrift.anonve.android.core.ui.PathriftTextPrimary
 import com.pathrift.anonve.android.core.ui.PathriftTextSecondary
 import com.pathrift.anonve.android.game.GamePhase
 import com.pathrift.anonve.android.game.GameRenderer
 import com.pathrift.anonve.android.game.GameState
-import com.pathrift.anonve.android.game.GridSystem
-import com.pathrift.anonve.android.game.PathSystem
-import com.pathrift.anonve.android.game.towers.BlastTower
-import com.pathrift.anonve.android.game.towers.BoltTower
-import com.pathrift.anonve.android.game.towers.FrostTower
-import com.pathrift.anonve.android.game.towers.Tower
+import com.pathrift.anonve.android.game.TowerInfo
 import com.pathrift.anonve.android.game.towers.TowerType
 
 // ==============================
@@ -74,11 +83,8 @@ fun GameScreen(
     gameViewModel: GameViewModel = viewModel()
 ) {
     val state by gameViewModel.state.collectAsState()
-    val enemies by gameViewModel.enemies.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
-
-    // Tower type the player has selected to place
-    var selectedTowerType by remember { mutableStateOf<TowerType?>(null) }
+    var isPaused by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         gameViewModel.events.collect { event ->
@@ -100,24 +106,37 @@ fun GameScreen(
         GameCanvasView(
             state = state,
             gameViewModel = gameViewModel,
-            selectedTowerType = selectedTowerType,
-            onTowerPlaced = { selectedTowerType = null },
             modifier = Modifier.fillMaxSize()
         )
 
         CombatHUD(
             state = state,
-            selectedTowerType = selectedTowerType,
-            onTowerSelect = { selectedTowerType = it },
             onNextWave = gameViewModel::startNextWave,
-            onClearSelection = { selectedTowerType = null },
+            onPause = { isPaused = true },
             modifier = Modifier.fillMaxSize()
         )
+
+        state.selectedTowerInfo?.let { info ->
+            TowerInfoBottomPanel(
+                info = info,
+                gold = state.gold,
+                onUpgrade = { gameViewModel.upgradeSelectedTower() },
+                onSell = { gameViewModel.sellSelectedTower() },
+                onDismiss = { gameViewModel.clearTowerSelection() }
+            )
+        }
 
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter)
         )
+
+        if (isPaused) {
+            PauseOverlay(
+                onResume = { isPaused = false },
+                onQuit = { onRunEnded(state.score, state.wave) }
+            )
+        }
     }
 }
 
@@ -129,36 +148,23 @@ fun GameScreen(
 private fun GameCanvasView(
     state: GameState,
     gameViewModel: GameViewModel,
-    selectedTowerType: TowerType?,
-    onTowerPlaced: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val gameSurface = remember { GameRenderer(context) }
     val enemies by gameViewModel.enemies.collectAsState()
 
-    // Sync renderer state
     gameSurface.enemies = enemies
     gameSurface.towerInstances = gameViewModel.game.towers
-    gameSurface.slotPositions = PathSystem.slotPositions
-    gameSurface.slotOccupied = gameViewModel.game.towers.keys.associateWith { true }
+    gameSurface.slotPositions = gameViewModel.game.grid.slots.map { it.position }
+    gameSurface.slotOccupied = gameViewModel.game.grid.slots.associate { it.id to it.state.isOccupied }
     gameSurface.selectedSlotId = state.selectedTowerSlotId
     gameSurface.riftShiftActive = state.riftShiftActive
 
     Box(modifier = modifier) {
         AndroidView(
-            factory = { ctx ->
-                FrameLayout(ctx).apply {
-                    addView(gameSurface)
-                }
-            },
-            update = { frame ->
-                // Provide screen dimensions to engine (once non-zero)
-                if (frame.width > 0 && frame.height > 0) {
-                    gameViewModel.initLayout(frame.width.toFloat(), frame.height.toFloat())
-                }
-                // Sync enemy positions on each frame
-                gameViewModel.syncEnemyPositions()
+            factory = {
+                FrameLayout(context).apply { addView(gameSurface) }
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -166,280 +172,261 @@ private fun GameCanvasView(
 }
 
 // ==============================
-// HUD
+// Combat HUD
 // ==============================
 
 @Composable
 private fun CombatHUD(
     state: GameState,
-    selectedTowerType: TowerType?,
-    onTowerSelect: (TowerType) -> Unit,
     onNextWave: () -> Unit,
-    onClearSelection: () -> Unit,
+    onPause: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
-        TopStatusBar(
-            wave = state.wave,
-            score = state.score,
-            lives = state.lives,
-            gold = state.gold,
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopStart)
-                .background(PathriftBackground.copy(alpha = 0.85f))
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(PathriftBackground.copy(alpha = 0.9f), Color.Transparent)
+                        )
+                    )
+                    .systemBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HudStatPill(LanguageManager.s("GOLD", "ALTIN"), "${state.gold}", PathriftNeonBlue)
+                Spacer(Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (state.wave == 0) LanguageManager.s("READY", "HAZIR") else LanguageManager.s("WAVE", "DALGA"),
+                        fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                        color = PathriftTextSecondary, letterSpacing = 2.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = if (state.wave == 0) "--" else "${state.wave}",
+                        fontSize = 24.sp, fontWeight = FontWeight.Black,
+                        color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
+                    )
+                }
+                Spacer(Modifier.weight(1f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row {
+                        for (i in 0 until 3) {
+                            Icon(
+                                imageVector = if (i < state.lives) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                contentDescription = null,
+                                tint = if (i < state.lives) PathriftDanger else PathriftTextSecondary.copy(alpha = 0.3f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.width(14.dp))
+                    IconButton(onClick = onPause, modifier = Modifier.size(32.dp)) {
+                        Icon(Icons.Default.Pause, "pause", tint = PathriftTextSecondary.copy(alpha = 0.8f), modifier = Modifier.size(22.dp))
+                    }
+                }
+            }
+            state.waveCompleteMessage?.let { msg ->
+                Box(
+                    modifier = Modifier.fillMaxWidth()
+                        .background(PathriftNeonBlue.copy(alpha = 0.15f))
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(msg, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PathriftNeonBlue, fontFamily = FontFamily.Monospace)
+                }
+            }
+        }
 
-        TowerPanel(
-            playerGold = state.gold,
-            selectedType = selectedTowerType,
-            onTowerSelect = onTowerSelect,
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 8.dp)
-        )
-
-        BottomActionBar(
-            phase = state.phase,
-            selectedTowerType = selectedTowerType,
-            wave = state.wave,
-            onNextWave = onNextWave,
-            onClearSelection = onClearSelection,
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomStart)
-                .background(PathriftBackground.copy(alpha = 0.85f))
-                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, PathriftBackground.copy(alpha = 0.9f))))
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange)
+            Spacer(Modifier.weight(1f))
+            when {
+                state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
+                state.phase != GamePhase.GAME_OVER -> SendWaveButton(onClick = onNextWave)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HudStatPill(label: String, value: String, valueColor: Color) {
+    Column {
+        Text(value, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = valueColor, fontFamily = FontFamily.Monospace)
+        Text(label, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = PathriftTextSecondary, letterSpacing = 1.5.sp, fontFamily = FontFamily.Monospace)
+    }
+}
+
+@Composable
+private fun WaveProgressIndicator(cleared: Int, total: Int) {
+    val progress = cleared.toFloat() / maxOf(1, total).toFloat()
+    Column(horizontalAlignment = Alignment.End) {
+        Text(
+            text = "$cleared / $total ${LanguageManager.s("CLEARED", "TEMİZLENDİ")}",
+            fontSize = 11.sp, color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
+        )
+        Spacer(Modifier.height(4.dp))
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier.width(140.dp).height(7.dp).clip(RoundedCornerShape(4.dp)),
+            color = PathriftNeonBlue, trackColor = PathriftSurface
         )
     }
 }
 
 @Composable
-private fun TopStatusBar(
-    wave: Int,
-    score: Long,
-    lives: Int,
+private fun SendWaveButton(onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(containerColor = PathriftNeonBlue),
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.height(48.dp)
+    ) {
+        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(11.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(LanguageManager.s("SEND WAVE", "DALGA GÖNDER"), fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+    }
+}
+
+// ==============================
+// Pause Overlay
+// ==============================
+
+@Composable
+private fun PauseOverlay(onResume: () -> Unit, onQuit: () -> Unit) {
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.7f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier.background(PathriftSurface, RoundedCornerShape(20.dp)).padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(LanguageManager.s("PAUSED", "DURAKLATILDI"), fontSize = 22.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary, letterSpacing = 3.sp, fontFamily = FontFamily.Monospace)
+            Spacer(Modifier.height(24.dp))
+            Button(onClick = onResume, modifier = Modifier.fillMaxWidth().height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = PathriftNeonBlue), shape = RoundedCornerShape(12.dp)) {
+                Text(LanguageManager.s("RESUME", "DEVAM ET"), fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(onClick = onQuit, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) {
+                Text(LanguageManager.s("QUIT RUN", "OYUNU BIRAK"), fontSize = 14.sp, color = PathriftTextSecondary)
+            }
+        }
+    }
+}
+
+// ==============================
+// Tower Info Panel
+// ==============================
+
+@Composable
+private fun TowerInfoBottomPanel(
+    info: TowerInfo,
     gold: Int,
-    modifier: Modifier = Modifier
+    onUpgrade: () -> Unit,
+    onSell: () -> Unit,
+    onDismiss: () -> Unit
 ) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        StatChip(label = "WAVE", value = if (wave == 0) "-" else "$wave", valueColor = PathriftNeonBlue)
-        Spacer(Modifier.width(12.dp))
-        StatChip(label = "SCORE", value = "$score", valueColor = PathriftTextPrimary)
-        Spacer(Modifier.weight(1f))
-
-        // Life indicators — up to 5 (iOS has 5)
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            repeat(5) { idx ->
-                val filled = idx < lives
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(if (filled) PathriftDanger else PathriftSurfaceVariant)
-                )
-            }
-        }
-
-        Spacer(Modifier.width(16.dp))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = "$gold", color = PathriftGold, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            Text(text = " G", color = PathriftGold.copy(alpha = 0.6f), fontSize = 12.sp)
-        }
+    val canAffordUpgrade = gold >= info.upgradeCost
+    val towerColor = when (info.type) {
+        TowerType.BOLT  -> BoltTowerColor
+        TowerType.BLAST -> BlastTowerColor
+        TowerType.FROST -> FrostTowerColor
     }
-}
 
-@Composable
-private fun StatChip(label: String, value: String, valueColor: Color) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(PathriftSurface)
-            .padding(horizontal = 10.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)),
+        contentAlignment = Alignment.BottomCenter
     ) {
-        Text(text = "$label ", color = PathriftTextSecondary, fontSize = 10.sp, fontWeight = FontWeight.Medium)
-        Text(text = value, color = valueColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-    }
-}
+        Column(
+            modifier = Modifier.fillMaxWidth().background(PathriftSurface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp).size(36.dp, 4.dp).background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
 
-@Composable
-private fun BottomActionBar(
-    phase: GamePhase,
-    selectedTowerType: TowerType?,
-    wave: Int,
-    onNextWave: () -> Unit,
-    onClearSelection: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (selectedTowerType != null) {
-            Column {
-                Text(
-                    text = "Tap grid to place ${selectedTowerType.name} tower",
-                    color = PathriftNeonBlue,
-                    fontSize = 12.sp
-                )
-                Text(text = "Tap again to cancel", color = PathriftTextSecondary, fontSize = 10.sp)
-            }
-        } else {
-            Text(text = "Select a tower from the panel", color = PathriftTextSecondary, fontSize = 12.sp)
-        }
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp, top = 8.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(12.dp).background(towerColor, CircleShape))
+                    Spacer(Modifier.width(8.dp))
+                    Text(info.type.name, fontSize = 15.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary, letterSpacing = 1.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Box(modifier = Modifier.background(PathriftNeonBlue.copy(alpha = 0.15f), RoundedCornerShape(6.dp)).padding(horizontal = 7.dp, vertical = 3.dp)) {
+                        Text("Lv.${info.level}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = PathriftNeonBlue, fontFamily = FontFamily.Monospace)
+                    }
+                    Spacer(Modifier.weight(1f))
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                        Text("✕", fontSize = 16.sp, color = PathriftTextSecondary)
+                    }
+                }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (selectedTowerType != null) {
-                Button(
-                    onClick = onClearSelection,
-                    colors = ButtonDefaults.buttonColors(containerColor = PathriftSurfaceVariant)
+                Spacer(Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(10.dp)).padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Cancel", color = PathriftTextSecondary, fontSize = 12.sp)
+                    TowerStatItem("DMG", String.format("%.0f", info.damage), PathriftOrange, Modifier.weight(1f))
+                    Box(modifier = Modifier.size(1.dp, 32.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
+                    TowerStatItem("RNG", "${info.range.toInt()}t", PathriftNeonBlue, Modifier.weight(1f))
+                    Box(modifier = Modifier.size(1.dp, 32.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
+                    TowerStatItem("SPD", String.format("%.1f/s", info.attackSpeed), PathriftPurple, Modifier.weight(1f))
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Button(
+                        onClick = onUpgrade, enabled = canAffordUpgrade,
+                        modifier = Modifier.weight(1f).height(52.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (canAffordUpgrade) PathriftNeonBlue else PathriftSurface,
+                            disabledContainerColor = PathriftSurface
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(LanguageManager.s("UPGRADE", "GELİŞTİR"), fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                                color = if (canAffordUpgrade) PathriftTextPrimary else PathriftTextSecondary)
+                            Text("${info.upgradeCost}g", fontSize = 11.sp,
+                                color = if (canAffordUpgrade) PathriftTextPrimary.copy(0.7f) else PathriftTextSecondary.copy(0.5f))
+                        }
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Button(
+                        onClick = onSell,
+                        modifier = Modifier.width(100.dp).height(52.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = PathriftSurface),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(LanguageManager.s("SELL", "SAT"), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PathriftOrange)
+                            Text("+${info.sellValue}g", fontSize = 11.sp, color = PathriftOrange.copy(0.8f))
+                        }
+                    }
                 }
             }
-
-            val waveButtonEnabled = phase != GamePhase.WAVE_ACTIVE && phase != GamePhase.GAME_OVER
-            val waveButtonLabel = when (phase) {
-                GamePhase.PRE_WAVE    -> if (wave == 0) "Start" else "Next Wave"
-                GamePhase.WAVE_ACTIVE -> "Wave in Progress..."
-                GamePhase.DECISION    -> "Next Wave"
-                GamePhase.RIFT_SHIFT  -> "Rift Shifting..."
-                GamePhase.GAME_OVER   -> "Run Ended"
-            }
-
-            Button(
-                onClick = onNextWave,
-                enabled = waveButtonEnabled,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = PathriftNeonBlue,
-                    disabledContainerColor = PathriftSurfaceVariant
-                )
-            ) {
-                Text(
-                    text = waveButtonLabel,
-                    color = if (waveButtonEnabled) PathriftBackground else PathriftTextSecondary,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp
-                )
-            }
-        }
-    }
-}
-
-// ==============================
-// Tower Panel
-// ==============================
-
-private data class TowerOption(val tower: Tower, val color: Color)
-
-private val TOWER_OPTIONS = listOf(
-    TowerOption(BoltTower(), BoltTowerColor),
-    TowerOption(BlastTower(), BlastTowerColor),
-    TowerOption(FrostTower(), FrostTowerColor)
-)
-
-@Composable
-private fun TowerPanel(
-    playerGold: Int,
-    selectedType: TowerType?,
-    onTowerSelect: (TowerType) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Column(
-        modifier = modifier
-            .background(PathriftSurface.copy(alpha = 0.92f), RoundedCornerShape(12.dp))
-            .padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Text(
-            text = "TOWERS",
-            color = PathriftTextSecondary,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
-        )
-
-        TOWER_OPTIONS.forEach { option ->
-            val canAfford = playerGold >= option.tower.cost
-            val isSelected = selectedType == option.tower.type
-
-            TowerCard(
-                option = option,
-                canAfford = canAfford,
-                isSelected = isSelected,
-                onClick = { if (canAfford) onTowerSelect(option.tower.type) }
-            )
         }
     }
 }
 
 @Composable
-private fun TowerCard(
-    option: TowerOption,
-    canAfford: Boolean,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val borderColor = if (isSelected) option.color else PathriftSurfaceVariant
-    val bgColor = when {
-        isSelected -> option.color.copy(alpha = 0.15f)
-        canAfford  -> PathriftSurfaceVariant
-        else       -> PathriftSurfaceVariant.copy(alpha = 0.4f)
-    }
-    val textAlpha = if (canAfford) 1f else 0.4f
-
-    Row(
-        modifier = Modifier
-            .width(160.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(bgColor)
-            .border(1.dp, borderColor, RoundedCornerShape(8.dp))
-            .clickable(enabled = canAfford) { onClick() }
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Canvas(modifier = Modifier.size(10.dp)) {
-            drawCircle(option.color.copy(alpha = textAlpha))
-        }
-
-        Spacer(Modifier.width(8.dp))
-
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = option.tower.displayName,
-                color = PathriftTextPrimary.copy(alpha = textAlpha),
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = "DMG ${option.tower.damagePerHit} | RNG ${option.tower.rangeTiles}",
-                color = PathriftTextSecondary.copy(alpha = textAlpha),
-                fontSize = 9.sp
-            )
-        }
-
-        Spacer(Modifier.width(4.dp))
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                text = "${option.tower.cost}",
-                color = if (canAfford) PathriftGold else PathriftTextSecondary.copy(alpha = 0.4f),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "g",
-                color = PathriftGold.copy(alpha = if (canAfford) 0.7f else 0.3f),
-                fontSize = 9.sp
-            )
-        }
+private fun TowerStatItem(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PathriftTextPrimary, fontFamily = FontFamily.Monospace)
+        Text(label, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = PathriftTextSecondary, letterSpacing = 1.sp, fontFamily = FontFamily.Monospace)
     }
 }

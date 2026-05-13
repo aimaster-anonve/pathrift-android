@@ -2,7 +2,6 @@ package com.pathrift.anonve.android.core.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -11,7 +10,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.pathrift.anonve.android.core.ui.screens.GameScreen
 import com.pathrift.anonve.android.core.ui.screens.HomeScreen
+import com.pathrift.anonve.android.core.ui.screens.HowToPlayScreen
 import com.pathrift.anonve.android.core.ui.screens.RunEndScreen
+import com.pathrift.anonve.android.core.ui.screens.SettingsScreen
+import com.pathrift.anonve.android.core.ui.screens.StoreScreen
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
@@ -19,6 +21,9 @@ sealed class Screen(val route: String) {
     object RunEnd : Screen("run_end/{score}/{wave}") {
         fun createRoute(score: Long, wave: Int) = "run_end/$score/$wave"
     }
+    object Settings : Screen("settings")
+    object Store : Screen("store")
+    object HowToPlay : Screen("how_to_play")
 }
 
 @Composable
@@ -35,6 +40,15 @@ fun PathriftNavGraph(
             HomeScreen(
                 onStartGame = {
                     navController.navigate(Screen.Game.route)
+                },
+                onOpenSettings = {
+                    navController.navigate(Screen.Settings.route)
+                },
+                onOpenStore = {
+                    navController.navigate(Screen.Store.route)
+                },
+                onOpenHowToPlay = {
+                    navController.navigate(Screen.HowToPlay.route)
                 }
             )
         }
@@ -67,6 +81,36 @@ fun PathriftNavGraph(
                     }
                 },
                 onMainMenu = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onBack = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.Store.route) {
+            StoreScreen(
+                onBack = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.HowToPlay.route) {
+            HowToPlayScreen(
+                onBack = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }

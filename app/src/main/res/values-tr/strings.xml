@@ -5,22 +5,45 @@
 
     <!-- Main Menu -->
     <string name="main_menu_tagline">Harita değişiyor. Strateji sürekli evriliyor.</string>
-    <string name="main_menu_start">OYUNA BAŞLA</string>
+    <string name="main_menu_start">OYNA</string>
     <string name="main_menu_hint">Düşman dalgalarına karşı savunmak için grid üzerine kule yerleştir.</string>
     <string name="main_menu_best_run">EN İYİ KOŞ</string>
+    <string name="main_menu_best">EN İYİ</string>
+    <string name="main_menu_how_to_play">NASIL OYNANIR</string>
+    <string name="main_menu_settings">AYARLAR</string>
+    <string name="main_menu_store">MAĞAZA</string>
+    <string name="main_menu_tagline_sub">HARİTA HEP DEĞİŞİYOR</string>
+    <string name="main_menu_endless">SONSUZ KULE SAVUNMASI</string>
+    <string name="main_menu_bottom_info">Harita değişiyor • Strateji sürekli evriliyor</string>
 
     <!-- Game HUD -->
     <string name="hud_wave">DALGA</string>
     <string name="hud_score">PUAN</string>
     <string name="hud_lives">CAN</string>
     <string name="hud_gold">ALTIN</string>
+    <string name="hud_kills">ÖLDÜRME</string>
     <string name="hud_start_wave">Başla</string>
     <string name="hud_next_wave">Sonraki Dalga</string>
+    <string name="hud_send_wave">DALGA GÖNDER</string>
     <string name="hud_wave_active">Dalga devam ediyor…</string>
     <string name="hud_select_tower">Panelden bir kule seç</string>
     <string name="hud_place_tower">Kule yerleştirmek için grid\'e dokun</string>
     <string name="hud_cancel">İptal</string>
     <string name="hud_towers_label">KULELER</string>
+    <string name="hud_cleared">TEMİZLENDİ</string>
+    <string name="hud_paused">DURAKLATILDI</string>
+    <string name="hud_resume">DEVAM ET</string>
+    <string name="hud_quit_run">OYUNU BIRAK</string>
+    <string name="hud_ready">HAZIR</string>
+    <string name="hud_wave_in_progress">DALGA DEVAM EDİYOR</string>
+
+    <!-- Tower actions -->
+    <string name="tower_upgrade">GELİŞTİR</string>
+    <string name="tower_sell">SAT</string>
+    <string name="tower_place">KULE YERLEŞTIR</string>
+    <string name="tower_build">İNŞA ET</string>
+    <string name="tower_not_enough_gold">YETERLİ ALTIN YOK</string>
+    <string name="tower_select_type">Yukarıdan bir kule türü seç</string>
 
     <!-- Tower names -->
     <string name="tower_bolt_name">Şimşek Kulesi</string>
@@ -37,12 +60,50 @@
     <string name="enemy_tank_desc">Zırhlı canavar. %20 hasar azaltma. Yavaş ama dayanıklı.</string>
 
     <!-- Run End -->
-    <string name="run_end_title">KOŞ BİTTİ</string>
+    <string name="run_end_title">OYUN BİTTİ</string>
     <string name="run_end_score_label">TOPLAM PUAN</string>
     <string name="run_end_wave_label">Hayatta Kalınan Dalgalar</string>
+    <string name="run_end_waves_reached">ULAŞILAN DALGALAR</string>
+    <string name="run_end_enemy_kills">DÜŞMAN ÖLDÜRME</string>
+    <string name="run_end_final_score">TOPLAM PUAN</string>
     <string name="run_end_play_again">TEKRAR OYNA</string>
-    <string name="run_end_main_menu">Ana Menü</string>
+    <string name="run_end_main_menu">ANA MENÜ</string>
     <string name="run_end_rank">DERECE</string>
+    <string name="run_end_new_high_score">YENİ EN YÜKSEK PUAN</string>
+
+    <!-- Settings -->
+    <string name="settings_title">AYARLAR</string>
+    <string name="settings_language">Dil</string>
+    <string name="settings_game_info">OYUN BİLGİSİ</string>
+    <string name="settings_version">Versiyon</string>
+    <string name="settings_about_text">Harita hiç durmadan kayan sonsuz kule savunması.\nKule yerleştir. Rift\'te hayatta kal. Daha ilerle.</string>
+
+    <!-- Store -->
+    <string name="store_title">MAĞAZA</string>
+    <string name="store_diamonds">ELMASlar</string>
+    <string name="store_daily_bonus">GÜNLÜK BONUS</string>
+    <string name="store_tower_skins">KULE KAPLAMALARI</string>
+    <string name="store_free">BEDAVA</string>
+    <string name="store_coming_soon">Yakında</string>
+    <string name="store_daily_claim">10 bedava elmas al</string>
+    <string name="store_daily_claimed">Yarın geri gel!</string>
+    <string name="store_iap_note">Uygulama içi satın alma v1.1\'de geliyor — oynayarak elmas kazan!</string>
+    <string name="store_coming_soon_header">YAKINDA</string>
+
+    <!-- How To Play -->
+    <string name="how_to_play_title">NASIL OYNANIR</string>
+    <string name="htp_place_towers">KULELERİ YERLEŞTIR</string>
+    <string name="htp_place_towers_desc">Kule yerleştirmek için boş slotlara dokun. Her kulenin benzersiz güçlü yönleri vardır.</string>
+    <string name="htp_send_waves">DALGA GÖNDER</string>
+    <string name="htp_send_waves_desc">Sonraki düşman dalgasını başlatmak için DALGA GÖNDER\'e bas. Düşmanlar yolu takip eder.</string>
+    <string name="htp_rift_shift">RIFT KAYIŞI</string>
+    <string name="htp_rift_shift_desc">Her 5 dalgada bir harita kayar! Kulelerini taşı ve yeniden konumlandır.</string>
+    <string name="htp_towers">KULELER</string>
+    <string name="htp_towers_desc">Şimşek: Hızlı tek hedef\nPatlama: Alan hasarı\nBuz: Düşmanları %40 yavaşlatır</string>
+    <string name="htp_lives">CANLAR</string>
+    <string name="htp_lives_desc">3 canın var. Çıkışa ulaşan her düşman 1 can alır.</string>
+    <string name="htp_score">PUAN</string>
+    <string name="htp_score_desc">Puan = Dalga × 1000 + Öldürme × 5. Mümkün olduğunca ilerle!</string>
 
     <!-- Error messages -->
     <string name="error_not_enough_gold">Yeterli altın yok!</string>

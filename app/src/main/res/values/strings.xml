@@ -5,22 +5,45 @@
 
     <!-- Main Menu -->
     <string name="main_menu_tagline">The map shifts. The strategy evolves.</string>
-    <string name="main_menu_start">START RUN</string>
+    <string name="main_menu_start">PLAY</string>
     <string name="main_menu_hint">Place towers on the grid to defend against enemy waves.</string>
     <string name="main_menu_best_run">BEST RUN</string>
+    <string name="main_menu_best">BEST</string>
+    <string name="main_menu_how_to_play">HOW TO PLAY</string>
+    <string name="main_menu_settings">SETTINGS</string>
+    <string name="main_menu_store">STORE</string>
+    <string name="main_menu_tagline_sub">THE MAP ALWAYS SHIFTS</string>
+    <string name="main_menu_endless">ENDLESS TOWER DEFENSE</string>
+    <string name="main_menu_bottom_info">Harita değişiyor • Strateji sürekli evriliyor</string>
 
     <!-- Game HUD -->
     <string name="hud_wave">WAVE</string>
     <string name="hud_score">SCORE</string>
     <string name="hud_lives">LIVES</string>
     <string name="hud_gold">GOLD</string>
+    <string name="hud_kills">KILLS</string>
     <string name="hud_start_wave">Start</string>
     <string name="hud_next_wave">Next Wave</string>
+    <string name="hud_send_wave">SEND WAVE</string>
     <string name="hud_wave_active">Wave in Progress…</string>
     <string name="hud_select_tower">Select a tower from the panel</string>
     <string name="hud_place_tower">Tap grid to place tower</string>
     <string name="hud_cancel">Cancel</string>
     <string name="hud_towers_label">TOWERS</string>
+    <string name="hud_cleared">CLEARED</string>
+    <string name="hud_paused">PAUSED</string>
+    <string name="hud_resume">RESUME</string>
+    <string name="hud_quit_run">QUIT RUN</string>
+    <string name="hud_ready">READY</string>
+    <string name="hud_wave_in_progress">WAVE IN PROGRESS</string>
+
+    <!-- Tower actions -->
+    <string name="tower_upgrade">UPGRADE</string>
+    <string name="tower_sell">SELL</string>
+    <string name="tower_place">PLACE TOWER</string>
+    <string name="tower_build">BUILD</string>
+    <string name="tower_not_enough_gold">NOT ENOUGH GOLD</string>
+    <string name="tower_select_type">Select a tower type above</string>
 
     <!-- Tower names -->
     <string name="tower_bolt_name">Bolt Tower</string>
@@ -40,9 +63,47 @@
     <string name="run_end_title">RUN OVER</string>
     <string name="run_end_score_label">FINAL SCORE</string>
     <string name="run_end_wave_label">Waves Survived</string>
+    <string name="run_end_waves_reached">WAVES REACHED</string>
+    <string name="run_end_enemy_kills">ENEMY KILLS</string>
+    <string name="run_end_final_score">FINAL SCORE</string>
     <string name="run_end_play_again">PLAY AGAIN</string>
-    <string name="run_end_main_menu">Main Menu</string>
+    <string name="run_end_main_menu">MAIN MENU</string>
     <string name="run_end_rank">RANK</string>
+    <string name="run_end_new_high_score">NEW HIGH SCORE</string>
+
+    <!-- Settings -->
+    <string name="settings_title">SETTINGS</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_game_info">GAME INFO</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_about_text">Endless tower defense where the map never stops shifting.\nPlace towers. Survive the Rift. Push further.</string>
+
+    <!-- Store -->
+    <string name="store_title">STORE</string>
+    <string name="store_diamonds">DIAMONDS</string>
+    <string name="store_daily_bonus">DAILY BONUS</string>
+    <string name="store_tower_skins">TOWER SKINS</string>
+    <string name="store_free">FREE</string>
+    <string name="store_coming_soon">Coming Soon</string>
+    <string name="store_daily_claim">Claim 10 free diamonds</string>
+    <string name="store_daily_claimed">Come back tomorrow!</string>
+    <string name="store_iap_note">IAP purchases coming in v1.1 — earn diamonds by playing!</string>
+    <string name="store_coming_soon_header">COMING SOON</string>
+
+    <!-- How To Play -->
+    <string name="how_to_play_title">HOW TO PLAY</string>
+    <string name="htp_place_towers">PLACE TOWERS</string>
+    <string name="htp_place_towers_desc">Tap empty slots to place towers. Each tower has unique strengths.</string>
+    <string name="htp_send_waves">SEND WAVES</string>
+    <string name="htp_send_waves_desc">Press SEND WAVE to start the next enemy wave. Enemies follow the path.</string>
+    <string name="htp_rift_shift">RIFT SHIFT</string>
+    <string name="htp_rift_shift_desc">Every 5 waves the map shifts! Move and reposition your towers.</string>
+    <string name="htp_towers">TOWERS</string>
+    <string name="htp_towers_desc">Bolt: Fast single-target\nBlast: Area damage\nFrost: Slows enemies 40%</string>
+    <string name="htp_lives">LIVES</string>
+    <string name="htp_lives_desc">You have 3 lives. Each enemy that reaches the exit costs 1 life.</string>
+    <string name="htp_score">SCORE</string>
+    <string name="htp_score_desc">Score = Wave × 1000 + Kills × 5. Push as far as you can!</string>
 
     <!-- Error messages -->
     <string name="error_not_enough_gold">Not enough gold!</string>
