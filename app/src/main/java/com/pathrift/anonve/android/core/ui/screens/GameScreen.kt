@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Row
@@ -31,10 +32,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -326,7 +329,14 @@ private fun CombatHUD(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(PathriftBackground.copy(alpha = 0.88f))
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Black.copy(alpha = 0.75f),
+                                    Color.Black.copy(alpha = 0.45f)
+                                )
+                            )
+                        )
                         .systemBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -345,8 +355,8 @@ private fun CombatHUD(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Lives
-                        Row {
+                        // Lives pill
+                        StatPill {
                             for (i in 0 until EconomyConstants.STARTING_LIVES) {
                                 Icon(
                                     imageVector = if (i < state.lives) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -356,34 +366,58 @@ private fun CombatHUD(
                                 )
                             }
                         }
-                        Spacer(Modifier.width(12.dp))
-                        // Gold
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Spacer(Modifier.width(8.dp))
+                        // Gold pill
+                        StatPill {
                             Text("💰", fontSize = 11.sp)
                             Text("${state.gold}", color = PathriftGold, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                         }
-                        Spacer(Modifier.width(12.dp))
-                        // Diamond
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Spacer(Modifier.width(8.dp))
+                        // Diamond pill
+                        StatPill {
                             Text("♦", color = Color(0xFF00CCFF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             Text("${state.diamonds}", color = Color(0xFF00CCFF), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                         }
                     }
 
                     // RIGHT: Speed + Pause
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = onToggleSpeed, contentPadding = PaddingValues(horizontal = 6.dp), modifier = Modifier.height(28.dp)) {
-                            Text(
-                                if (state.speedMultiplier == 1f) "×1" else "×2",
-                                color = if (state.speedMultiplier == 2f) Color(0xFF00CCFF) else Color.Gray,
-                                fontWeight = FontWeight.Bold, fontSize = 13.sp
-                            )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (state.speedMultiplier == 2f) Color(0xFF00CCFF).copy(alpha = 0.2f)
+                                    else Color.White.copy(alpha = 0.07f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (state.speedMultiplier == 2f) Color(0xFF00CCFF).copy(alpha = 0.5f)
+                                    else Color.White.copy(alpha = 0.1f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable { onToggleSpeed() }
+                                .padding(horizontal = 8.dp, vertical = 5.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Icon(Icons.Default.Speed, contentDescription = null,
+                                    tint = if (state.speedMultiplier == 2f) Color(0xFF00CCFF) else Color.Gray,
+                                    modifier = Modifier.size(10.dp))
+                                Text(
+                                    if (state.speedMultiplier == 1f) "×1" else "×2",
+                                    color = if (state.speedMultiplier == 2f) Color(0xFF00CCFF) else Color.Gray,
+                                    fontWeight = FontWeight.Bold, fontSize = 12.sp
+                                )
+                            }
                         }
                         IconButton(onClick = onPause, modifier = Modifier.size(28.dp)) {
                             Icon(Icons.Default.Pause, contentDescription = null, tint = PathriftTextSecondary, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
+                // Wave progress strip — 4dp bar directly below top bar (landscape only)
+                WaveProgressStrip(
+                    progress = if (state.waveEnemyTotal > 0) state.waveEnemiesCleared.toDouble() / state.waveEnemyTotal else 0.0
+                )
             } else {
             // Portrait HUD (existing layout)
             Row(
@@ -468,15 +502,15 @@ private fun CombatHUD(
                     .fillMaxWidth()
                     .align(Alignment.BottomStart)
                     .background(
-                        Brush.verticalGradient(listOf(Color.Transparent, PathriftBackground.copy(alpha = 0.9f)))
+                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))
                     )
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // LEFT: Kills
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("⚡", fontSize = 11.sp)
-                    Text("${state.enemyKills}", color = PathriftOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                // LEFT: Kills (Change 4 — StatPill)
+                StatPill {
+                    Text("✕", color = PathriftOrange, fontSize = 11.sp)
+                    Text("${state.enemyKills}", color = PathriftOrange, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                 }
 
                 Spacer(Modifier.weight(1f))
@@ -516,19 +550,72 @@ private fun HudStatPill(label: String, value: String, valueColor: Color) {
     }
 }
 
+/** Subtle pill wrapper for HUD stat clusters in the landscape top bar. */
+@Composable
+private fun StatPill(content: @Composable RowScope.() -> Unit) {
+    Row(
+        modifier = Modifier
+            .background(Color.White.copy(alpha = 0.07f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(3.dp),
+        content = content
+    )
+}
+
+/** 4dp wave progress strip below the landscape top bar. */
+@Composable
+private fun WaveProgressStrip(progress: Double) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(4.dp)
+            .padding(horizontal = 8.dp)
+    ) {
+        // Track
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.08f))
+        )
+        // Fill
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(fraction = progress.toFloat().coerceIn(0f, 1f))
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(
+                    Brush.horizontalGradient(
+                        listOf(Color(0xFF00CCFF), Color(0xFF9966FF))
+                    )
+                )
+        )
+    }
+}
+
 @Composable
 private fun WaveProgressIndicator(cleared: Int, total: Int) {
-    val progress = cleared.toFloat() / maxOf(1, total).toFloat()
-    Column(horizontalAlignment = Alignment.End) {
+    Row(
+        modifier = Modifier
+            .background(Color.White.copy(alpha = 0.07f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
         Text(
-            text = "$cleared / $total ${LanguageManager.s("CLEARED", "TEMİZLENDİ")}",
-            fontSize = 11.sp, color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
+            "$cleared/$total",
+            color = PathriftTextSecondary,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
         )
-        Spacer(Modifier.height(4.dp))
         LinearProgressIndicator(
-            progress = { progress },
-            modifier = Modifier.width(120.dp).height(5.dp).clip(RoundedCornerShape(3.dp)),
-            color = PathriftNeonBlue, trackColor = PathriftSurface
+            progress = { if (total > 0) cleared.toFloat() / total else 0f },
+            modifier = Modifier.width(80.dp).height(5.dp).clip(RoundedCornerShape(3.dp)),
+            color = Color(0xFF00CCFF),
+            trackColor = Color.White.copy(alpha = 0.1f)
         )
     }
 }
@@ -537,13 +624,34 @@ private fun WaveProgressIndicator(cleared: Int, total: Int) {
 private fun SendWaveButton(onClick: () -> Unit) {
     Button(
         onClick = onClick,
-        colors = ButtonDefaults.buttonColors(containerColor = PathriftNeonBlue),
-        shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.height(40.dp)
+        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+        modifier = Modifier.height(36.dp),
+        shape = RoundedCornerShape(18.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+        elevation = ButtonDefaults.buttonElevation(0.dp)
     ) {
-        Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(11.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(LanguageManager.s("SEND WAVE", "DALGA GÖNDER"), fontSize = 13.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+        Box(
+            modifier = Modifier
+                .background(
+                    Brush.horizontalGradient(listOf(Color(0xFF00CCFF), Color(0xFF9966FF))),
+                    RoundedCornerShape(18.dp)
+                )
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(Icons.Default.FastForward, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                Text(
+                    LanguageManager.s("NEXT WAVE", "SONRAKI DALGA"),
+                    color = Color.Black,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 0.5.sp
+                )
+            }
+        }
     }
 }
 

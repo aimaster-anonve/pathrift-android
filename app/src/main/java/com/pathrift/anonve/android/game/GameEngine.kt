@@ -1,5 +1,6 @@
 package com.pathrift.anonve.android.game
 
+import android.content.res.Resources
 import android.graphics.PointF
 import com.pathrift.anonve.android.core.engine.EconomyConstants
 import com.pathrift.anonve.android.game.PathLayer
@@ -136,6 +137,11 @@ class GameEngine(
     fun initLayout(width: Float, height: Float) {
         screenWidth = width
         screenHeight = height
+        // Convert dp insets to pixels so PathSystem trims the game canvas away from HUD
+        val density = Resources.getSystem().displayMetrics.density
+        PathSystem.hudTopInset = 48f * density
+        PathSystem.hudBottomInset = 46f * density
+        PathSystem.hudHorizontalInset = 8f * density
         PathSystem.buildLayout(width, height, currentWave = 0, layoutIndex = -1)
         grid.updateSlots(PathSystem.slotPositions)
     }

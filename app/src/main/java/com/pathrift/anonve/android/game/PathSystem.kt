@@ -37,6 +37,22 @@ object PathSystem {
     var currentLayoutIndex: Int = 0
         private set
 
+    // HUD insets in pixels — set by GameEngine.initLayout() using screen density
+    var hudTopInset: Float = 48f
+    var hudBottomInset: Float = 46f
+    var hudHorizontalInset: Float = 8f
+
+    // Effective game-area bounds (derived from screenWidth/Height + insets)
+    val contentMinY: Float get() = hudBottomInset
+    val contentMaxY: Float get() = if (screenHeight > 0f) screenHeight - hudTopInset else 0f
+    val contentHeight: Float get() = maxOf(1f, contentMaxY - contentMinY)
+    val contentWidth: Float get() = maxOf(1f, screenWidth - 2f * hudHorizontalInset)
+    val contentOffsetX: Float get() = hudHorizontalInset
+
+    // Internal storage for screen dimensions (set in buildLayout)
+    private var screenWidth: Float = 0f
+    private var screenHeight: Float = 0f
+
     var waypoints: List<PointF> = emptyList()
         private set
 
@@ -71,20 +87,28 @@ object PathSystem {
         currentWave: Int = 0,
         layoutIndex: Int = -1
     ) {
-        val W = screenWidth
-        val H = screenHeight
+        // Store for content-area computed properties
+        this.screenWidth = screenWidth
+        this.screenHeight = screenHeight
+
+        val W = contentWidth
+        val H = contentHeight
+        val xOff = contentOffsetX
+        val yOff = contentMinY
+
         val totalLayouts = layoutParams.size + 6  // 18 total
         val idx = if (layoutIndex < 0) (0 until totalLayouts).random() else layoutIndex
         currentLayoutIndex = idx
 
         if (idx < layoutParams.size) {
             // Z-shaped layouts (indices 0–11)
-            val p = layoutParams[idx]
-            val y1 = H * p[0]
-            val y2 = H * p[1]
-            val y3 = H * p[2]
-            val xL = W * p[3]
-            val xR = W * p[4]
+            val safeIdx = idx.coerceIn(0, layoutParams.size - 1)
+            val p = layoutParams[safeIdx]
+            val y1 = yOff + H * p[0]
+            val y2 = yOff + H * p[1]
+            val y3 = yOff + H * p[2]
+            val xL = xOff + W * p[3]
+            val xR = xOff + W * p[4]
 
             waypoints = listOf(
                 PointF(-10f, y1),
@@ -92,19 +116,19 @@ object PathSystem {
                 PointF(xR, y2),
                 PointF(xL, y2),
                 PointF(xL, y3),
-                PointF(W + 10f, y3)
+                PointF(xOff + W + 10f, y3)
             )
 
             // All Z-shaped layouts are ground-only
             waypointLayers = List(waypoints.size) { PathLayer.GROUND }
 
-            val rawSlots = computeSlots(y1, y2, y3, xL, xR, W, H, currentWave)
+            val rawSlots = computeSlots(y1, y2, y3, xL, xR, xOff + W, yOff + H, currentWave)
             val filteredSlots = rawSlots.filter { isSlotClearOfPath(it, waypoints, clearance = 36f) }
             slotPositions = guaranteePathCoverage(filteredSlots, waypoints, currentWave)
         } else {
             // Crossing/complex layouts (indices 12–17)
             val crossIdx = idx - layoutParams.size
-            waypoints = buildCrossingLayout(crossIdx, W, H)
+            waypoints = buildCrossingLayout(crossIdx, xOff + W, yOff + H, xOff, yOff)
 
             // Assign layer definitions for crossing layouts
             waypointLayers = if (crossIdx >= 0 && crossIdx < crossingLayerDefs.size) {
@@ -115,7 +139,7 @@ object PathSystem {
                 List(waypoints.size) { PathLayer.GROUND }
             }
 
-            val rawSlots = computeSlotsForCrossing(W, H, currentWave)
+            val rawSlots = computeSlotsForCrossing(xOff + W, yOff + H, xOff, yOff, currentWave)
             val filteredSlots = rawSlots.filter { isSlotClearOfPath(it, waypoints, clearance = 36f) }
             slotPositions = guaranteePathCoverage(filteredSlots, waypoints, currentWave)
         }
@@ -290,86 +314,96 @@ object PathSystem {
 
     // ---- Crossing / complex path layouts (indices 12–17) ----
 
-    private fun buildCrossingLayout(crossIdx: Int, W: Float, H: Float): List<PointF> {
+    /**
+     * Build crossing layout waypoints.
+     * [W] is the right boundary (xOff + contentWidth), [H] the bottom boundary (yOff + contentHeight).
+     * [xOff] and [yOff] are the content-area starting offsets.
+     */
+    private fun buildCrossingLayout(crossIdx: Int, W: Float, H: Float, xOff: Float = 0f, yOff: Float = 0f): List<PointF> {
         return when (crossIdx) {
             0 -> listOf(
                 // Cross-0: S-curve (smooth)
-                PointF(-10f, H * 0.5f),
-                PointF(W * 0.25f, H * 0.2f),
-                PointF(W * 0.5f, H * 0.5f),
-                PointF(W * 0.75f, H * 0.8f),
-                PointF(W + 10f, H * 0.5f)
+                PointF(-10f, yOff + (H - yOff) * 0.5f),
+                PointF(xOff + (W - xOff) * 0.25f, yOff + (H - yOff) * 0.2f),
+                PointF(xOff + (W - xOff) * 0.5f, yOff + (H - yOff) * 0.5f),
+                PointF(xOff + (W - xOff) * 0.75f, yOff + (H - yOff) * 0.8f),
+                PointF(W + 10f, yOff + (H - yOff) * 0.5f)
             )
             1 -> listOf(
                 // Cross-1: Diamond/X approach
-                PointF(-10f, H * 0.5f),
-                PointF(W * 0.35f, H * 0.15f),
-                PointF(W * 0.65f, H * 0.5f),
-                PointF(W * 0.35f, H * 0.85f),
-                PointF(W * 0.5f, H * 0.5f),
-                PointF(W + 10f, H * 0.5f)
+                PointF(-10f, yOff + (H - yOff) * 0.5f),
+                PointF(xOff + (W - xOff) * 0.35f, yOff + (H - yOff) * 0.15f),
+                PointF(xOff + (W - xOff) * 0.65f, yOff + (H - yOff) * 0.5f),
+                PointF(xOff + (W - xOff) * 0.35f, yOff + (H - yOff) * 0.85f),
+                PointF(xOff + (W - xOff) * 0.5f, yOff + (H - yOff) * 0.5f),
+                PointF(W + 10f, yOff + (H - yOff) * 0.5f)
             )
             2 -> listOf(
                 // Cross-2: Double zigzag
-                PointF(-10f, H * 0.15f),
-                PointF(W * 0.3f, H * 0.15f),
-                PointF(W * 0.3f, H * 0.85f),
-                PointF(W * 0.7f, H * 0.85f),
-                PointF(W * 0.7f, H * 0.15f),
-                PointF(W + 10f, H * 0.15f)
+                PointF(-10f, yOff + (H - yOff) * 0.15f),
+                PointF(xOff + (W - xOff) * 0.3f, yOff + (H - yOff) * 0.15f),
+                PointF(xOff + (W - xOff) * 0.3f, yOff + (H - yOff) * 0.85f),
+                PointF(xOff + (W - xOff) * 0.7f, yOff + (H - yOff) * 0.85f),
+                PointF(xOff + (W - xOff) * 0.7f, yOff + (H - yOff) * 0.15f),
+                PointF(W + 10f, yOff + (H - yOff) * 0.15f)
             )
             3 -> listOf(
                 // Cross-3: Spiral approach
-                PointF(-10f, H * 0.75f),
-                PointF(W * 0.5f, H * 0.75f),
-                PointF(W * 0.5f, H * 0.25f),
-                PointF(W * 0.2f, H * 0.25f),
-                PointF(W * 0.7f, H * 0.6f),
-                PointF(W + 10f, H * 0.6f)
+                PointF(-10f, yOff + (H - yOff) * 0.75f),
+                PointF(xOff + (W - xOff) * 0.5f, yOff + (H - yOff) * 0.75f),
+                PointF(xOff + (W - xOff) * 0.5f, yOff + (H - yOff) * 0.25f),
+                PointF(xOff + (W - xOff) * 0.2f, yOff + (H - yOff) * 0.25f),
+                PointF(xOff + (W - xOff) * 0.7f, yOff + (H - yOff) * 0.6f),
+                PointF(W + 10f, yOff + (H - yOff) * 0.6f)
             )
             4 -> listOf(
                 // Cross-4: W-shape
-                PointF(-10f, H * 0.5f),
-                PointF(W * 0.2f, H * 0.15f),
-                PointF(W * 0.4f, H * 0.55f),
-                PointF(W * 0.6f, H * 0.15f),
-                PointF(W * 0.8f, H * 0.55f),
-                PointF(W + 10f, H * 0.5f)
+                PointF(-10f, yOff + (H - yOff) * 0.5f),
+                PointF(xOff + (W - xOff) * 0.2f, yOff + (H - yOff) * 0.15f),
+                PointF(xOff + (W - xOff) * 0.4f, yOff + (H - yOff) * 0.55f),
+                PointF(xOff + (W - xOff) * 0.6f, yOff + (H - yOff) * 0.15f),
+                PointF(xOff + (W - xOff) * 0.8f, yOff + (H - yOff) * 0.55f),
+                PointF(W + 10f, yOff + (H - yOff) * 0.5f)
             )
             else -> listOf(
                 // Cross-5: Long diagonal
-                PointF(-10f, H * 0.2f),
-                PointF(W * 0.6f, H * 0.2f),
-                PointF(W * 0.4f, H * 0.8f),
-                PointF(W + 10f, H * 0.8f)
+                PointF(-10f, yOff + (H - yOff) * 0.2f),
+                PointF(xOff + (W - xOff) * 0.6f, yOff + (H - yOff) * 0.2f),
+                PointF(xOff + (W - xOff) * 0.4f, yOff + (H - yOff) * 0.8f),
+                PointF(W + 10f, yOff + (H - yOff) * 0.8f)
             )
         }
     }
 
-    /** Generate candidate slots spread across the screen for crossing layouts. */
-    private fun computeSlotsForCrossing(W: Float, H: Float, currentWave: Int): List<PointF> {
+    /**
+     * Generate candidate slots spread across the game-content area for crossing layouts.
+     * [W] is the right boundary (xOff + contentWidth), [H] the bottom boundary (yOff + contentHeight).
+     */
+    private fun computeSlotsForCrossing(W: Float, H: Float, xOff: Float = 0f, yOff: Float = 0f, currentWave: Int): List<PointF> {
         val edge = 30f
         val minSep = 56f
+        val cW = W - xOff   // usable content width
+        val cH = H - yOff   // usable content height
 
         val candidates = listOf(
-            PointF(W * 0.12f, H * 0.35f),
-            PointF(W * 0.12f, H * 0.65f),
-            PointF(W * 0.28f, H * 0.20f),
-            PointF(W * 0.28f, H * 0.50f),
-            PointF(W * 0.28f, H * 0.80f),
-            PointF(W * 0.45f, H * 0.35f),
-            PointF(W * 0.45f, H * 0.65f),
-            PointF(W * 0.60f, H * 0.20f),
-            PointF(W * 0.60f, H * 0.50f),
-            PointF(W * 0.60f, H * 0.80f),
-            PointF(W * 0.78f, H * 0.35f),
-            PointF(W * 0.78f, H * 0.65f),
-            PointF(W * 0.88f, H * 0.50f),
+            PointF(xOff + cW * 0.12f, yOff + cH * 0.35f),
+            PointF(xOff + cW * 0.12f, yOff + cH * 0.65f),
+            PointF(xOff + cW * 0.28f, yOff + cH * 0.20f),
+            PointF(xOff + cW * 0.28f, yOff + cH * 0.50f),
+            PointF(xOff + cW * 0.28f, yOff + cH * 0.80f),
+            PointF(xOff + cW * 0.45f, yOff + cH * 0.35f),
+            PointF(xOff + cW * 0.45f, yOff + cH * 0.65f),
+            PointF(xOff + cW * 0.60f, yOff + cH * 0.20f),
+            PointF(xOff + cW * 0.60f, yOff + cH * 0.50f),
+            PointF(xOff + cW * 0.60f, yOff + cH * 0.80f),
+            PointF(xOff + cW * 0.78f, yOff + cH * 0.35f),
+            PointF(xOff + cW * 0.78f, yOff + cH * 0.65f),
+            PointF(xOff + cW * 0.88f, yOff + cH * 0.50f),
         )
 
         val result = mutableListOf<PointF>()
         for (c in candidates) {
-            if (c.x < edge || c.x > W - edge || c.y < edge || c.y > H - edge) continue
+            if (c.x < xOff + edge || c.x > W - edge || c.y < yOff + edge || c.y > H - edge) continue
             val tooClose = result.any { e ->
                 val dx = c.x - e.x
                 val dy = c.y - e.y
