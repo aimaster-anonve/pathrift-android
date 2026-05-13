@@ -56,4 +56,7 @@ data class GameState(
     val waveCompleteMessage: String? = null,
     val activeTowerSlots: Map<Int, TowerSlotData> = emptyMap(),
     val diamonds: Int = 0,
+    val speedMultiplier: Float = 1.0f,
+    val showRevivePrompt: Boolean = false,
+    val reviveCountdown: Int = 5,
 )

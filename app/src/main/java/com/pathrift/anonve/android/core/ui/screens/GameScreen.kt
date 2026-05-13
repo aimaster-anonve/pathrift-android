@@ -9,6 +9,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.lazy.LazyRow
@@ -24,11 +25,13 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +42,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -59,7 +63,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import kotlin.math.sqrt
+import androidx.compose.ui.text.style.TextOverflow
 import com.pathrift.anonve.android.core.ui.BlastTowerColor
 import com.pathrift.anonve.android.core.ui.BoltTowerColor
 import com.pathrift.anonve.android.core.ui.CoreTowerColor
@@ -94,11 +100,13 @@ import com.pathrift.anonve.android.game.towers.TowerType
 @Composable
 fun GameScreen(
     onRunEnded: (score: Long, wave: Int) -> Unit,
+    navController: NavController? = null,
     gameViewModel: GameViewModel = viewModel()
 ) {
     val state by gameViewModel.state.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var isPaused by remember { mutableStateOf(false) }
+    var showPremiumDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         gameViewModel.events.collect { event ->
@@ -108,6 +116,7 @@ fun GameScreen(
                 is GameEvent.WaveStarted -> {}
                 is GameEvent.WaveCompleted -> {}
                 is GameEvent.RiftShift -> {}
+                is GameEvent.ShowPremiumPrompt -> showPremiumDialog = true
             }
         }
     }
@@ -127,6 +136,7 @@ fun GameScreen(
             state = state,
             onNextWave = gameViewModel::startNextWave,
             onPause = { isPaused = true },
+            onToggleSpeed = gameViewModel::toggleSpeed,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -159,6 +169,63 @@ fun GameScreen(
             PauseOverlay(
                 onResume = { isPaused = false },
                 onQuit = { onRunEnded(state.score, state.wave) }
+            )
+        }
+
+        // Revive overlay
+        if (state.showRevivePrompt) {
+            Box(
+                Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.75f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .padding(32.dp)
+                        .background(Color(0xFF1A1A2E), RoundedCornerShape(20.dp))
+                        .padding(28.dp)
+                ) {
+                    Text("GAME OVER", color = Color(0xFFFF2244), fontSize = 22.sp, fontWeight = FontWeight.Black)
+                    Spacer(Modifier.height(12.dp))
+                    Text("REVIVE? (${state.reviveCountdown}s)", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Text("You have 1 revive (Premium)", color = Color.Gray, fontSize = 12.sp)
+                    Spacer(Modifier.height(20.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Button(
+                            onClick = { gameViewModel.acceptRevive() },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00AA44))
+                        ) {
+                            Text("REVIVE", fontWeight = FontWeight.Black)
+                        }
+                        OutlinedButton(
+                            onClick = { gameViewModel.declineRevive() },
+                            border = BorderStroke(1.dp, Color(0xFFFF2244))
+                        ) {
+                            Text("Give Up", color = Color(0xFFFF2244))
+                        }
+                    }
+                }
+            }
+        }
+
+        // Premium prompt dialog
+        if (showPremiumDialog) {
+            AlertDialog(
+                onDismissRequest = { showPremiumDialog = false },
+                title = { Text("Premium Feature", color = Color(0xFF00CCFF)) },
+                text = { Text("x2 Speed requires Premium membership. Visit the Store to activate Premium.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showPremiumDialog = false
+                        navController?.navigate("store")
+                    }) {
+                        Text("Get Premium")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showPremiumDialog = false }) { Text("Not Now") }
+                },
+                containerColor = Color(0xFF1A1A2E)
             )
         }
     }
@@ -234,6 +301,7 @@ private fun CombatHUD(
     state: GameState,
     onNextWave: () -> Unit,
     onPause: () -> Unit,
+    onToggleSpeed: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Box(modifier = modifier.fillMaxSize()) {
@@ -283,7 +351,22 @@ private fun CombatHUD(
                             )
                         }
                     }
-                    Spacer(Modifier.width(14.dp))
+                    Spacer(Modifier.width(8.dp))
+                    // Speed toggle button
+                    TextButton(
+                        onClick = onToggleSpeed,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color.Black.copy(alpha = 0.4f))
+                    ) {
+                        Text(
+                            text = if (state.speedMultiplier == 1.0f) "x1" else "x2",
+                            color = if (state.speedMultiplier == 2.0f) Color(0xFF00CCFF) else Color.Gray,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                    }
+                    Spacer(Modifier.width(6.dp))
                     IconButton(onClick = onPause, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Pause, "pause", tint = PathriftTextSecondary.copy(alpha = 0.8f), modifier = Modifier.size(22.dp))
                     }

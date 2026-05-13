@@ -5,7 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.pathrift.anonve.android.app.PathriftApp
 import com.pathrift.anonve.android.core.engine.EconomyConstants
+import com.pathrift.anonve.android.core.storage.ArsenalStore
 import com.pathrift.anonve.android.core.storage.DiamondStore
+import com.pathrift.anonve.android.core.storage.PremiumStore
 import com.pathrift.anonve.android.game.GameBridge
 import com.pathrift.anonve.android.game.GameEngine
 import com.pathrift.anonve.android.game.GamePhase
@@ -41,6 +43,7 @@ sealed class GameEvent {
     data object WaveStarted : GameEvent()
     data object WaveCompleted : GameEvent()
     data object RiftShift : GameEvent()
+    data object ShowPremiumPrompt : GameEvent()
 }
 
 /**
@@ -51,6 +54,8 @@ sealed class GameEvent {
 class GameViewModel(application: Application) : AndroidViewModel(application), GameBridge {
 
     private val diamondStore: DiamondStore = (application as PathriftApp).diamondStore
+    private val premiumStore: PremiumStore = (application as PathriftApp).premiumStore
+    private val arsenalStore: ArsenalStore = (application as PathriftApp).arsenalStore
 
     private val _state = MutableStateFlow(GameState(diamonds = diamondStore.balance))
     val state: StateFlow<GameState> = _state.asStateFlow()
@@ -61,7 +66,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     private val _enemies = MutableStateFlow<List<EnemyInstance>>(emptyList())
     val enemies: StateFlow<List<EnemyInstance>> = _enemies.asStateFlow()
 
-    val game = GameEngine(this, diamondStore)
+    val game = GameEngine(this, diamondStore, arsenalStore, premiumStore)
 
     init {
         game.start(viewModelScope)
@@ -311,15 +316,59 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
         TowerType.NOVA    -> 500
     }
 
-    private val TowerType.displayName: String get() = when (this) {
-        TowerType.BOLT    -> "Bolt"
-        TowerType.BLAST   -> "Blast"
-        TowerType.FROST   -> "Frost"
-        TowerType.PIERCE  -> "Pierce"
-        TowerType.CORE    -> "Core"
-        TowerType.INFERNO -> "Inferno"
-        TowerType.TESLA   -> "Tesla"
-        TowerType.NOVA    -> "Nova"
+    // ---- Speed toggle ----
+
+    fun toggleSpeed() {
+        if (!premiumStore.isPremium) {
+            viewModelScope.launch {
+                _events.emit(GameEvent.ShowPremiumPrompt)
+            }
+            return
+        }
+        val newSpeed = if (_state.value.speedMultiplier == 1.0f) 2.0f else 1.0f
+        _state.update { it.copy(speedMultiplier = newSpeed) }
+        game.setSpeed(newSpeed)
+    }
+
+    // ---- Revive ----
+
+    fun acceptRevive() {
+        _state.update { it.copy(showRevivePrompt = false) }
+        game.acceptRevive()
+    }
+
+    fun declineRevive() {
+        _state.update { it.copy(showRevivePrompt = false) }
+        game.declineRevive()
+    }
+
+    private fun startReviveCountdown() {
+        viewModelScope.launch {
+            repeat(5) { i ->
+                kotlinx.coroutines.delay(1000L)
+                _state.update { it.copy(reviveCountdown = 4 - i) }
+            }
+            if (_state.value.showRevivePrompt) {
+                _state.update { it.copy(showRevivePrompt = false) }
+                game.declineRevive()
+            }
+        }
+    }
+
+    // ---- New GameBridge callbacks ----
+
+    override fun onSpeedChanged(multiplier: Float) {
+        // State already updated by toggleSpeed; no additional action needed
+    }
+
+    override fun onReviveAvailable() {
+        _state.update { it.copy(showRevivePrompt = true, reviveCountdown = 5) }
+        startReviveCountdown()
+    }
+
+    override fun onLifeRestored(lives: Int) {
+        _state.update { it.copy(lives = lives) }
+        viewModelScope.launch { _events.emit(GameEvent.ShowMessage("Revived! 1 life restored.")) }
     }
 
     override fun onCleared() {

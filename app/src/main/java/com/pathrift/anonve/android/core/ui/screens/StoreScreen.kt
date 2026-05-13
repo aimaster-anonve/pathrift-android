@@ -1,6 +1,7 @@
 package com.pathrift.anonve.android.core.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,8 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -27,8 +26,8 @@ import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -39,7 +38,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -47,41 +45,52 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pathrift.anonve.android.app.PathriftApp
 import com.pathrift.anonve.android.core.ui.BlastTowerColor
 import com.pathrift.anonve.android.core.ui.BoltTowerColor
+import com.pathrift.anonve.android.core.ui.CoreTowerColor
 import com.pathrift.anonve.android.core.ui.FrostTowerColor
+import com.pathrift.anonve.android.core.ui.InfernoTowerColor
 import com.pathrift.anonve.android.core.ui.LanguageManager
+import com.pathrift.anonve.android.core.ui.NovaTowerColor
 import com.pathrift.anonve.android.core.ui.PathriftBackground
 import com.pathrift.anonve.android.core.ui.PathriftGold
 import com.pathrift.anonve.android.core.ui.PathriftNeonBlue
+import com.pathrift.anonve.android.core.ui.PathriftOrange
 import com.pathrift.anonve.android.core.ui.PathriftSuccess
 import com.pathrift.anonve.android.core.ui.PathriftSurface
 import com.pathrift.anonve.android.core.ui.PathriftTextPrimary
 import com.pathrift.anonve.android.core.ui.PathriftTextSecondary
+import com.pathrift.anonve.android.core.ui.PierceTowerColor
+import com.pathrift.anonve.android.core.ui.TeslaTowerColor
+import com.pathrift.anonve.android.game.towers.TowerType
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StoreScreen(onBack: () -> Unit) {
-    val lang by LanguageManager.current.collectAsState()
     val context = LocalContext.current
+    val app = context.applicationContext as PathriftApp
+    val diamondStore = app.diamondStore
+    val premiumStore = app.premiumStore
 
+    // Local prefs for daily bonus only
     val prefs = remember {
         context.getSharedPreferences("pathrift_store", android.content.Context.MODE_PRIVATE)
     }
 
-    var diamonds by remember {
-        mutableIntStateOf(prefs.getInt("diamond_balance", 0))
-    }
+    var diamonds by remember { mutableIntStateOf(diamondStore.balance) }
+    var isPremium by remember { mutableStateOf(premiumStore.isPremium) }
     var dailyClaimed by remember {
         val todayKey = todayKey()
         mutableStateOf(prefs.getBoolean("daily_claimed_$todayKey", false))
@@ -110,7 +119,6 @@ fun StoreScreen(onBack: () -> Unit) {
                     }
                 },
                 actions = {
-                    // Diamond count in nav bar
                     Row(
                         modifier = Modifier.padding(end = 16.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -160,91 +168,292 @@ fun StoreScreen(onBack: () -> Unit) {
                 claimed = dailyClaimed,
                 onClaim = {
                     if (!dailyClaimed) {
-                        val newBalance = diamonds + 10
-                        diamonds = newBalance
+                        diamondStore.earn(10)
+                        diamonds = diamondStore.balance
                         dailyClaimed = true
                         val todayKey = todayKey()
-                        prefs.edit()
-                            .putInt("diamond_balance", newBalance)
-                            .putBoolean("daily_claimed_$todayKey", true)
-                            .apply()
+                        prefs.edit().putBoolean("daily_claimed_$todayKey", true).apply()
                     }
                 }
             )
 
             Spacer(Modifier.height(24.dp))
 
-            // Tower skins section header
-            StoreSectionHeader(
-                title = LanguageManager.s("TOWER SKINS", "KULE KAPLAMALARI"),
-                icon = Icons.Default.Palette
-            )
+            // ---- SECTION 1: PREMIUM ----
+            StoreSectionHeader(title = "PREMIUM", icon = Icons.Default.WorkspacePremium)
             Spacer(Modifier.height(12.dp))
-
-            // Tower skins grid (2 columns, non-scrollable inside scroll)
-            val towerSkins = listOf(
-                Triple(BoltTowerColor, "BOLT", true),
-                Triple(BlastTowerColor, "BLAST", true),
-                Triple(FrostTowerColor, "FROST", true)
-            )
-            val lockedSkins = listOf("Cyber", "Void")
-
-            // Row 1: Bolt + Blast
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                towerSkins.take(2).forEach { (color, name, free) ->
-                    SkinCard(
-                        color = color,
-                        name = name,
-                        free = free,
-                        modifier = Modifier.weight(1f)
-                    )
+            PremiumCard(
+                isPremium = isPremium,
+                onActivate = {
+                    premiumStore.activate()
+                    isPremium = true
                 }
-            }
-            Spacer(Modifier.height(12.dp))
-            // Row 2: Frost + Cyber (locked)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                SkinCard(
-                    color = FrostTowerColor,
-                    name = "FROST",
-                    free = true,
-                    modifier = Modifier.weight(1f)
-                )
-                LockedSkinCard(name = "Cyber", modifier = Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(12.dp))
-            // Row 3: Void (locked) + placeholder
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                LockedSkinCard(name = "Void", modifier = Modifier.weight(1f))
-                Spacer(Modifier.weight(1f))
-            }
+            )
 
             Spacer(Modifier.height(24.dp))
 
-            // Coming soon section
-            StoreSectionHeader(title = "COMING SOON", icon = Icons.Default.Star)
+            // ---- SECTION 2: TOWERS ----
+            StoreSectionHeader(
+                title = LanguageManager.s("TOWERS", "KULELER"),
+                icon = Icons.Default.Bolt
+            )
             Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                ComingSoonPill(icon = Icons.Default.Map, label = "Map Themes", modifier = Modifier.weight(1f))
-                ComingSoonPill(icon = Icons.Default.Star, label = "Rift Pass", modifier = Modifier.weight(1f))
-                ComingSoonPill(icon = Icons.Default.EmojiEvents, label = "Leaderboard", modifier = Modifier.weight(1f))
-            }
+            TowersSection(
+                unlockedTowers = diamondStore.unlockedTowers,
+                diamonds = diamonds,
+                onUnlock = { type ->
+                    if (diamondStore.unlock(type)) {
+                        diamonds = diamondStore.balance
+                    }
+                }
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            // ---- SECTION 3: BUY DIAMONDS ----
+            StoreSectionHeader(title = "DIAMONDS", icon = Icons.Default.Diamond)
+            Spacer(Modifier.height(12.dp))
+            BuyDiamondsSection()
 
             Spacer(Modifier.height(40.dp))
         }
     }
 }
+
+// ---- Premium Card ----
+
+@Composable
+private fun PremiumCard(isPremium: Boolean, onActivate: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                if (isPremium) Color(0xFF0A2A1A) else PathriftSurface,
+                RoundedCornerShape(16.dp)
+            )
+            .border(
+                1.dp,
+                if (isPremium) PathriftSuccess.copy(0.4f) else PathriftNeonBlue.copy(0.3f),
+                RoundedCornerShape(16.dp)
+            )
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Default.WorkspacePremium,
+                contentDescription = null,
+                tint = if (isPremium) PathriftSuccess else PathriftGold,
+                modifier = Modifier.size(28.dp)
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = if (isPremium) "PREMIUM ACTIVE" else "PREMIUM",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Black,
+                    color = if (isPremium) PathriftSuccess else PathriftTextPrimary,
+                    letterSpacing = 1.sp
+                )
+                Text(
+                    text = if (isPremium) "All premium features unlocked" else "Unlock speed boost, revives & more",
+                    fontSize = 11.sp,
+                    color = PathriftTextSecondary,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            if (isPremium) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = PathriftSuccess,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
+        if (!isPremium) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                PremiumBenefit(text = "x2 Speed in-game")
+                PremiumBenefit(text = "1 Revive per run")
+                PremiumBenefit(text = "More perks coming")
+            }
+            Button(
+                onClick = onActivate,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = PathriftGold),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Text(
+                    text = "GET PREMIUM (Test Mode)",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.Black
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PremiumBenefit(text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Box(
+            Modifier.size(6.dp).clip(CircleShape).background(PathriftGold)
+        )
+        Text(text, fontSize = 12.sp, color = PathriftTextSecondary, fontFamily = FontFamily.Monospace)
+    }
+}
+
+// ---- Towers Section ----
+
+@Composable
+private fun TowersSection(
+    unlockedTowers: Set<String>,
+    diamonds: Int,
+    onUnlock: (TowerType) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        TowerType.values().forEach { type ->
+            val isUnlocked = unlockedTowers.contains(type.name) || type.diamondCost == 0
+            val canAfford = diamonds >= type.diamondCost
+            TowerStoreCard(
+                type = type,
+                isUnlocked = isUnlocked,
+                canAfford = canAfford,
+                onUnlock = { onUnlock(type) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun TowerStoreCard(
+    type: TowerType,
+    isUnlocked: Boolean,
+    canAfford: Boolean,
+    onUnlock: () -> Unit
+) {
+    val color = towerColor(type)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PathriftSurface, RoundedCornerShape(12.dp))
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(36.dp)
+                .clip(CircleShape)
+                .background(color.copy(alpha = 0.15f))
+                .border(1.dp, color.copy(alpha = 0.5f), CircleShape)
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    type.displayName.uppercase(),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Black,
+                    color = PathriftTextPrimary
+                )
+                Text(
+                    "T${type.tier}",
+                    color = color,
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .background(color.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
+                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                )
+            }
+            Text(
+                type.typeAdvantageHint ?: type.displayName,
+                fontSize = 10.sp,
+                color = PathriftTextSecondary,
+                fontFamily = FontFamily.Monospace
+            )
+        }
+        if (isUnlocked) {
+            Box(
+                Modifier
+                    .background(PathriftSuccess.copy(0.15f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text("OWNED", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PathriftSuccess)
+            }
+        } else if (type.diamondCost == 0) {
+            Box(
+                Modifier
+                    .background(PathriftSuccess.copy(0.15f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 5.dp)
+            ) {
+                Text("FREE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PathriftSuccess)
+            }
+        } else {
+            Button(
+                onClick = onUnlock,
+                enabled = canAfford,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = PathriftNeonBlue,
+                    disabledContainerColor = PathriftSurface.copy(alpha = 0.5f)
+                ),
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Diamond,
+                    contentDescription = null,
+                    modifier = Modifier.size(10.dp),
+                    tint = if (canAfford) Color.Black else PathriftTextSecondary
+                )
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    "${type.diamondCost}",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (canAfford) Color.Black else PathriftTextSecondary
+                )
+            }
+        }
+    }
+}
+
+// ---- Buy Diamonds Section ----
+
+@Composable
+private fun BuyDiamondsSection() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PathriftSurface.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
+            .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Diamond,
+            contentDescription = null,
+            tint = PathriftNeonBlue.copy(alpha = 0.4f),
+            modifier = Modifier.size(36.dp)
+        )
+        Text(
+            "Buy Diamonds",
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            color = PathriftTextSecondary
+        )
+        Text(
+            "Coming Soon — v1.1",
+            fontSize = 11.sp,
+            color = PathriftTextSecondary.copy(alpha = 0.5f),
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
+
+// ---- Reused helpers ----
 
 @Composable
 private fun DiamondBalanceCard(diamonds: Int) {
@@ -258,7 +467,7 @@ private fun DiamondBalanceCard(diamonds: Int) {
     ) {
         Column {
             Text(
-                text = LanguageManager.s("DIAMONDS", "ELMASlar"),
+                text = LanguageManager.s("DIAMONDS", "ELMASLAR"),
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = PathriftTextSecondary,
@@ -284,7 +493,7 @@ private fun DiamondBalanceCard(diamonds: Int) {
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                text = "💎 IAP purchases coming in v1.1 — earn diamonds by playing!",
+                text = "Earn diamonds by playing — IAP coming in v1.1",
                 fontSize = 11.sp,
                 color = PathriftTextSecondary.copy(alpha = 0.6f),
                 fontFamily = FontFamily.Monospace
@@ -312,9 +521,7 @@ private fun DailyBonusCard(claimed: Boolean, onClaim: () -> Unit) {
         shape = RoundedCornerShape(14.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
@@ -380,95 +587,6 @@ private fun DailyBonusCard(claimed: Boolean, onClaim: () -> Unit) {
 }
 
 @Composable
-private fun SkinCard(color: Color, name: String, free: Boolean, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .background(PathriftSurface, RoundedCornerShape(12.dp))
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(70.dp)
-                .background(color.copy(alpha = 0.15f), RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .background(color, CircleShape)
-            )
-        }
-        Text(
-            text = name,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            color = PathriftTextPrimary
-        )
-        Box(
-            modifier = Modifier
-                .background(PathriftSuccess.copy(alpha = 0.15f), RoundedCornerShape(6.dp))
-                .padding(horizontal = 8.dp, vertical = 3.dp)
-        ) {
-            Text(
-                text = LanguageManager.s("FREE", "BEDAVA"),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = PathriftSuccess,
-                fontFamily = FontFamily.Monospace
-            )
-        }
-    }
-}
-
-@Composable
-private fun LockedSkinCard(name: String, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .background(PathriftSurface.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-            .padding(12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(70.dp)
-                .background(PathriftSurface, RoundedCornerShape(10.dp)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Lock,
-                contentDescription = null,
-                tint = PathriftTextSecondary.copy(alpha = 0.3f),
-                modifier = Modifier.size(24.dp)
-            )
-        }
-        Text(
-            text = name,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            color = PathriftTextSecondary
-        )
-        Box(
-            modifier = Modifier
-                .background(PathriftSurface, RoundedCornerShape(6.dp))
-                .padding(horizontal = 8.dp, vertical = 3.dp)
-        ) {
-            Text(
-                text = LanguageManager.s("Coming Soon", "Yakında"),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = PathriftTextSecondary.copy(alpha = 0.5f),
-                fontFamily = FontFamily.Monospace
-            )
-        }
-    }
-}
-
-@Composable
 private fun StoreSectionHeader(title: String, icon: ImageVector) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -486,31 +604,6 @@ private fun StoreSectionHeader(title: String, icon: ImageVector) {
             fontWeight = FontWeight.Bold,
             color = PathriftTextSecondary,
             letterSpacing = 1.5.sp,
-            fontFamily = FontFamily.Monospace
-        )
-    }
-}
-
-@Composable
-private fun ComingSoonPill(icon: ImageVector, label: String, modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier
-            .background(PathriftSurface.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
-            .padding(vertical = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = PathriftTextSecondary.copy(alpha = 0.4f),
-            modifier = Modifier.size(20.dp)
-        )
-        Text(
-            text = label,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = PathriftTextSecondary.copy(alpha = 0.5f),
             fontFamily = FontFamily.Monospace
         )
     }

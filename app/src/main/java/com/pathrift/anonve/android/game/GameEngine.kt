@@ -2,7 +2,9 @@ package com.pathrift.anonve.android.game
 
 import android.graphics.PointF
 import com.pathrift.anonve.android.core.engine.EconomyConstants
+import com.pathrift.anonve.android.core.storage.ArsenalStore
 import com.pathrift.anonve.android.core.storage.DiamondStore
+import com.pathrift.anonve.android.core.storage.PremiumStore
 import com.pathrift.anonve.android.game.enemies.BossEnemy
 import com.pathrift.anonve.android.game.enemies.EnemyInstance
 import com.pathrift.anonve.android.game.enemies.EnemyType
@@ -47,7 +49,12 @@ import kotlin.math.sqrt
  * - Splitter enemy (splits into 2 Swarm on death)
  * - Jumper enemy (teleports forward every 3s)
  */
-class GameEngine(private val bridge: GameBridge, val diamondStore: DiamondStore) {
+class GameEngine(
+    private val bridge: GameBridge,
+    val diamondStore: DiamondStore,
+    private val arsenalStore: ArsenalStore,
+    private val premiumStore: PremiumStore
+) {
 
     val grid = GridSystem()
     private val waveSystem = WaveSystem()
@@ -78,6 +85,12 @@ class GameEngine(private val bridge: GameBridge, val diamondStore: DiamondStore)
     private var isWaveActive: Boolean = false
     private var waveEnemyTotal: Int = 0
     private var waveEnemiesCleared: Int = 0
+
+    // Speed multiplier (1.0 = normal, 2.0 = fast)
+    var speedMultiplier: Float = 1.0f
+
+    // Revive state
+    var hasUsedRevive: Boolean = false
 
     // Screen dimensions (set from renderer/view)
     var screenWidth: Float = 0f
@@ -110,6 +123,8 @@ class GameEngine(private val bridge: GameBridge, val diamondStore: DiamondStore)
         isWaveActive = false
         waveEnemyTotal = 0
         waveEnemiesCleared = 0
+        speedMultiplier = 1.0f
+        hasUsedRevive = false
     }
 
     /** Must be called once screen dimensions are known (before first wave). */
@@ -140,7 +155,7 @@ class GameEngine(private val bridge: GameBridge, val diamondStore: DiamondStore)
                 repeat(group.count) {
                     if (!isActive) return@launch
                     spawnEnemy(group.type, hpMult)
-                    delay(group.spawnIntervalMs)
+                    delay((group.spawnIntervalMs / speedMultiplier).toLong())
                 }
             }
         }
@@ -218,6 +233,7 @@ class GameEngine(private val bridge: GameBridge, val diamondStore: DiamondStore)
     private fun updateSimulation(delta: Float) {
         if (lives <= 0) return
 
+        val adjustedDelta = delta * speedMultiplier
         val pathLen = PathSystem.totalPathLength()
         if (pathLen <= 0f) return
 
@@ -243,7 +259,7 @@ class GameEngine(private val bridge: GameBridge, val diamondStore: DiamondStore)
                 val newProgress = if (shouldJump) {
                     minOf(1f, enemy.pathProgress + JumperEnemy.JUMP_DISTANCE)
                 } else {
-                    val distanceToMove = spd * delta
+                    val distanceToMove = spd * adjustedDelta
                     enemy.pathProgress + distanceToMove / pathLen
                 }
 
@@ -266,7 +282,11 @@ class GameEngine(private val bridge: GameBridge, val diamondStore: DiamondStore)
                 bridge.onLifeLost(lives)
                 bridge.onWaveProgress(waveEnemiesCleared, waveEnemyTotal)
                 if (lives <= 0) {
-                    triggerGameOver()
+                    if (premiumStore.isPremium && !hasUsedRevive) {
+                        bridge.onReviveAvailable()
+                    } else {
+                        triggerGameOver()
+                    }
                     return
                 }
             }
@@ -285,8 +305,12 @@ class GameEngine(private val bridge: GameBridge, val diamondStore: DiamondStore)
             for ((slotId, inst) in _towers) {
                 val tower = inst.tower
 
-                // F2: Attack speed scaling — +8% per level above 1
-                val effectiveAttacksPerSecond = tower.attacksPerSecond * (1f + 0.08f * (inst.level - 1))
+                // Permanent bonuses from Arsenal
+                val permDmgBonus = arsenalStore.permDamageBonus(tower.type)
+                val permSpdBonus = arsenalStore.permSpeedBonus(tower.type)
+
+                // F2: Attack speed scaling — +8% per level above 1, plus permanent speed bonus
+                val effectiveAttacksPerSecond = tower.attacksPerSecond * (1f + 0.08f * (inst.level - 1)) * (1f + permSpdBonus)
 
                 // Attack cooldown
                 if (now - inst.lastAttackTime < (1000L / effectiveAttacksPerSecond).toLong()) continue
@@ -304,8 +328,8 @@ class GameEngine(private val bridge: GameBridge, val diamondStore: DiamondStore)
 
                 if (inRange.isEmpty()) continue
 
-                // Damage with level scaling: +25% per level above 1
-                val levelMult = 1f + 0.25f * (inst.level - 1)
+                // Damage with level scaling: +25% per level above 1, plus permanent damage bonus
+                val levelMult = (1f + 0.25f * (inst.level - 1)) * (1f + permDmgBonus)
                 val damage = tower.damagePerHit * levelMult
 
                 when {
@@ -632,6 +656,21 @@ class GameEngine(private val bridge: GameBridge, val diamondStore: DiamondStore)
             else -> return // Only SWARM supported for Splitter splits
         }
         _enemies.add(instance)
+    }
+
+    fun setSpeed(mult: Float) {
+        speedMultiplier = mult
+        bridge.onSpeedChanged(mult)
+    }
+
+    fun acceptRevive() {
+        hasUsedRevive = true
+        lives = 1
+        bridge.onLifeRestored(lives)
+    }
+
+    fun declineRevive() {
+        triggerGameOver()
     }
 
     private fun triggerGameOver() {

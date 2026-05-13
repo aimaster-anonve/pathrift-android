@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.pathrift.anonve.android.core.ui.screens.ArsenalScreen
 import com.pathrift.anonve.android.core.ui.screens.GameScreen
 import com.pathrift.anonve.android.core.ui.screens.HomeScreen
 import com.pathrift.anonve.android.core.ui.screens.HowToPlayScreen
@@ -24,6 +25,7 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object Store : Screen("store")
     object HowToPlay : Screen("how_to_play")
+    object Arsenal : Screen("arsenal")
 }
 
 @Composable
@@ -49,6 +51,9 @@ fun PathriftNavGraph(
                 },
                 onOpenHowToPlay = {
                     navController.navigate(Screen.HowToPlay.route)
+                },
+                onOpenArsenal = {
+                    navController.navigate(Screen.Arsenal.route)
                 }
             )
         }
@@ -59,7 +64,8 @@ fun PathriftNavGraph(
                     navController.navigate(Screen.RunEnd.createRoute(score, wave)) {
                         popUpTo(Screen.Game.route) { inclusive = true }
                     }
-                }
+                },
+                navController = navController
             )
         }
 
@@ -100,6 +106,16 @@ fun PathriftNavGraph(
 
         composable(Screen.Store.route) {
             StoreScreen(
+                onBack = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.Arsenal.route) {
+            ArsenalScreen(
                 onBack = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }

@@ -35,10 +35,31 @@ enum class TowerType {
     }
 
     val diamondCost: Int get() = when (this) {
-        TowerType.INFERNO -> 50
+        TowerType.BOLT    -> 0
+        TowerType.BLAST   -> 10
+        TowerType.FROST   -> 15
+        TowerType.PIERCE  -> 30
+        TowerType.CORE    -> 50
+        TowerType.INFERNO -> 80
         TowerType.TESLA   -> 150
         TowerType.NOVA    -> 300
-        else              -> 0
+    }
+
+    val tier: Int get() = when (this) {
+        TowerType.BOLT, TowerType.BLAST, TowerType.FROST -> 1
+        TowerType.PIERCE, TowerType.CORE                  -> 2
+        TowerType.INFERNO, TowerType.TESLA, TowerType.NOVA -> 3
+    }
+
+    val displayName: String get() = when (this) {
+        TowerType.BOLT    -> "Bolt"
+        TowerType.BLAST   -> "Blast"
+        TowerType.FROST   -> "Frost"
+        TowerType.PIERCE  -> "Pierce"
+        TowerType.CORE    -> "Core"
+        TowerType.INFERNO -> "Inferno"
+        TowerType.TESLA   -> "Tesla"
+        TowerType.NOVA    -> "Nova"
     }
 
     val isPremium: Boolean get() = diamondCost > 0

@@ -18,4 +18,7 @@ interface GameBridge {
     fun onTowerTapped(slotId: Int)
     fun onGoldChanged(gold: Int)
     fun onDiamondsChanged(balance: Int)
+    fun onSpeedChanged(multiplier: Float)
+    fun onReviveAvailable()
+    fun onLifeRestored(lives: Int)
 }

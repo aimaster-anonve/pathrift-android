@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.HelpOutline
+import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -54,6 +55,7 @@ import com.pathrift.anonve.android.core.ui.LanguageManager
 import com.pathrift.anonve.android.core.ui.PathriftBackground
 import com.pathrift.anonve.android.core.ui.PathriftGold
 import com.pathrift.anonve.android.core.ui.PathriftNeonBlue
+import com.pathrift.anonve.android.core.ui.PathriftOrange
 import com.pathrift.anonve.android.core.ui.PathriftPurple
 import com.pathrift.anonve.android.core.ui.PathriftSurface
 import com.pathrift.anonve.android.core.ui.PathriftTextPrimary
@@ -66,6 +68,7 @@ fun HomeScreen(
     onOpenSettings: () -> Unit,
     onOpenStore: () -> Unit,
     onOpenHowToPlay: () -> Unit,
+    onOpenArsenal: () -> Unit = {},
     storage: LocalProgressStore? = null
 ) {
     val lang by LanguageManager.current.collectAsState()
@@ -250,6 +253,28 @@ fun HomeScreen(
                         fontSize = 13.sp
                     )
                 }
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // Arsenal button
+            OutlinedButton(
+                onClick = onOpenArsenal,
+                modifier = Modifier.fillMaxWidth().height(44.dp),
+                border = BorderStroke(1.dp, PathriftOrange.copy(alpha = 0.4f)),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftOrange)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MilitaryTech,
+                    contentDescription = null,
+                    modifier = Modifier.size(14.dp)
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = LanguageManager.s("ARSENAL", "CEPHANE"),
+                    fontSize = 13.sp
+                )
             }
 
             Spacer(Modifier.height(12.dp))

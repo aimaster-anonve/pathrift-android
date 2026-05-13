@@ -11,6 +11,14 @@ class DiamondStore(context: Context) {
 
     private val prefs = context.getSharedPreferences("pathrift_diamonds", Context.MODE_PRIVATE)
 
+    init {
+        if (!isUnlocked(TowerType.BOLT)) {
+            val set = unlockedTowers.toMutableSet()
+            set.add(TowerType.BOLT.name)
+            prefs.edit().putStringSet("unlocked_towers", set).apply()
+        }
+    }
+
     var balance: Int
         get() = prefs.getInt("balance", 0)
         set(value) = prefs.edit().putInt("balance", value).apply()
