@@ -4,9 +4,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -150,75 +152,148 @@ fun StoreScreen(onBack: () -> Unit) {
         },
         containerColor = PathriftBackground
     ) { padding ->
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .background(PathriftBackground)
                 .padding(padding)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            Spacer(Modifier.height(24.dp))
+            val isLandscape = maxWidth > maxHeight
+            if (isLandscape) {
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    // Left column: Premium + Diamond balance + Daily bonus
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        DiamondBalanceCard(diamonds = diamonds)
+                        DailyBonusCard(
+                            claimed = dailyClaimed,
+                            onClaim = {
+                                if (!dailyClaimed) {
+                                    diamondStore.earn(10)
+                                    diamonds = diamondStore.balance
+                                    dailyClaimed = true
+                                    val todayKey = todayKey()
+                                    prefs.edit().putBoolean("daily_claimed_$todayKey", true).apply()
+                                }
+                            }
+                        )
+                        StoreSectionHeader(title = "PREMIUM", icon = Icons.Default.WorkspacePremium)
+                        PremiumCard(
+                            isPremium = isPremium,
+                            onActivate = {
+                                premiumStore.toggle()
+                                isPremium = premiumStore.isPremium
+                            }
+                        )
+                    }
 
-            // Diamond balance card
-            DiamondBalanceCard(diamonds = diamonds)
+                    Box(
+                        Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(PathriftSurface)
+                    )
 
-            Spacer(Modifier.height(16.dp))
-
-            // Daily bonus card
-            DailyBonusCard(
-                claimed = dailyClaimed,
-                onClaim = {
-                    if (!dailyClaimed) {
-                        diamondStore.earn(10)
-                        diamonds = diamondStore.balance
-                        dailyClaimed = true
-                        val todayKey = todayKey()
-                        prefs.edit().putBoolean("daily_claimed_$todayKey", true).apply()
+                    // Right column: Towers + buy diamonds
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        StoreSectionHeader(
+                            title = LanguageManager.s("TOWERS", "KULELER"),
+                            icon = Icons.Default.Bolt
+                        )
+                        TowersSection(
+                            unlockedTowers = diamondStore.unlockedTowers,
+                            diamonds = diamonds,
+                            onUnlock = { type ->
+                                if (diamondStore.unlock(type)) {
+                                    diamonds = diamondStore.balance
+                                }
+                            }
+                        )
+                        StoreSectionHeader(title = "DIAMONDS", icon = Icons.Default.Diamond)
+                        BuyDiamondsSection()
                     }
                 }
-            )
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    Spacer(Modifier.height(24.dp))
 
-            Spacer(Modifier.height(24.dp))
+                    DiamondBalanceCard(diamonds = diamonds)
 
-            // ---- SECTION 1: PREMIUM ----
-            StoreSectionHeader(title = "PREMIUM", icon = Icons.Default.WorkspacePremium)
-            Spacer(Modifier.height(12.dp))
-            PremiumCard(
-                isPremium = isPremium,
-                onActivate = {
-                    premiumStore.toggle()
-                    isPremium = premiumStore.isPremium
+                    Spacer(Modifier.height(16.dp))
+
+                    DailyBonusCard(
+                        claimed = dailyClaimed,
+                        onClaim = {
+                            if (!dailyClaimed) {
+                                diamondStore.earn(10)
+                                diamonds = diamondStore.balance
+                                dailyClaimed = true
+                                val todayKey = todayKey()
+                                prefs.edit().putBoolean("daily_claimed_$todayKey", true).apply()
+                            }
+                        }
+                    )
+
+                    Spacer(Modifier.height(24.dp))
+
+                    StoreSectionHeader(title = "PREMIUM", icon = Icons.Default.WorkspacePremium)
+                    Spacer(Modifier.height(12.dp))
+                    PremiumCard(
+                        isPremium = isPremium,
+                        onActivate = {
+                            premiumStore.toggle()
+                            isPremium = premiumStore.isPremium
+                        }
+                    )
+
+                    Spacer(Modifier.height(24.dp))
+
+                    StoreSectionHeader(
+                        title = LanguageManager.s("TOWERS", "KULELER"),
+                        icon = Icons.Default.Bolt
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    TowersSection(
+                        unlockedTowers = diamondStore.unlockedTowers,
+                        diamonds = diamonds,
+                        onUnlock = { type ->
+                            if (diamondStore.unlock(type)) {
+                                diamonds = diamondStore.balance
+                            }
+                        }
+                    )
+
+                    Spacer(Modifier.height(24.dp))
+
+                    StoreSectionHeader(title = "DIAMONDS", icon = Icons.Default.Diamond)
+                    Spacer(Modifier.height(12.dp))
+                    BuyDiamondsSection()
+
+                    Spacer(Modifier.height(40.dp))
                 }
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            // ---- SECTION 2: TOWERS ----
-            StoreSectionHeader(
-                title = LanguageManager.s("TOWERS", "KULELER"),
-                icon = Icons.Default.Bolt
-            )
-            Spacer(Modifier.height(12.dp))
-            TowersSection(
-                unlockedTowers = diamondStore.unlockedTowers,
-                diamonds = diamonds,
-                onUnlock = { type ->
-                    if (diamondStore.unlock(type)) {
-                        diamonds = diamondStore.balance
-                    }
-                }
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            // ---- SECTION 3: BUY DIAMONDS ----
-            StoreSectionHeader(title = "DIAMONDS", icon = Icons.Default.Diamond)
-            Spacer(Modifier.height(12.dp))
-            BuyDiamondsSection()
-
-            Spacer(Modifier.height(40.dp))
+            }
         }
     }
 }

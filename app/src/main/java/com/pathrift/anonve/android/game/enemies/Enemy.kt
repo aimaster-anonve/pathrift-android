@@ -1,5 +1,7 @@
 package com.pathrift.anonve.android.game.enemies
 
+import com.pathrift.anonve.android.game.PathLayer
+
 enum class EnemyType {
     RUNNER,
     TANK,
@@ -43,7 +45,9 @@ data class EnemyInstance(
     // Boss
     val bossVariant: Int = 0,
     // Jumper
-    val lastJumpTime: Long = 0L
+    val lastJumpTime: Long = 0L,
+    // Z-layer path system
+    val pathLayer: PathLayer = PathLayer.GROUND
 ) {
     val isAlive: Boolean get() = currentHp > 0f && !hasReachedEnd
     val isDead: Boolean get() = currentHp <= 0f

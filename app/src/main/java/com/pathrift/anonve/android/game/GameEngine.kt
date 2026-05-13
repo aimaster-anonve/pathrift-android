@@ -2,6 +2,7 @@ package com.pathrift.anonve.android.game
 
 import android.graphics.PointF
 import com.pathrift.anonve.android.core.engine.EconomyConstants
+import com.pathrift.anonve.android.game.PathLayer
 import com.pathrift.anonve.android.core.storage.ArsenalStore
 import com.pathrift.anonve.android.core.storage.DiamondStore
 import com.pathrift.anonve.android.core.storage.PremiumStore
@@ -15,6 +16,7 @@ import com.pathrift.anonve.android.game.enemies.ShieldEnemy
 import com.pathrift.anonve.android.game.enemies.SplitterEnemy
 import com.pathrift.anonve.android.game.enemies.SwarmEnemy
 import com.pathrift.anonve.android.game.enemies.TankEnemy
+import com.pathrift.anonve.android.game.towers.ArtilleryTower
 import com.pathrift.anonve.android.game.towers.BlastTower
 import com.pathrift.anonve.android.game.towers.BoltTower
 import com.pathrift.anonve.android.game.towers.CoreTower
@@ -22,6 +24,8 @@ import com.pathrift.anonve.android.game.towers.FrostTower
 import com.pathrift.anonve.android.game.towers.InfernoTower
 import com.pathrift.anonve.android.game.towers.NovaTower
 import com.pathrift.anonve.android.game.towers.PierceTower
+import com.pathrift.anonve.android.game.towers.SniperTower
+import com.pathrift.anonve.android.game.towers.TargetingMode
 import com.pathrift.anonve.android.game.towers.TeslaTower
 import com.pathrift.anonve.android.game.towers.Tower
 import com.pathrift.anonve.android.game.towers.TowerType
@@ -165,14 +169,16 @@ class GameEngine(
 
     fun placeTower(slotId: Int, type: TowerType): Boolean {
         val tower = when (type) {
-            TowerType.BOLT    -> BoltTower()
-            TowerType.BLAST   -> BlastTower()
-            TowerType.FROST   -> FrostTower()
-            TowerType.PIERCE  -> PierceTower()
-            TowerType.CORE    -> CoreTower()
-            TowerType.INFERNO -> InfernoTower()
-            TowerType.TESLA   -> TeslaTower()
-            TowerType.NOVA    -> NovaTower()
+            TowerType.BOLT      -> BoltTower()
+            TowerType.BLAST     -> BlastTower()
+            TowerType.FROST     -> FrostTower()
+            TowerType.PIERCE    -> PierceTower()
+            TowerType.CORE      -> CoreTower()
+            TowerType.INFERNO   -> InfernoTower()
+            TowerType.TESLA     -> TeslaTower()
+            TowerType.NOVA      -> NovaTower()
+            TowerType.SNIPER    -> SniperTower()
+            TowerType.ARTILLERY -> ArtilleryTower()
         }
         if (gold < tower.cost) return false
         val slot = grid.slot(slotId) ?: return false
@@ -270,7 +276,16 @@ class GameEngine(
                     return@replaceAll enemy.copy(hasReachedEnd = true, pathProgress = 1f, lastJumpTime = updatedLastJump)
                 }
 
-                enemy.copy(pathProgress = newProgress, currentSpeed = spd, lastJumpTime = updatedLastJump)
+                // Update pathLayer based on current waypoint segment
+                val waypointLayerCount = PathSystem.waypointLayers.size
+                val waypointIndex = if (waypointLayerCount > 1) {
+                    (newProgress * (waypointLayerCount - 1)).toInt().coerceIn(0, waypointLayerCount - 1)
+                } else {
+                    0
+                }
+                val newLayer = PathSystem.layerAt(waypointIndex)
+
+                enemy.copy(pathProgress = newProgress, currentSpeed = spd, lastJumpTime = updatedLastJump, pathLayer = newLayer)
             }
 
             // Remove escaped
@@ -323,7 +338,14 @@ class GameEngine(
                     val pos = PathSystem.positionAt(e.pathProgress)
                     val dx = pos.x - inst.position.x
                     val dy = pos.y - inst.position.y
-                    sqrt(dx * dx + dy * dy) <= rangePixels
+                    val distOk = sqrt(dx * dx + dy * dy) <= rangePixels
+                    if (!distOk) return@filter false
+                    // Layer filter based on targeting mode
+                    when (tower.type.targetingMode) {
+                        TargetingMode.ALL_LAYERS   -> true
+                        TargetingMode.GROUND_ONLY  -> e.pathLayer == PathLayer.GROUND
+                        TargetingMode.BRIDGE_ONLY  -> e.pathLayer == PathLayer.BRIDGE
+                    }
                 }
 
                 if (inRange.isEmpty()) continue

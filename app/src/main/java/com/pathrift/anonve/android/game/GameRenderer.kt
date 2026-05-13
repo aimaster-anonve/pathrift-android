@@ -12,7 +12,11 @@ import android.view.SurfaceView
 import com.pathrift.anonve.android.game.enemies.EnemyInstance
 import com.pathrift.anonve.android.game.enemies.EnemyType
 import com.pathrift.anonve.android.game.towers.TowerType
+import com.pathrift.anonve.android.game.PathLayer
 import kotlin.math.sqrt
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * GameRenderer — Canvas-based SurfaceView renderer. iOS parity for all 6 enemy types,
@@ -72,14 +76,16 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     }
 
     // Tower colors
-    private val towerBoltPaint    = Paint().apply { color = Color.parseColor("#00C8FF"); style = Paint.Style.FILL }
-    private val towerBlastPaint   = Paint().apply { color = Color.parseColor("#FF6B00"); style = Paint.Style.FILL }
-    private val towerFrostPaint   = Paint().apply { color = Color.parseColor("#8B4FFF"); style = Paint.Style.FILL }
-    private val towerPiercePaint  = Paint().apply { color = Color.parseColor("#CCFF00"); style = Paint.Style.FILL }
-    private val towerCorePaint    = Paint().apply { color = Color.parseColor("#FF4400"); style = Paint.Style.FILL }
-    private val towerInfernoPaint = Paint().apply { color = Color.parseColor("#FF2200"); style = Paint.Style.FILL }
-    private val towerTeslaPaint   = Paint().apply { color = Color.parseColor("#00AAFF"); style = Paint.Style.FILL }
-    private val towerNovaPaint    = Paint().apply { color = Color.parseColor("#FFD700"); style = Paint.Style.FILL }
+    private val towerBoltPaint      = Paint().apply { color = Color.parseColor("#00C8FF"); style = Paint.Style.FILL }
+    private val towerBlastPaint     = Paint().apply { color = Color.parseColor("#FF6B00"); style = Paint.Style.FILL }
+    private val towerFrostPaint     = Paint().apply { color = Color.parseColor("#8B4FFF"); style = Paint.Style.FILL }
+    private val towerPiercePaint    = Paint().apply { color = Color.parseColor("#CCFF00"); style = Paint.Style.FILL }
+    private val towerCorePaint      = Paint().apply { color = Color.parseColor("#FF4400"); style = Paint.Style.FILL }
+    private val towerInfernoPaint   = Paint().apply { color = Color.parseColor("#FF2200"); style = Paint.Style.FILL }
+    private val towerTeslaPaint     = Paint().apply { color = Color.parseColor("#00AAFF"); style = Paint.Style.FILL }
+    private val towerNovaPaint      = Paint().apply { color = Color.parseColor("#FFD700"); style = Paint.Style.FILL }
+    private val towerSniperPaint    = Paint().apply { color = Color.parseColor("#66FFFF"); style = Paint.Style.FILL }
+    private val towerArtilleryPaint = Paint().apply { color = Color.parseColor("#CC8800"); style = Paint.Style.FILL }
 
     // Tower range ring — semi-transparent blue halo
     private val towerRangePaint = Paint().apply {
@@ -226,12 +232,13 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         }
     }
 
-    // Render the Z-shaped waypoint path as thick segments + joints
+    // Render the Z-shaped waypoint path as thick segments + joints, with bridge overlay pass
     private fun drawPath(canvas: Canvas, W: Float, H: Float) {
         val wps = PathSystem.waypoints
         if (wps.size < 2) return
         val thickness = 24f
 
+        // First pass: draw all ground path segments
         for (i in 1 until wps.size) {
             val from = wps[i - 1]
             val to = wps[i]
@@ -254,6 +261,43 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             canvas.drawCircle(wp.x, wp.y, thickness / 2f, pathFillPaint)
         }
 
+        // Second pass: draw bridge segments with elevated visual
+        val bridgeShadowPaint = Paint().apply {
+            color = Color.argb(77, 0, 0, 0)   // black ~30% alpha
+            style = Paint.Style.STROKE
+            strokeWidth = thickness + 6f
+            strokeCap = Paint.Cap.ROUND
+        }
+        val bridgeSurfacePaint = Paint().apply {
+            color = Color.parseColor("#594D33")  // lighter brown
+            style = Paint.Style.STROKE
+            strokeWidth = thickness
+            strokeCap = Paint.Cap.ROUND
+        }
+        val bridgeRailPaint = Paint().apply {
+            color = Color.argb(179, 153, 122, 77)  // brass ~70% alpha
+            style = Paint.Style.STROKE
+            strokeWidth = 2.5f
+            strokeCap = Paint.Cap.ROUND
+        }
+
+        for (i in 1 until wps.size) {
+            val fromLayer = PathSystem.layerAt(i - 1)
+            val toLayer = PathSystem.layerAt(i)
+            if (fromLayer == PathLayer.BRIDGE || toLayer == PathLayer.BRIDGE) {
+                val from = wps[i - 1]
+                val to = wps[i]
+                // Shadow (offset down 3px)
+                canvas.drawLine(from.x, from.y + 3f, to.x, to.y + 3f, bridgeShadowPaint)
+                // Bridge surface
+                canvas.drawLine(from.x, from.y, to.x, to.y, bridgeSurfacePaint)
+                // Rails
+                val perp = computePerpendicular(from, to, thickness / 2f - 2f)
+                canvas.drawLine(from.x + perp.x, from.y + perp.y, to.x + perp.x, to.y + perp.y, bridgeRailPaint)
+                canvas.drawLine(from.x - perp.x, from.y - perp.y, to.x - perp.x, to.y - perp.y, bridgeRailPaint)
+            }
+        }
+
         // Start indicator
         wps.firstOrNull()?.let { first ->
             val cx = first.x + 20f
@@ -267,6 +311,14 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             canvas.drawCircle(cx, last.y, 14f, endPaint)
             canvas.drawText("✕", cx, last.y + 7f, indicatorTextPaint)
         }
+    }
+
+    /** Compute perpendicular offset vector for bridge rail rendering. */
+    private fun computePerpendicular(from: PointF, to: PointF, distance: Float): PointF {
+        val dx = to.x - from.x
+        val dy = to.y - from.y
+        val len = sqrt(dx * dx + dy * dy)
+        return if (len > 0) PointF(-dy / len * distance, dx / len * distance) else PointF(0f, distance)
     }
 
     // Tower slot backgrounds (only unoccupied)
@@ -304,14 +356,16 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
             // Tower body (diamond)
             val towerPaint = when (inst.tower.type) {
-                TowerType.BOLT    -> towerBoltPaint
-                TowerType.BLAST   -> towerBlastPaint
-                TowerType.FROST   -> towerFrostPaint
-                TowerType.PIERCE  -> towerPiercePaint
-                TowerType.CORE    -> towerCorePaint
-                TowerType.INFERNO -> towerInfernoPaint
-                TowerType.TESLA   -> towerTeslaPaint
-                TowerType.NOVA    -> towerNovaPaint
+                TowerType.BOLT      -> towerBoltPaint
+                TowerType.BLAST     -> towerBlastPaint
+                TowerType.FROST     -> towerFrostPaint
+                TowerType.PIERCE    -> towerPiercePaint
+                TowerType.CORE      -> towerCorePaint
+                TowerType.INFERNO   -> towerInfernoPaint
+                TowerType.TESLA     -> towerTeslaPaint
+                TowerType.NOVA      -> towerNovaPaint
+                TowerType.SNIPER    -> towerSniperPaint
+                TowerType.ARTILLERY -> towerArtilleryPaint
             }
             val path = Path().apply {
                 moveTo(cx, cy - radius)
@@ -355,13 +409,19 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         canvas.drawText(level.toString(), cx, cy + 5f, tp)
     }
 
-    // All 6 enemy types with distinct visuals
+    // All enemy types with distinct visuals; bridge enemies drawn 1.15× larger
     private fun drawEnemies(canvas: Canvas) {
         for (enemy in enemies) {
             if (!enemy.isAlive) continue
             val pos = PathSystem.positionAt(enemy.pathProgress)
             val px = pos.x
             val py = pos.y
+            val scale = if (enemy.pathLayer == PathLayer.BRIDGE) 1.15f else 1.0f
+
+            if (scale != 1.0f) {
+                canvas.save()
+                canvas.scale(scale, scale, px, py)
+            }
 
             when (enemy.type) {
                 EnemyType.RUNNER   -> drawRunnerEnemy(canvas, px, py, enemy)
@@ -372,6 +432,10 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 EnemyType.BOSS     -> drawBossEnemy(canvas, px, py, enemy)
                 EnemyType.SPLITTER -> drawSplitterEnemy(canvas, px, py, enemy)
                 EnemyType.JUMPER   -> drawJumperEnemy(canvas, px, py, enemy)
+            }
+
+            if (scale != 1.0f) {
+                canvas.restore()
             }
         }
     }

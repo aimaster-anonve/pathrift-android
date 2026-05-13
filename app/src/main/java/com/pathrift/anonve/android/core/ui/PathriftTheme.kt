@@ -35,6 +35,8 @@ val CoreTowerColor = Color(0xFFFF4400)     // red-orange
 val InfernoTowerColor = Color(0xFFFF2200)  // deep red
 val TeslaTowerColor = Color(0xFF00AAFF)    // electric blue
 val NovaTowerColor = Color(0xFFFFD700)     // gold
+val SniperTowerColor = Color(0xFF66FFFF)   // cyan-white
+val ArtilleryTowerColor = Color(0xFFCC8800) // brass/gold
 
 // ---- Enemy Colors ----
 val RunnerEnemyColor = PathriftDanger

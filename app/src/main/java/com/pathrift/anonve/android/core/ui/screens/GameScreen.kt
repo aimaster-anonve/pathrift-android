@@ -12,13 +12,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
@@ -66,6 +70,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import kotlin.math.sqrt
 import androidx.compose.ui.text.style.TextOverflow
+import com.pathrift.anonve.android.core.ui.ArtilleryTowerColor
 import com.pathrift.anonve.android.core.ui.BlastTowerColor
 import com.pathrift.anonve.android.core.ui.BoltTowerColor
 import com.pathrift.anonve.android.core.ui.CoreTowerColor
@@ -76,6 +81,7 @@ import com.pathrift.anonve.android.core.ui.NovaTowerColor
 import com.pathrift.anonve.android.core.ui.PathriftGold
 import com.pathrift.anonve.android.core.ui.PathriftTextDisabled
 import com.pathrift.anonve.android.core.ui.PierceTowerColor
+import com.pathrift.anonve.android.core.ui.SniperTowerColor
 import com.pathrift.anonve.android.core.ui.TeslaTowerColor
 import com.pathrift.anonve.android.core.ui.GameViewModel
 import com.pathrift.anonve.android.core.ui.LanguageManager
@@ -389,7 +395,7 @@ private fun CombatHUD(
                 .fillMaxWidth()
                 .align(Alignment.BottomStart)
                 .background(Brush.verticalGradient(listOf(Color.Transparent, PathriftBackground.copy(alpha = 0.9f))))
-                .padding(horizontal = 20.dp, vertical = 14.dp),
+                .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange)
@@ -421,7 +427,7 @@ private fun WaveProgressIndicator(cleared: Int, total: Int) {
         Spacer(Modifier.height(4.dp))
         LinearProgressIndicator(
             progress = { progress },
-            modifier = Modifier.width(140.dp).height(7.dp).clip(RoundedCornerShape(4.dp)),
+            modifier = Modifier.width(120.dp).height(5.dp).clip(RoundedCornerShape(3.dp)),
             color = PathriftNeonBlue, trackColor = PathriftSurface
         )
     }
@@ -433,7 +439,7 @@ private fun SendWaveButton(onClick: () -> Unit) {
         onClick = onClick,
         colors = ButtonDefaults.buttonColors(containerColor = PathriftNeonBlue),
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.height(48.dp)
+        modifier = Modifier.height(40.dp)
     ) {
         Icon(Icons.Default.PlayArrow, null, modifier = Modifier.size(11.dp))
         Spacer(Modifier.width(8.dp))
@@ -482,14 +488,16 @@ private fun TowerInfoBottomPanel(
 ) {
     val canAffordUpgrade = gold >= info.upgradeCost
     val towerColor = when (info.type) {
-        TowerType.BOLT    -> BoltTowerColor
-        TowerType.BLAST   -> BlastTowerColor
-        TowerType.FROST   -> FrostTowerColor
-        TowerType.PIERCE  -> PierceTowerColor
-        TowerType.CORE    -> CoreTowerColor
-        TowerType.INFERNO -> InfernoTowerColor
-        TowerType.TESLA   -> TeslaTowerColor
-        TowerType.NOVA    -> NovaTowerColor
+        TowerType.BOLT      -> BoltTowerColor
+        TowerType.BLAST     -> BlastTowerColor
+        TowerType.FROST     -> FrostTowerColor
+        TowerType.PIERCE    -> PierceTowerColor
+        TowerType.CORE      -> CoreTowerColor
+        TowerType.INFERNO   -> InfernoTowerColor
+        TowerType.TESLA     -> TeslaTowerColor
+        TowerType.NOVA      -> NovaTowerColor
+        TowerType.SNIPER    -> SniperTowerColor
+        TowerType.ARTILLERY -> ArtilleryTowerColor
     }
 
     Box(
@@ -497,69 +505,84 @@ private fun TowerInfoBottomPanel(
         contentAlignment = Alignment.BottomCenter
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().background(PathriftSurface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 160.dp)
+                .background(PathriftSurface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .navigationBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Box(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp).size(36.dp, 4.dp).background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
 
-            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 32.dp, top = 8.dp)) {
-                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(12.dp).background(towerColor, CircleShape))
-                    Spacer(Modifier.width(8.dp))
-                    Text(info.type.name, fontSize = 15.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary, letterSpacing = 1.sp)
-                    Spacer(Modifier.width(8.dp))
-                    Box(modifier = Modifier.background(PathriftNeonBlue.copy(alpha = 0.15f), RoundedCornerShape(6.dp)).padding(horizontal = 7.dp, vertical = 3.dp)) {
-                        Text("Lv.${info.level}", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = PathriftNeonBlue, fontFamily = FontFamily.Monospace)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Left: header + stats
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.size(12.dp).background(towerColor, CircleShape))
+                        Spacer(Modifier.width(8.dp))
+                        Text(info.type.name, fontSize = 14.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary, letterSpacing = 1.sp)
+                        Spacer(Modifier.width(6.dp))
+                        Box(modifier = Modifier.background(PathriftNeonBlue.copy(alpha = 0.15f), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
+                            Text("Lv.${info.level}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PathriftNeonBlue, fontFamily = FontFamily.Monospace)
+                        }
+                        Spacer(Modifier.weight(1f))
+                        IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                            Text("✕", fontSize = 14.sp, color = PathriftTextSecondary)
+                        }
                     }
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                        Text("✕", fontSize = 16.sp, color = PathriftTextSecondary)
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp)).padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        TowerStatItem("DMG", String.format("%.0f", info.damage), PathriftOrange, Modifier.weight(1f))
+                        Box(modifier = Modifier.size(1.dp, 28.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
+                        TowerStatItem("RNG", "${info.range.toInt()}t", PathriftNeonBlue, Modifier.weight(1f))
+                        Box(modifier = Modifier.size(1.dp, 28.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
+                        TowerStatItem("SPD", String.format("%.1f/s", info.attackSpeed), PathriftPurple, Modifier.weight(1f))
+                    }
+                    info.type.typeAdvantageHint?.let { hint ->
+                        Text(hint, color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(top = 2.dp))
                     }
                 }
 
-                Spacer(Modifier.height(12.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(10.dp)).padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                // Right: action buttons (140dp)
+                Column(
+                    modifier = Modifier.width(140.dp).padding(start = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    TowerStatItem("DMG", String.format("%.0f", info.damage), PathriftOrange, Modifier.weight(1f))
-                    Box(modifier = Modifier.size(1.dp, 32.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
-                    TowerStatItem("RNG", "${info.range.toInt()}t", PathriftNeonBlue, Modifier.weight(1f))
-                    Box(modifier = Modifier.size(1.dp, 32.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
-                    TowerStatItem("SPD", String.format("%.1f/s", info.attackSpeed), PathriftPurple, Modifier.weight(1f))
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                Row(modifier = Modifier.fillMaxWidth()) {
                     Button(
                         onClick = onUpgrade, enabled = canAffordUpgrade,
-                        modifier = Modifier.weight(1f).height(52.dp),
+                        modifier = Modifier.fillMaxWidth().height(44.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (canAffordUpgrade) PathriftNeonBlue else PathriftSurface,
                             disabledContainerColor = PathriftSurface
                         ),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(LanguageManager.s("UPGRADE", "GELİŞTİR"), fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                            Text(LanguageManager.s("UPGRADE", "GELİŞTİR"), fontSize = 12.sp, fontWeight = FontWeight.Bold,
                                 color = if (canAffordUpgrade) PathriftTextPrimary else PathriftTextSecondary)
-                            Text("${info.upgradeCost}g", fontSize = 11.sp,
+                            Text("${info.upgradeCost}g", fontSize = 10.sp,
                                 color = if (canAffordUpgrade) PathriftTextPrimary.copy(0.7f) else PathriftTextSecondary.copy(0.5f))
                         }
                     }
-                    Spacer(Modifier.width(12.dp))
                     Button(
                         onClick = onSell,
-                        modifier = Modifier.width(100.dp).height(52.dp),
+                        modifier = Modifier.fillMaxWidth().height(36.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = PathriftSurface),
-                        shape = RoundedCornerShape(12.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(LanguageManager.s("SELL", "SAT"), fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PathriftOrange)
-                            Text("+${info.sellValue}g", fontSize = 11.sp, color = PathriftOrange.copy(0.8f))
-                        }
+                        Text(LanguageManager.s("SELL", "SAT"), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PathriftOrange)
+                        Spacer(Modifier.width(4.dp))
+                        Text("+${info.sellValue}g", fontSize = 10.sp, color = PathriftOrange.copy(0.8f))
                     }
                 }
             }
@@ -596,48 +619,129 @@ private fun TowerSelectionPanel(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(max = 120.dp)
                 .background(PathriftSurface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .clickable(enabled = false, onClick = {}) // consume clicks inside panel
+                .navigationBarsPadding()
+                .clickable(enabled = false, onClick = {})
         ) {
-            Box(modifier = Modifier.padding(top = 10.dp, bottom = 4.dp).size(36.dp, 4.dp).align(Alignment.CenterHorizontally).background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
+            Box(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp).size(36.dp, 4.dp).align(Alignment.CenterHorizontally).background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
 
-            Text(
-                text = LanguageManager.s("SELECT TOWER", "KULE SEÇ"),
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = PathriftTextSecondary,
-                letterSpacing = 2.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(start = 20.dp, bottom = 8.dp, top = 4.dp)
-            )
-
-            LazyRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
-                    .padding(bottom = 28.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(TowerType.values().toList()) { type ->
-                    val isUnlocked = viewModel.isTowerUnlocked(type)
-                    val canAffordGold = state.gold >= towerGoldCost(type)
-                    val canAffordDiamonds = state.diamonds >= type.diamondCost || type.diamondCost == 0
-                    TowerPickCard(
-                        type = type,
-                        isUnlocked = isUnlocked,
-                        canAffordGold = canAffordGold,
-                        canAffordDiamonds = canAffordDiamonds,
-                        diamonds = state.diamonds,
-                        onTap = {
-                            if (isUnlocked) {
-                                viewModel.placeTower(slotId, type)
-                                onDismiss()
-                            } else {
-                                viewModel.unlockTower(type)
+                LazyRow(
+                    modifier = Modifier.weight(1f).padding(start = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = PaddingValues(end = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items(TowerType.values().toList()) { type ->
+                        val isUnlocked = viewModel.isTowerUnlocked(type)
+                        val canAffordGold = state.gold >= towerGoldCost(type)
+                        val canAffordDiamonds = state.diamonds >= type.diamondCost || type.diamondCost == 0
+                        CompactTowerPickCard(
+                            type = type,
+                            isUnlocked = isUnlocked,
+                            canAffordGold = canAffordGold,
+                            canAffordDiamonds = canAffordDiamonds,
+                            diamonds = state.diamonds,
+                            onTap = {
+                                if (isUnlocked) {
+                                    viewModel.placeTower(slotId, type)
+                                    onDismiss()
+                                } else {
+                                    viewModel.unlockTower(type)
+                                }
                             }
-                        }
-                    )
-                    Spacer(Modifier.width(8.dp))
+                        )
+                    }
                 }
+
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(56.dp)
+                        .background(Color.White.copy(0.08f))
+                )
+
+                Box(
+                    modifier = Modifier
+                        .width(140.dp)
+                        .padding(horizontal = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = LanguageManager.s("TAP TOWER TO BUILD", "KULEYE DOKUN"),
+                        fontSize = 9.sp,
+                        color = PathriftTextSecondary,
+                        fontFamily = FontFamily.Monospace,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactTowerPickCard(
+    type: TowerType,
+    isUnlocked: Boolean,
+    canAffordGold: Boolean,
+    canAffordDiamonds: Boolean,
+    diamonds: Int,
+    onTap: () -> Unit
+) {
+    val towerColor = towerDisplayColor(type)
+    val isAffordable = isUnlocked && canAffordGold
+    val alpha = if (isAffordable) 1f else 0.45f
+
+    Box(
+        modifier = Modifier
+            .width(60.dp)
+            .background(
+                PathriftSurface.copy(alpha = alpha),
+                RoundedCornerShape(10.dp)
+            )
+            .border(
+                width = 1.dp,
+                color = if (isAffordable) towerColor.copy(alpha = 0.7f) else PathriftTextDisabled,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .clickable(onClick = onTap)
+            .padding(vertical = 6.dp, horizontal = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .size(18.dp)
+                    .background(towerColor.copy(alpha = alpha), CircleShape)
+            )
+            Spacer(Modifier.height(3.dp))
+            Text(
+                text = type.displayName.uppercase().take(6),
+                fontSize = 8.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isAffordable) PathriftTextPrimary else PathriftTextSecondary.copy(alpha = alpha),
+                fontFamily = FontFamily.Monospace
+            )
+            Spacer(Modifier.height(2.dp))
+            if (!isUnlocked) {
+                Text(
+                    text = "🔒",
+                    fontSize = 8.sp
+                )
+            } else {
+                val goldCost = towerGoldCost(type)
+                Text(
+                    text = "${goldCost}g",
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (canAffordGold) PathriftGold else PathriftDanger,
+                    fontFamily = FontFamily.Monospace
+                )
             }
         }
     }
@@ -724,23 +828,27 @@ private fun TowerPickCard(
 }
 
 private fun towerDisplayColor(type: TowerType): Color = when (type) {
-    TowerType.BOLT    -> BoltTowerColor
-    TowerType.BLAST   -> BlastTowerColor
-    TowerType.FROST   -> FrostTowerColor
-    TowerType.PIERCE  -> PierceTowerColor
-    TowerType.CORE    -> CoreTowerColor
-    TowerType.INFERNO -> InfernoTowerColor
-    TowerType.TESLA   -> TeslaTowerColor
-    TowerType.NOVA    -> NovaTowerColor
+    TowerType.BOLT      -> BoltTowerColor
+    TowerType.BLAST     -> BlastTowerColor
+    TowerType.FROST     -> FrostTowerColor
+    TowerType.PIERCE    -> PierceTowerColor
+    TowerType.CORE      -> CoreTowerColor
+    TowerType.INFERNO   -> InfernoTowerColor
+    TowerType.TESLA     -> TeslaTowerColor
+    TowerType.NOVA      -> NovaTowerColor
+    TowerType.SNIPER    -> SniperTowerColor
+    TowerType.ARTILLERY -> ArtilleryTowerColor
 }
 
 private fun towerGoldCost(type: TowerType): Int = when (type) {
-    TowerType.BOLT    -> 50
-    TowerType.BLAST   -> 70
-    TowerType.FROST   -> 60
-    TowerType.PIERCE  -> 130
-    TowerType.CORE    -> 180
-    TowerType.INFERNO -> 200
-    TowerType.TESLA   -> 300
-    TowerType.NOVA    -> 500
+    TowerType.BOLT      -> 50
+    TowerType.BLAST     -> 70
+    TowerType.FROST     -> 60
+    TowerType.PIERCE    -> 130
+    TowerType.CORE      -> 180
+    TowerType.INFERNO   -> 200
+    TowerType.TESLA     -> 300
+    TowerType.NOVA      -> 500
+    TowerType.SNIPER    -> 220
+    TowerType.ARTILLERY -> 160
 }

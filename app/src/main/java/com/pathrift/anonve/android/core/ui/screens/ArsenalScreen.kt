@@ -6,10 +6,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -48,6 +50,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.pathrift.anonve.android.app.PathriftApp
 import com.pathrift.anonve.android.core.storage.ArsenalStore
 import com.pathrift.anonve.android.core.storage.DiamondStore
+import com.pathrift.anonve.android.core.ui.ArtilleryTowerColor
 import com.pathrift.anonve.android.core.ui.BlastTowerColor
 import com.pathrift.anonve.android.core.ui.BoltTowerColor
 import com.pathrift.anonve.android.core.ui.CoreTowerColor
@@ -55,6 +58,7 @@ import com.pathrift.anonve.android.core.ui.FrostTowerColor
 import com.pathrift.anonve.android.core.ui.InfernoTowerColor
 import com.pathrift.anonve.android.core.ui.NovaTowerColor
 import com.pathrift.anonve.android.core.ui.PierceTowerColor
+import com.pathrift.anonve.android.core.ui.SniperTowerColor
 import com.pathrift.anonve.android.core.ui.TeslaTowerColor
 import com.pathrift.anonve.android.game.towers.TowerType
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -120,7 +124,7 @@ fun ArsenalScreen(
     ) {
         // Header
         Row(
-            Modifier.fillMaxWidth().padding(16.dp),
+            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
@@ -129,7 +133,7 @@ fun ArsenalScreen(
             Text(
                 "ARSENAL",
                 color = Color.White,
-                fontSize = 20.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Black,
                 letterSpacing = 2.sp,
                 modifier = Modifier.weight(1f).padding(start = 8.dp)
@@ -137,7 +141,7 @@ fun ArsenalScreen(
             Text(
                 "◆ ${state.diamonds}",
                 color = Color(0xFF00CCFF),
-                fontSize = 16.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace
             )
@@ -179,46 +183,50 @@ fun TowerArsenalCard(
     onUpgradeSpd: () -> Unit
 ) {
     val towerColor = towerColor(type)
-    val alpha = if (isUnlocked) 1f else 0.5f
 
     Card(
-        modifier = Modifier.fillMaxWidth().alpha(alpha),
+        modifier = Modifier.fillMaxWidth().alpha(if (isUnlocked) 1f else 0.6f),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF16162A)),
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(
             1.dp,
-            if (isUnlocked) towerColor.copy(alpha = 0.3f) else Color.Gray.copy(alpha = 0.2f)
+            if (isUnlocked) towerColor.copy(alpha = 0.25f) else Color.Gray.copy(alpha = 0.15f)
         )
     ) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Tower header row
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Left: identity (40% width)
+            Row(
+                Modifier.fillMaxWidth(0.4f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 Box(
                     Modifier
-                        .size(36.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
-                        .background(towerColor.copy(alpha = 0.2f))
+                        .background(towerColor.copy(0.2f))
                         .border(1.5.dp, towerColor, CircleShape)
                 )
-                Spacer(Modifier.width(10.dp))
                 Column {
                     Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             type.displayName.uppercase(),
                             color = Color.White,
                             fontWeight = FontWeight.Black,
-                            fontSize = 14.sp
+                            fontSize = 13.sp
                         )
                         Text(
                             "T${type.tier}",
                             color = towerColor,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
+                            fontSize = 8.sp,
                             modifier = Modifier
-                                .background(towerColor.copy(alpha = 0.15f), RoundedCornerShape(3.dp))
+                                .background(towerColor.copy(0.15f), RoundedCornerShape(3.dp))
                                 .padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }
@@ -230,46 +238,44 @@ fun TowerArsenalCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
-                Spacer(Modifier.weight(1f))
-                if (!isUnlocked) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("🔒", fontSize = 14.sp)
-                        Text(
-                            "${type.diamondCost}◆",
-                            color = Color(0xFF00CCFF),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
             }
 
             if (isUnlocked) {
-                HorizontalDivider(color = Color.White.copy(alpha = 0.08f))
-                Row(Modifier.fillMaxWidth()) {
-                    upgradeRow(
-                        label = "DMG",
-                        level = dmgLevel,
-                        cost = dmgCost,
-                        diamonds = diamonds,
-                        color = Color(0xFFFF6B00),
-                        onUpgrade = onUpgradeDmg,
-                        modifier = Modifier.weight(1f)
-                    )
-                    VerticalDivider(
-                        modifier = Modifier
-                            .height(40.dp)
-                            .padding(horizontal = 8.dp),
-                        color = Color.White.copy(alpha = 0.08f)
-                    )
-                    upgradeRow(
-                        label = "SPD",
-                        level = spdLevel,
-                        cost = spdCost,
-                        diamonds = diamonds,
-                        color = Color(0xFF9966FF),
-                        onUpgrade = onUpgradeSpd,
-                        modifier = Modifier.weight(1f)
+                VerticalDivider(
+                    modifier = Modifier.height(40.dp).padding(horizontal = 8.dp),
+                    color = Color.White.copy(0.08f)
+                )
+                upgradeRow(
+                    label = "DMG",
+                    level = dmgLevel,
+                    cost = dmgCost,
+                    diamonds = diamonds,
+                    color = Color(0xFFFF6B00),
+                    onUpgrade = onUpgradeDmg,
+                    modifier = Modifier.weight(1f)
+                )
+                VerticalDivider(
+                    modifier = Modifier.height(40.dp).padding(horizontal = 8.dp),
+                    color = Color.White.copy(0.08f)
+                )
+                upgradeRow(
+                    label = "SPD",
+                    level = spdLevel,
+                    cost = spdCost,
+                    diamonds = diamonds,
+                    color = Color(0xFF9966FF),
+                    onUpgrade = onUpgradeSpd,
+                    modifier = Modifier.weight(1f)
+                )
+            } else {
+                Spacer(Modifier.weight(1f))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("🔒", fontSize = 14.sp)
+                    Text(
+                        "${type.diamondCost}♦",
+                        color = Color(0xFF00CCFF),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -333,12 +339,14 @@ fun upgradeRow(
 // ---- Tower Color Helper ----
 
 internal fun towerColor(type: TowerType): Color = when (type) {
-    TowerType.BOLT    -> BoltTowerColor
-    TowerType.BLAST   -> BlastTowerColor
-    TowerType.FROST   -> FrostTowerColor
-    TowerType.PIERCE  -> PierceTowerColor
-    TowerType.CORE    -> CoreTowerColor
-    TowerType.INFERNO -> InfernoTowerColor
-    TowerType.TESLA   -> TeslaTowerColor
-    TowerType.NOVA    -> NovaTowerColor
+    TowerType.BOLT      -> BoltTowerColor
+    TowerType.BLAST     -> BlastTowerColor
+    TowerType.FROST     -> FrostTowerColor
+    TowerType.PIERCE    -> PierceTowerColor
+    TowerType.CORE      -> CoreTowerColor
+    TowerType.INFERNO   -> InfernoTowerColor
+    TowerType.TESLA     -> TeslaTowerColor
+    TowerType.NOVA      -> NovaTowerColor
+    TowerType.SNIPER    -> SniperTowerColor
+    TowerType.ARTILLERY -> ArtilleryTowerColor
 }

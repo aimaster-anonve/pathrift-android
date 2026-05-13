@@ -3,6 +3,8 @@ package com.pathrift.anonve.android.game
 import android.graphics.PointF
 import kotlin.math.sqrt
 
+enum class PathLayer { GROUND, BRIDGE }
+
 /**
  * PathSystem — 18 layouts (12 Z-shaped + 6 crossing/complex), continuous waypoint path,
  * algorithmic slot placement that never overlaps the path.
@@ -40,6 +42,24 @@ object PathSystem {
     var slotPositions: List<PointF> = emptyList()
         private set
 
+    var waypointLayers: List<PathLayer> = emptyList()
+        private set
+
+    val bridgeSegmentCount: Int get() = waypointLayers.count { it == PathLayer.BRIDGE }
+
+    fun layerAt(index: Int): PathLayer =
+        if (index < waypointLayers.size) waypointLayers[index] else PathLayer.GROUND
+
+    // Layer definitions for crossing layouts (crossIdx 0-5)
+    private val crossingLayerDefs: List<List<PathLayer>> = listOf(
+        listOf(PathLayer.GROUND, PathLayer.GROUND, PathLayer.BRIDGE, PathLayer.GROUND, PathLayer.GROUND),
+        listOf(PathLayer.GROUND, PathLayer.GROUND, PathLayer.BRIDGE, PathLayer.BRIDGE, PathLayer.GROUND, PathLayer.GROUND),
+        listOf(PathLayer.GROUND, PathLayer.GROUND, PathLayer.GROUND, PathLayer.BRIDGE, PathLayer.BRIDGE, PathLayer.GROUND),
+        listOf(PathLayer.GROUND, PathLayer.GROUND, PathLayer.BRIDGE, PathLayer.GROUND, PathLayer.BRIDGE, PathLayer.GROUND),
+        listOf(PathLayer.GROUND, PathLayer.BRIDGE, PathLayer.BRIDGE, PathLayer.GROUND, PathLayer.GROUND, PathLayer.GROUND),
+        listOf(PathLayer.GROUND, PathLayer.GROUND, PathLayer.BRIDGE, PathLayer.GROUND)
+    )
+
     /**
      * Build the path and slot layout for the given screen dimensions.
      * @param layoutIndex -1 = random pick
@@ -74,12 +94,25 @@ object PathSystem {
                 PointF(W + 10f, y3)
             )
 
+            // All Z-shaped layouts are ground-only
+            waypointLayers = List(waypoints.size) { PathLayer.GROUND }
+
             val rawSlots = computeSlots(y1, y2, y3, xL, xR, W, H, currentWave)
             slotPositions = guaranteePathCoverage(rawSlots, waypoints, currentWave)
         } else {
             // Crossing/complex layouts (indices 12–17)
             val crossIdx = idx - layoutParams.size
             waypoints = buildCrossingLayout(crossIdx, W, H)
+
+            // Assign layer definitions for crossing layouts
+            waypointLayers = if (crossIdx >= 0 && crossIdx < crossingLayerDefs.size) {
+                val layerDef = crossingLayerDefs[crossIdx]
+                // Pad or trim to match waypoints size
+                List(waypoints.size) { i -> if (i < layerDef.size) layerDef[i] else PathLayer.GROUND }
+            } else {
+                List(waypoints.size) { PathLayer.GROUND }
+            }
+
             val rawSlots = computeSlotsForCrossing(W, H, currentWave)
             slotPositions = guaranteePathCoverage(rawSlots, waypoints, currentWave)
         }

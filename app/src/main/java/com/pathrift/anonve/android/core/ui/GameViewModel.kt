@@ -16,6 +16,7 @@ import com.pathrift.anonve.android.game.TowerInfo
 import com.pathrift.anonve.android.game.TowerSlotData
 import com.pathrift.anonve.android.game.enemies.EnemyInstance
 import com.pathrift.anonve.android.game.enemies.EnemyType
+import com.pathrift.anonve.android.game.towers.ArtilleryTower
 import com.pathrift.anonve.android.game.towers.BoltTower
 import com.pathrift.anonve.android.game.towers.BlastTower
 import com.pathrift.anonve.android.game.towers.CoreTower
@@ -23,6 +24,7 @@ import com.pathrift.anonve.android.game.towers.FrostTower
 import com.pathrift.anonve.android.game.towers.InfernoTower
 import com.pathrift.anonve.android.game.towers.NovaTower
 import com.pathrift.anonve.android.game.towers.PierceTower
+import com.pathrift.anonve.android.game.towers.SniperTower
 import com.pathrift.anonve.android.game.towers.TeslaTower
 import com.pathrift.anonve.android.game.towers.TowerType
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -279,14 +281,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     private fun buildTowerInfo(slotId: Int, type: TowerType, level: Int, totalInvested: Int): TowerInfo {
         val inst = game.towerInstance(slotId)
         val tower = inst?.tower ?: when (type) {
-            TowerType.BOLT    -> BoltTower()
-            TowerType.BLAST   -> BlastTower()
-            TowerType.FROST   -> FrostTower()
-            TowerType.PIERCE  -> PierceTower()
-            TowerType.CORE    -> CoreTower()
-            TowerType.INFERNO -> InfernoTower()
-            TowerType.TESLA   -> TeslaTower()
-            TowerType.NOVA    -> NovaTower()
+            TowerType.BOLT      -> BoltTower()
+            TowerType.BLAST     -> BlastTower()
+            TowerType.FROST     -> FrostTower()
+            TowerType.PIERCE    -> PierceTower()
+            TowerType.CORE      -> CoreTower()
+            TowerType.INFERNO   -> InfernoTower()
+            TowerType.TESLA     -> TeslaTower()
+            TowerType.NOVA      -> NovaTower()
+            TowerType.SNIPER    -> SniperTower()
+            TowerType.ARTILLERY -> ArtilleryTower()
         }
         val upgradeCost = (EconomyConstants.UPGRADE_BASE_COST *
                 EconomyConstants.UPGRADE_GROWTH_RATE.pow((level - 1).toDouble())).toInt()
@@ -306,14 +310,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     }
 
     private fun getCost(type: TowerType): Int = when (type) {
-        TowerType.BOLT    -> EconomyConstants.TowerCost.BOLT
-        TowerType.BLAST   -> EconomyConstants.TowerCost.BLAST
-        TowerType.FROST   -> EconomyConstants.TowerCost.FROST
-        TowerType.PIERCE  -> 130
-        TowerType.CORE    -> 180
-        TowerType.INFERNO -> 200
-        TowerType.TESLA   -> 300
-        TowerType.NOVA    -> 500
+        TowerType.BOLT      -> EconomyConstants.TowerCost.BOLT
+        TowerType.BLAST     -> EconomyConstants.TowerCost.BLAST
+        TowerType.FROST     -> EconomyConstants.TowerCost.FROST
+        TowerType.PIERCE    -> 130
+        TowerType.CORE      -> 180
+        TowerType.INFERNO   -> 200
+        TowerType.TESLA     -> 300
+        TowerType.NOVA      -> 500
+        TowerType.SNIPER    -> 220
+        TowerType.ARTILLERY -> 160
     }
 
     // ---- Speed toggle ----
