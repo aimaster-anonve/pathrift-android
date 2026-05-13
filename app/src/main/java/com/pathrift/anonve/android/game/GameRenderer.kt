@@ -295,10 +295,12 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             }
         }
 
-        // Elite entry / exit indicators
+        // Elite entry / exit indicators — clamped to screen edges so they are always visible
         if (wps.isNotEmpty()) {
-            drawEntryIndicator(canvas, wps[0])
-            drawExitIndicator(canvas, wps[wps.size - 1])
+            val entryPos = PointF(24f, wps[0].y)
+            val exitPos = PointF(canvas.width.toFloat() - 24f, wps[wps.size - 1].y)
+            drawEntryIndicator(canvas, entryPos)
+            drawExitIndicator(canvas, exitPos)
         }
     }
 
@@ -403,19 +405,27 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         }
     }
 
-    // Towers with diamond shape, range ring for selected, level badge
+    // Towers with diamond shape, range ring for selected, level badge.
+    // Each tower rotates its barrel toward the current target via facingAngle.
     private fun drawTowers(canvas: Canvas) {
         for ((slotId, inst) in towerInstances) {
             val cx = inst.position.x
             val cy = inst.position.y
             val radius = 22f
 
-            // Range ring for selected tower
+            // Range ring for selected tower (drawn before rotation so it stays axis-aligned)
             if (selectedSlotId == slotId) {
                 val rangePixels = inst.tower.rangeTiles * GridSystem.TILE_SIZE_DP
                 canvas.drawCircle(cx, cy, rangePixels, towerRangeFillPaint)
                 canvas.drawCircle(cx, cy, rangePixels, towerRangePaint)
             }
+
+            // Rotate canvas so barrel points toward current target.
+            // facingAngle=0 means target is to the right (+x). Drawing assumes barrel points up (-y),
+            // so we rotate by (angle_degrees - 90) to align the barrel to the target direction.
+            val rotationDeg = Math.toDegrees(inst.facingAngle.toDouble()).toFloat() - 90f
+            canvas.save()
+            canvas.rotate(rotationDeg, cx, cy)
 
             // Tower body (diamond)
             val towerPaint = when (inst.tower.type) {
@@ -444,7 +454,9 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             val labelPaint = Paint(indicatorTextPaint).apply { textSize = radius * 0.85f }
             canvas.drawText(label, cx, cy + radius * 0.30f, labelPaint)
 
-            // Level badge (bottom-right of tower)
+            canvas.restore()
+
+            // Level badge (drawn after restore so it stays in fixed position)
             if (inst.level > 1) {
                 drawLevelBadge(canvas, cx + 14f, cy + 14f, inst.level)
             }

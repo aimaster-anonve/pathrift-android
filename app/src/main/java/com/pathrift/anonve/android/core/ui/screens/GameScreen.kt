@@ -72,6 +72,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import kotlin.math.sqrt
 import androidx.compose.ui.text.style.TextOverflow
+import com.pathrift.anonve.android.core.engine.EconomyConstants
 import com.pathrift.anonve.android.core.ui.ArtilleryTowerColor
 import com.pathrift.anonve.android.core.ui.BlastTowerColor
 import com.pathrift.anonve.android.core.ui.BoltTowerColor
@@ -321,45 +322,66 @@ private fun CombatHUD(
                 .align(Alignment.TopStart)
         ) {
             if (isLandscape) {
-                // Compact single-row landscape HUD (≤52dp)
+                // Three-section landscape top bar: [Wave] [Lives+Gold+Diamond] [Speed+Pause]
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(PathriftBackground.copy(alpha = 0.88f))
                         .systemBarsPadding()
-                        .padding(horizontal = 12.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Wave
+                    // LEFT: Wave
                     Text(
-                        text = if (state.wave == 0) "--" else "W${state.wave}",
-                        fontSize = 16.sp, fontWeight = FontWeight.Black,
-                        color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
+                        text = if (state.wave == 0) "W--" else "W${state.wave}",
+                        fontSize = 15.sp, fontWeight = FontWeight.Black,
+                        color = PathriftNeonBlue, fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.width(56.dp)
                     )
-                    Spacer(Modifier.weight(1f))
-                    // Lives
-                    for (i in 0 until 3) {
-                        Icon(
-                            imageVector = if (i < state.lives) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            contentDescription = null,
-                            tint = if (i < state.lives) PathriftDanger else PathriftTextSecondary.copy(alpha = 0.3f),
-                            modifier = Modifier.size(14.dp)
-                        )
+
+                    // CENTER (weight 1): Lives + Gold + Diamond
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Lives
+                        Row {
+                            for (i in 0 until EconomyConstants.STARTING_LIVES) {
+                                Icon(
+                                    imageVector = if (i < state.lives) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    contentDescription = null,
+                                    tint = if (i < state.lives) PathriftDanger else PathriftTextSecondary.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        // Gold
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("💰", fontSize = 11.sp)
+                            Text("${state.gold}", color = PathriftGold, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        // Diamond
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text("♦", color = Color(0xFF00CCFF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("${state.diamonds}", color = Color(0xFF00CCFF), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
                     }
-                    // Gold
-                    Text("💰${state.gold}", color = PathriftGold, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                    // Diamonds
-                    Text("♦${state.diamonds}", color = Color(0xFF00CCFF), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                    // Speed
-                    TextButton(onClick = onToggleSpeed, modifier = Modifier.height(28.dp), contentPadding = PaddingValues(horizontal = 6.dp)) {
-                        Text(if (state.speedMultiplier == 1.0f) "×1" else "×2",
-                            color = if (state.speedMultiplier == 2.0f) Color(0xFF00CCFF) else Color.Gray,
-                            fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    }
-                    // Pause
-                    IconButton(onClick = onPause, modifier = Modifier.size(28.dp)) {
-                        Icon(Icons.Default.Pause, "pause", tint = PathriftTextSecondary, modifier = Modifier.size(16.dp))
+
+                    // RIGHT: Speed + Pause
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = onToggleSpeed, contentPadding = PaddingValues(horizontal = 6.dp), modifier = Modifier.height(28.dp)) {
+                            Text(
+                                if (state.speedMultiplier == 1f) "×1" else "×2",
+                                color = if (state.speedMultiplier == 2f) Color(0xFF00CCFF) else Color.Gray,
+                                fontWeight = FontWeight.Bold, fontSize = 13.sp
+                            )
+                        }
+                        IconButton(onClick = onPause, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Pause, contentDescription = null, tint = PathriftTextSecondary, modifier = Modifier.size(16.dp))
+                        }
                     }
                 }
             } else {
@@ -439,19 +461,48 @@ private fun CombatHUD(
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomStart)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, PathriftBackground.copy(alpha = 0.9f))))
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange)
-            Spacer(Modifier.weight(1f))
-            when {
-                state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
-                state.phase != GamePhase.GAME_OVER -> SendWaveButton(onClick = onNextWave)
+        if (isLandscape) {
+            // Landscape bottom bar: compact kills left, progress/send right
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomStart)
+                    .background(
+                        Brush.verticalGradient(listOf(Color.Transparent, PathriftBackground.copy(alpha = 0.9f)))
+                    )
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // LEFT: Kills
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("⚡", fontSize = 11.sp)
+                    Text("${state.enemyKills}", color = PathriftOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+
+                Spacer(Modifier.weight(1f))
+
+                // RIGHT: Progress or Send Wave
+                when {
+                    state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
+                    state.phase != GamePhase.GAME_OVER -> SendWaveButton(onClick = onNextWave)
+                }
+            }
+        } else {
+            // Portrait bottom bar (unchanged)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomStart)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, PathriftBackground.copy(alpha = 0.9f))))
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange)
+                Spacer(Modifier.weight(1f))
+                when {
+                    state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
+                    state.phase != GamePhase.GAME_OVER -> SendWaveButton(onClick = onNextWave)
+                }
             }
         }
     }

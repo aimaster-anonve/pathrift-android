@@ -35,6 +35,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
@@ -354,9 +355,16 @@ class GameEngine(
                 val levelMult = (1f + 0.25f * (inst.level - 1)) * (1f + permDmgBonus)
                 val damage = tower.damagePerHit * levelMult
 
+                var targetFacingAngle = inst.facingAngle
+
                 when {
                     // F5: Pierce — hits all enemies in range, bypasses shield
                     tower.type == TowerType.PIERCE -> {
+                        val primary = inRange.maxByOrNull { it.pathProgress }
+                        if (primary != null) {
+                            val tPos = PathSystem.positionAt(primary.pathProgress)
+                            targetFacingAngle = atan2(tPos.y - inst.position.y, tPos.x - inst.position.x)
+                        }
                         for (e in inRange) {
                             val typeMult = tower.type.damageMultiplier(e.type)
                             val finalDamage = (damage * typeMult).toInt()
@@ -367,12 +375,13 @@ class GameEngine(
                     // F8: Tesla — chain lightning hits primary + 2 nearest
                     tower.type == TowerType.TESLA -> {
                         val primary = inRange.maxByOrNull { it.pathProgress } ?: continue
+                        val primaryPos = PathSystem.positionAt(primary.pathProgress)
+                        targetFacingAngle = atan2(primaryPos.y - inst.position.y, primaryPos.x - inst.position.x)
                         val typeMult = tower.type.damageMultiplier(primary.type)
                         val primaryDamage = (damage * typeMult).toInt()
                         applyDamage(primary.id, primaryDamage)
 
                         // Chain to 2 nearest other enemies within 150px of primary
-                        val primaryPos = PathSystem.positionAt(primary.pathProgress)
                         val chainTargets = inRange
                             .filter { it.id != primary.id && it.isAlive }
                             .sortedBy { e ->
@@ -394,6 +403,7 @@ class GameEngine(
                         val aoePixels = tower.aoeRadius * GridSystem.TILE_SIZE_DP
                         val primary = inRange.maxByOrNull { it.pathProgress } ?: continue
                         val primaryPos = PathSystem.positionAt(primary.pathProgress)
+                        targetFacingAngle = atan2(primaryPos.y - inst.position.y, primaryPos.x - inst.position.x)
                         for (e in inRange) {
                             val ePos = PathSystem.positionAt(e.pathProgress)
                             val dx = ePos.x - primaryPos.x
@@ -409,6 +419,8 @@ class GameEngine(
                     // Frost: single target + slow
                     tower.slowFactor < 1f -> {
                         val target = inRange.maxByOrNull { it.pathProgress } ?: continue
+                        val tPos = PathSystem.positionAt(target.pathProgress)
+                        targetFacingAngle = atan2(tPos.y - inst.position.y, tPos.x - inst.position.x)
                         val typeMult = tower.type.damageMultiplier(target.type)
                         val finalDamage = (damage * typeMult).toInt()
                         applyDamage(target.id, finalDamage)
@@ -418,6 +430,8 @@ class GameEngine(
                     // Single target: furthest along path
                     else -> {
                         val target = inRange.maxByOrNull { it.pathProgress } ?: continue
+                        val tPos = PathSystem.positionAt(target.pathProgress)
+                        targetFacingAngle = atan2(tPos.y - inst.position.y, tPos.x - inst.position.x)
                         val typeMult = tower.type.damageMultiplier(target.type)
                         val penetration = if (tower.type == TowerType.CORE) 0.5f else 0f
                         val finalDamage = (damage * typeMult).toInt()
@@ -425,7 +439,7 @@ class GameEngine(
                     }
                 }
 
-                _towers[slotId] = inst.copy(lastAttackTime = now)
+                _towers[slotId] = inst.copy(lastAttackTime = now, facingAngle = targetFacingAngle)
             }
         }
     }
@@ -711,5 +725,6 @@ data class TowerInstance(
     val position: PointF,
     val level: Int = 1,
     val totalInvested: Int = 0,
-    val lastAttackTime: Long = 0L
+    val lastAttackTime: Long = 0L,
+    val facingAngle: Float = 0f  // radians toward current target; updated each attack
 )
