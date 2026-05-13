@@ -60,7 +60,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import android.content.res.Configuration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -310,12 +312,64 @@ private fun CombatHUD(
     onToggleSpeed: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopStart)
         ) {
+            if (isLandscape) {
+                // Compact single-row landscape HUD (≤52dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(PathriftBackground.copy(alpha = 0.88f))
+                        .systemBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Wave
+                    Text(
+                        text = if (state.wave == 0) "--" else "W${state.wave}",
+                        fontSize = 16.sp, fontWeight = FontWeight.Black,
+                        color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
+                    )
+                    // Progress bar
+                    LinearProgressIndicator(
+                        progress = { state.waveProgress.toFloat() },
+                        modifier = Modifier.weight(1f).height(5.dp).clip(RoundedCornerShape(3.dp)),
+                        color = PathriftNeonBlue,
+                        trackColor = Color.White.copy(alpha = 0.1f)
+                    )
+                    // Lives
+                    for (i in 0 until 3) {
+                        Icon(
+                            imageVector = if (i < state.lives) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = null,
+                            tint = if (i < state.lives) PathriftDanger else PathriftTextSecondary.copy(alpha = 0.3f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                    // Gold
+                    Text("💰${state.gold}", color = PathriftGold, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    // Diamonds
+                    Text("♦${state.diamonds}", color = Color(0xFF00CCFF), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    // Speed
+                    TextButton(onClick = onToggleSpeed, modifier = Modifier.height(28.dp), contentPadding = PaddingValues(horizontal = 6.dp)) {
+                        Text(if (state.speedMultiplier == 1.0f) "×1" else "×2",
+                            color = if (state.speedMultiplier == 2.0f) Color(0xFF00CCFF) else Color.Gray,
+                            fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+                    // Pause
+                    IconButton(onClick = onPause, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.Pause, "pause", tint = PathriftTextSecondary, modifier = Modifier.size(16.dp))
+                    }
+                }
+            } else {
+            // Portrait HUD (existing layout)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -378,6 +432,7 @@ private fun CombatHUD(
                     }
                 }
             }
+            } // end portrait else
             state.waveCompleteMessage?.let { msg ->
                 Box(
                     modifier = Modifier.fillMaxWidth()

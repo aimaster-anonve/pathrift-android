@@ -49,10 +49,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pathrift.anonve.android.core.storage.LocalProgressStore
+import com.pathrift.anonve.android.core.ui.ArtilleryTowerColor
 import com.pathrift.anonve.android.core.ui.BlastTowerColor
 import com.pathrift.anonve.android.core.ui.BoltTowerColor
+import com.pathrift.anonve.android.core.ui.CoreTowerColor
 import com.pathrift.anonve.android.core.ui.FrostTowerColor
+import com.pathrift.anonve.android.core.ui.InfernoTowerColor
 import com.pathrift.anonve.android.core.ui.LanguageManager
+import com.pathrift.anonve.android.core.ui.NovaTowerColor
+import com.pathrift.anonve.android.core.ui.PierceTowerColor
+import com.pathrift.anonve.android.core.ui.SniperTowerColor
+import com.pathrift.anonve.android.core.ui.TeslaTowerColor
+import com.pathrift.anonve.android.game.towers.TowerType
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import com.pathrift.anonve.android.core.ui.PathriftBackground
 import com.pathrift.anonve.android.core.ui.PathriftGold
 import com.pathrift.anonve.android.core.ui.PathriftNeonBlue
@@ -462,31 +473,38 @@ private fun PortraitHomeContent(
 }
 
 @Composable
-private fun TowerLegend() {
-    val towers = listOf(
-        Triple(BoltTowerColor, "BOLT", "Fast"),
-        Triple(BlastTowerColor, "BLAST", "Area"),
-        Triple(FrostTowerColor, "FROST", "Slow")
-    )
+private fun towerLegendColor(type: TowerType): Color = when (type) {
+    TowerType.BOLT      -> BoltTowerColor
+    TowerType.BLAST     -> BlastTowerColor
+    TowerType.FROST     -> FrostTowerColor
+    TowerType.PIERCE    -> PierceTowerColor
+    TowerType.CORE      -> CoreTowerColor
+    TowerType.INFERNO   -> InfernoTowerColor
+    TowerType.TESLA     -> TeslaTowerColor
+    TowerType.NOVA      -> NovaTowerColor
+    TowerType.SNIPER    -> SniperTowerColor
+    TowerType.ARTILLERY -> ArtilleryTowerColor
+}
 
+@Composable
+private fun TowerLegend() {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(PathriftSurface.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
-            .padding(vertical = 12.dp, horizontal = 8.dp),
+            .padding(vertical = 10.dp, horizontal = 8.dp)
+            .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
-        towers.forEach { (color, name, _) ->
+        TowerType.values().forEach { type ->
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Canvas(modifier = Modifier.size(10.dp)) {
-                    drawCircle(color)
-                }
+                Box(Modifier.size(10.dp).background(towerLegendColor(type), CircleShape))
                 Text(
-                    text = name,
-                    fontSize = 9.sp,
+                    text = type.displayName.take(4).uppercase(),
+                    fontSize = 8.sp,
                     fontWeight = FontWeight.Medium,
                     color = PathriftTextSecondary,
                     fontFamily = FontFamily.Monospace
@@ -498,28 +516,21 @@ private fun TowerLegend() {
 
 @Composable
 private fun TowerLegendCompact(modifier: Modifier = Modifier) {
-    val towers = listOf(
-        Pair(BoltTowerColor, "BOLT"),
-        Pair(BlastTowerColor, "BLAST"),
-        Pair(FrostTowerColor, "FROST")
-    )
-
     Row(
         modifier = modifier
             .background(PathriftSurface.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
-            .padding(vertical = 6.dp, horizontal = 8.dp),
-        horizontalArrangement = Arrangement.SpaceEvenly
+            .padding(vertical = 6.dp, horizontal = 8.dp)
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        towers.forEach { (color, name) ->
+        TowerType.values().forEach { type ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                Canvas(modifier = Modifier.size(7.dp)) {
-                    drawCircle(color)
-                }
+                Box(Modifier.size(7.dp).background(towerLegendColor(type), CircleShape))
                 Text(
-                    text = name,
+                    text = type.displayName.take(4).uppercase(),
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Medium,
                     color = PathriftTextSecondary,
