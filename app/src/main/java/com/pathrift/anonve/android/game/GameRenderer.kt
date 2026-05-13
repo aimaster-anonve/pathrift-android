@@ -72,9 +72,14 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     }
 
     // Tower colors
-    private val towerBoltPaint = Paint().apply { color = Color.parseColor("#00C8FF"); style = Paint.Style.FILL }
-    private val towerBlastPaint = Paint().apply { color = Color.parseColor("#FF6B00"); style = Paint.Style.FILL }
-    private val towerFrostPaint = Paint().apply { color = Color.parseColor("#8B4FFF"); style = Paint.Style.FILL }
+    private val towerBoltPaint    = Paint().apply { color = Color.parseColor("#00C8FF"); style = Paint.Style.FILL }
+    private val towerBlastPaint   = Paint().apply { color = Color.parseColor("#FF6B00"); style = Paint.Style.FILL }
+    private val towerFrostPaint   = Paint().apply { color = Color.parseColor("#8B4FFF"); style = Paint.Style.FILL }
+    private val towerPiercePaint  = Paint().apply { color = Color.parseColor("#CCFF00"); style = Paint.Style.FILL }
+    private val towerCorePaint    = Paint().apply { color = Color.parseColor("#FF4400"); style = Paint.Style.FILL }
+    private val towerInfernoPaint = Paint().apply { color = Color.parseColor("#FF2200"); style = Paint.Style.FILL }
+    private val towerTeslaPaint   = Paint().apply { color = Color.parseColor("#00AAFF"); style = Paint.Style.FILL }
+    private val towerNovaPaint    = Paint().apply { color = Color.parseColor("#FFD700"); style = Paint.Style.FILL }
 
     // Tower range ring — semi-transparent blue halo
     private val towerRangePaint = Paint().apply {
@@ -123,6 +128,8 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         style = Paint.Style.FILL
         alpha = 191   // 0.75 alpha
     }
+    private val enemySplitterPaint = Paint().apply { color = Color.parseColor("#FF66FF"); style = Paint.Style.FILL }
+    private val enemyJumperPaint = Paint().apply { color = Color.parseColor("#00FF99"); style = Paint.Style.FILL }
     private val enemyBossVariantPaints = listOf(
         Paint().apply { color = Color.parseColor("#6633FF"); style = Paint.Style.FILL },  // 0 Rift Guardian — purple
         Paint().apply { color = Color.parseColor("#666678"); style = Paint.Style.FILL },  // 1 Iron Colossus — grey
@@ -297,9 +304,14 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
             // Tower body (diamond)
             val towerPaint = when (inst.tower.type) {
-                TowerType.BOLT  -> towerBoltPaint
-                TowerType.BLAST -> towerBlastPaint
-                TowerType.FROST -> towerFrostPaint
+                TowerType.BOLT    -> towerBoltPaint
+                TowerType.BLAST   -> towerBlastPaint
+                TowerType.FROST   -> towerFrostPaint
+                TowerType.PIERCE  -> towerPiercePaint
+                TowerType.CORE    -> towerCorePaint
+                TowerType.INFERNO -> towerInfernoPaint
+                TowerType.TESLA   -> towerTeslaPaint
+                TowerType.NOVA    -> towerNovaPaint
             }
             val path = Path().apply {
                 moveTo(cx, cy - radius)
@@ -352,12 +364,14 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             val py = pos.y
 
             when (enemy.type) {
-                EnemyType.RUNNER -> drawRunnerEnemy(canvas, px, py, enemy)
-                EnemyType.TANK   -> drawTankEnemy(canvas, px, py, enemy)
-                EnemyType.SHIELD -> drawShieldEnemy(canvas, px, py, enemy)
-                EnemyType.SWARM  -> drawSwarmEnemy(canvas, px, py, enemy)
-                EnemyType.GHOST  -> drawGhostEnemy(canvas, px, py, enemy)
-                EnemyType.BOSS   -> drawBossEnemy(canvas, px, py, enemy)
+                EnemyType.RUNNER   -> drawRunnerEnemy(canvas, px, py, enemy)
+                EnemyType.TANK     -> drawTankEnemy(canvas, px, py, enemy)
+                EnemyType.SHIELD   -> drawShieldEnemy(canvas, px, py, enemy)
+                EnemyType.SWARM    -> drawSwarmEnemy(canvas, px, py, enemy)
+                EnemyType.GHOST    -> drawGhostEnemy(canvas, px, py, enemy)
+                EnemyType.BOSS     -> drawBossEnemy(canvas, px, py, enemy)
+                EnemyType.SPLITTER -> drawSplitterEnemy(canvas, px, py, enemy)
+                EnemyType.JUMPER   -> drawJumperEnemy(canvas, px, py, enemy)
             }
         }
     }
@@ -467,6 +481,40 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
         // Boss wide health bar
         drawHealthBar(canvas, cx, cy, 26f, e.currentHp, e.maxHp, barWidth = 56f, barHeight = 7f)
+    }
+
+    private fun drawSplitterEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
+        val r = 10f
+        // Magenta diamond shape — splits on death
+        val path = android.graphics.Path().apply {
+            moveTo(cx, cy - r)
+            lineTo(cx + r, cy)
+            lineTo(cx, cy + r)
+            lineTo(cx - r, cy)
+            close()
+        }
+        canvas.drawPath(path, enemySplitterPaint)
+        // Split indicators — two small dots
+        val dotPaint = Paint().apply { color = Color.parseColor("#FF99FF"); style = Paint.Style.FILL; alpha = 204 }
+        canvas.drawCircle(cx - 5f, cy + 1f, 3f, dotPaint)
+        canvas.drawCircle(cx + 5f, cy + 1f, 3f, dotPaint)
+        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 22f, barHeight = 4f)
+    }
+
+    private fun drawJumperEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
+        val r = 12f
+        // Teal-green hexagon shape — jumps forward
+        canvas.drawCircle(cx, cy, r, enemyJumperPaint)
+        // Jump arrow indicator
+        val arrowPaint = Paint().apply { color = Color.parseColor("#004422"); style = Paint.Style.FILL; isFakeBoldText = true }
+        val arrowPath = android.graphics.Path().apply {
+            moveTo(cx - 4f, cy)
+            lineTo(cx + 4f, cy)
+            lineTo(cx, cy - 6f)
+            close()
+        }
+        canvas.drawPath(arrowPath, arrowPaint)
+        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 26f, barHeight = 5f)
     }
 
     private fun drawHealthBar(

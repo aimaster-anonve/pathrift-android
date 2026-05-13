@@ -85,6 +85,16 @@ class WaveSystem {
             scaledGroups.add(SpawnGroup(EnemyType.GHOST, 2 + cycleNumber))
         }
 
+        // Cycle 2+ (wave 19+): inject splitter every 3rd pattern slot (offset 1)
+        if (cycleNumber >= 2 && patternIndex % 3 == 1) {
+            scaledGroups.add(SpawnGroup(EnemyType.SPLITTER, 2 + cycleNumber))
+        }
+
+        // Cycle 2+ (wave 19+): inject jumper every 4th pattern slot (offset 2)
+        if (cycleNumber >= 2 && patternIndex % 4 == 2) {
+            scaledGroups.add(SpawnGroup(EnemyType.JUMPER, 1 + cycleNumber))
+        }
+
         val interval = maxOf(800L, base.spawnIntervalMs - cycleNumber * 80L)
         return WaveDefinition(wave, scaledGroups, interval)
     }

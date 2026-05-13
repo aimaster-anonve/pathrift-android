@@ -55,4 +55,5 @@ data class GameState(
     val selectedTowerInfo: TowerInfo? = null,
     val waveCompleteMessage: String? = null,
     val activeTowerSlots: Map<Int, TowerSlotData> = emptyMap(),
+    val diamonds: Int = 0,
 )

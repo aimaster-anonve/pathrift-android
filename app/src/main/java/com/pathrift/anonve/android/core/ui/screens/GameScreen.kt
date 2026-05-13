@@ -7,8 +7,12 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +31,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -46,6 +51,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -53,10 +59,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlin.math.sqrt
 import com.pathrift.anonve.android.core.ui.BlastTowerColor
 import com.pathrift.anonve.android.core.ui.BoltTowerColor
+import com.pathrift.anonve.android.core.ui.CoreTowerColor
 import com.pathrift.anonve.android.core.ui.FrostTowerColor
 import com.pathrift.anonve.android.core.ui.GameEvent
+import com.pathrift.anonve.android.core.ui.InfernoTowerColor
+import com.pathrift.anonve.android.core.ui.NovaTowerColor
+import com.pathrift.anonve.android.core.ui.PathriftGold
+import com.pathrift.anonve.android.core.ui.PathriftTextDisabled
+import com.pathrift.anonve.android.core.ui.PierceTowerColor
+import com.pathrift.anonve.android.core.ui.TeslaTowerColor
 import com.pathrift.anonve.android.core.ui.GameViewModel
 import com.pathrift.anonve.android.core.ui.LanguageManager
 import com.pathrift.anonve.android.core.ui.PathriftBackground
@@ -126,6 +140,16 @@ fun GameScreen(
             )
         }
 
+        val emptySelectedSlot = state.selectedTowerSlotId
+        if (emptySelectedSlot != null && state.selectedTowerInfo == null) {
+            TowerSelectionPanel(
+                state = state,
+                slotId = emptySelectedSlot,
+                viewModel = gameViewModel,
+                onDismiss = { gameViewModel.clearTowerSelection() }
+            )
+        }
+
         SnackbarHost(
             hostState = snackbarHostState,
             modifier = Modifier.align(Alignment.BottomCenter)
@@ -161,7 +185,37 @@ private fun GameCanvasView(
     gameSurface.selectedSlotId = state.selectedTowerSlotId
     gameSurface.riftShiftActive = state.riftShiftActive
 
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier.pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull() ?: continue
+                    if (change.pressed && !change.previousPressed) {
+                        val tapX = change.position.x
+                        val tapY = change.position.y
+                        val slots = gameViewModel.game.grid.slots
+                        val tapRadiusPx = 60f
+                        var closestId: Int? = null
+                        var closestDist = Float.MAX_VALUE
+                        for (slot in slots) {
+                            val dx = slot.position.x - tapX
+                            val dy = slot.position.y - tapY
+                            val dist = sqrt(dx * dx + dy * dy)
+                            if (dist < tapRadiusPx && dist < closestDist) {
+                                closestDist = dist
+                                closestId = slot.id
+                            }
+                        }
+                        if (closestId != null) {
+                            gameViewModel.tapTowerSlot(closestId)
+                            change.consume()
+                        }
+                    }
+                }
+            }
+        }
+    ) {
         AndroidView(
             factory = {
                 FrameLayout(context).apply { addView(gameSurface) }
@@ -201,6 +255,8 @@ private fun CombatHUD(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 HudStatPill(LanguageManager.s("GOLD", "ALTIN"), "${state.gold}", PathriftNeonBlue)
+                Spacer(Modifier.width(14.dp))
+                HudStatPill(LanguageManager.s("DIAMONDS", "ELMAS"), "♦${state.diamonds}", Color(0xFF00CCFF))
                 Spacer(Modifier.weight(1f))
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
@@ -343,9 +399,14 @@ private fun TowerInfoBottomPanel(
 ) {
     val canAffordUpgrade = gold >= info.upgradeCost
     val towerColor = when (info.type) {
-        TowerType.BOLT  -> BoltTowerColor
-        TowerType.BLAST -> BlastTowerColor
-        TowerType.FROST -> FrostTowerColor
+        TowerType.BOLT    -> BoltTowerColor
+        TowerType.BLAST   -> BlastTowerColor
+        TowerType.FROST   -> FrostTowerColor
+        TowerType.PIERCE  -> PierceTowerColor
+        TowerType.CORE    -> CoreTowerColor
+        TowerType.INFERNO -> InfernoTowerColor
+        TowerType.TESLA   -> TeslaTowerColor
+        TowerType.NOVA    -> NovaTowerColor
     }
 
     Box(
@@ -429,4 +490,174 @@ private fun TowerStatItem(label: String, value: String, color: Color, modifier: 
         Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PathriftTextPrimary, fontFamily = FontFamily.Monospace)
         Text(label, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = PathriftTextSecondary, letterSpacing = 1.sp, fontFamily = FontFamily.Monospace)
     }
+}
+
+// ==============================
+// Tower Selection Panel
+// ==============================
+
+@Composable
+private fun TowerSelectionPanel(
+    state: GameState,
+    slotId: Int,
+    viewModel: GameViewModel,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.35f))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(PathriftSurface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .clickable(enabled = false, onClick = {}) // consume clicks inside panel
+        ) {
+            Box(modifier = Modifier.padding(top = 10.dp, bottom = 4.dp).size(36.dp, 4.dp).align(Alignment.CenterHorizontally).background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
+
+            Text(
+                text = LanguageManager.s("SELECT TOWER", "KULE SEÇ"),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = PathriftTextSecondary,
+                letterSpacing = 2.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(start = 20.dp, bottom = 8.dp, top = 4.dp)
+            )
+
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .padding(bottom = 28.dp)
+            ) {
+                items(TowerType.values().toList()) { type ->
+                    val isUnlocked = viewModel.isTowerUnlocked(type)
+                    val canAffordGold = state.gold >= towerGoldCost(type)
+                    val canAffordDiamonds = state.diamonds >= type.diamondCost || type.diamondCost == 0
+                    TowerPickCard(
+                        type = type,
+                        isUnlocked = isUnlocked,
+                        canAffordGold = canAffordGold,
+                        canAffordDiamonds = canAffordDiamonds,
+                        diamonds = state.diamonds,
+                        onTap = {
+                            if (isUnlocked) {
+                                viewModel.placeTower(slotId, type)
+                                onDismiss()
+                            } else {
+                                viewModel.unlockTower(type)
+                            }
+                        }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TowerPickCard(
+    type: TowerType,
+    isUnlocked: Boolean,
+    canAffordGold: Boolean,
+    canAffordDiamonds: Boolean,
+    diamonds: Int,
+    onTap: () -> Unit
+) {
+    val towerColor = towerDisplayColor(type)
+    val isAffordable = isUnlocked && canAffordGold
+    val alpha = if (isAffordable) 1f else 0.45f
+
+    Box(
+        modifier = Modifier
+            .width(76.dp)
+            .background(
+                PathriftSurface.copy(alpha = alpha),
+                RoundedCornerShape(12.dp)
+            )
+            .border(
+                width = 1.5.dp,
+                color = if (isAffordable) towerColor.copy(alpha = 0.7f) else PathriftTextDisabled,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .clickable(onClick = onTap)
+            .padding(vertical = 10.dp, horizontal = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // Color dot
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .background(towerColor.copy(alpha = alpha), CircleShape)
+            )
+            Spacer(Modifier.height(5.dp))
+            Text(
+                text = type.name,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (isAffordable) PathriftTextPrimary else PathriftTextSecondary.copy(alpha = alpha),
+                letterSpacing = 0.5.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Spacer(Modifier.height(3.dp))
+            // Cost / lock badge
+            if (!isUnlocked) {
+                // Premium lock — show diamond cost
+                Box(
+                    modifier = Modifier
+                        .background(
+                            if (canAffordDiamonds) Color(0xFF004466) else Color(0xFF330000),
+                            RoundedCornerShape(6.dp)
+                        )
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = "🔒 ${type.diamondCost}♦",
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (canAffordDiamonds) Color(0xFF00CCFF) else PathriftDanger,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            } else {
+                // Gold cost
+                val goldCost = towerGoldCost(type)
+                Text(
+                    text = "${goldCost}g",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (canAffordGold) PathriftGold else PathriftDanger,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+        }
+    }
+}
+
+private fun towerDisplayColor(type: TowerType): Color = when (type) {
+    TowerType.BOLT    -> BoltTowerColor
+    TowerType.BLAST   -> BlastTowerColor
+    TowerType.FROST   -> FrostTowerColor
+    TowerType.PIERCE  -> PierceTowerColor
+    TowerType.CORE    -> CoreTowerColor
+    TowerType.INFERNO -> InfernoTowerColor
+    TowerType.TESLA   -> TeslaTowerColor
+    TowerType.NOVA    -> NovaTowerColor
+}
+
+private fun towerGoldCost(type: TowerType): Int = when (type) {
+    TowerType.BOLT    -> 50
+    TowerType.BLAST   -> 70
+    TowerType.FROST   -> 60
+    TowerType.PIERCE  -> 130
+    TowerType.CORE    -> 180
+    TowerType.INFERNO -> 200
+    TowerType.TESLA   -> 300
+    TowerType.NOVA    -> 500
 }

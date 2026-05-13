@@ -1,8 +1,11 @@
 package com.pathrift.anonve.android.core.ui
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.pathrift.anonve.android.app.PathriftApp
 import com.pathrift.anonve.android.core.engine.EconomyConstants
+import com.pathrift.anonve.android.core.storage.DiamondStore
 import com.pathrift.anonve.android.game.GameBridge
 import com.pathrift.anonve.android.game.GameEngine
 import com.pathrift.anonve.android.game.GamePhase
@@ -11,6 +14,14 @@ import com.pathrift.anonve.android.game.TowerInfo
 import com.pathrift.anonve.android.game.TowerSlotData
 import com.pathrift.anonve.android.game.enemies.EnemyInstance
 import com.pathrift.anonve.android.game.enemies.EnemyType
+import com.pathrift.anonve.android.game.towers.BoltTower
+import com.pathrift.anonve.android.game.towers.BlastTower
+import com.pathrift.anonve.android.game.towers.CoreTower
+import com.pathrift.anonve.android.game.towers.FrostTower
+import com.pathrift.anonve.android.game.towers.InfernoTower
+import com.pathrift.anonve.android.game.towers.NovaTower
+import com.pathrift.anonve.android.game.towers.PierceTower
+import com.pathrift.anonve.android.game.towers.TeslaTower
 import com.pathrift.anonve.android.game.towers.TowerType
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,10 +46,13 @@ sealed class GameEvent {
 /**
  * GameViewModel — iOS GameViewModel.swift parity.
  * Implements GameBridge. Exposes StateFlow<GameState> to Compose UI.
+ * Now extends AndroidViewModel to access Application (DiamondStore).
  */
-class GameViewModel : ViewModel(), GameBridge {
+class GameViewModel(application: Application) : AndroidViewModel(application), GameBridge {
 
-    private val _state = MutableStateFlow(GameState())
+    private val diamondStore: DiamondStore = (application as PathriftApp).diamondStore
+
+    private val _state = MutableStateFlow(GameState(diamonds = diamondStore.balance))
     val state: StateFlow<GameState> = _state.asStateFlow()
 
     private val _events = MutableSharedFlow<GameEvent>()
@@ -47,7 +61,7 @@ class GameViewModel : ViewModel(), GameBridge {
     private val _enemies = MutableStateFlow<List<EnemyInstance>>(emptyList())
     val enemies: StateFlow<List<EnemyInstance>> = _enemies.asStateFlow()
 
-    val game = GameEngine(this)
+    val game = GameEngine(this, diamondStore)
 
     init {
         game.start(viewModelScope)
@@ -66,6 +80,13 @@ class GameViewModel : ViewModel(), GameBridge {
     }
 
     fun placeTower(slotId: Int, type: TowerType) {
+        // Check premium tower lock
+        if (type.isPremium && !diamondStore.isUnlocked(type)) {
+            viewModelScope.launch {
+                _events.emit(GameEvent.ShowMessage("${type.displayName} locked! Unlock for ${type.diamondCost}♦"))
+            }
+            return
+        }
         val success = game.placeTower(slotId, type)
         if (!success) {
             viewModelScope.launch {
@@ -108,7 +129,8 @@ class GameViewModel : ViewModel(), GameBridge {
         if (slot.state.isOccupied) {
             bridge.onTowerTapped(slotId)
         } else {
-            _state.update { it.copy(selectedTowerSlotId = null, selectedTowerInfo = null) }
+            // Show tower selection panel for empty slot
+            _state.update { it.copy(selectedTowerSlotId = slotId, selectedTowerInfo = null) }
         }
     }
 
@@ -119,9 +141,26 @@ class GameViewModel : ViewModel(), GameBridge {
     fun restartGame() {
         game.reset()
         game.start(viewModelScope)
-        _state.value = GameState()
+        _state.value = GameState(diamonds = diamondStore.balance)
         _enemies.value = emptyList()
     }
+
+    /** Unlock a premium tower by spending diamonds. */
+    fun unlockTower(type: TowerType) {
+        if (diamondStore.unlock(type)) {
+            _state.update { it.copy(diamonds = diamondStore.balance) }
+            viewModelScope.launch {
+                _events.emit(GameEvent.ShowMessage("${type.displayName} unlocked!"))
+            }
+        } else {
+            viewModelScope.launch {
+                _events.emit(GameEvent.ShowMessage("Not enough diamonds! Need ${type.diamondCost}♦"))
+            }
+        }
+    }
+
+    /** Returns true if a tower type is available to place (free or unlocked). */
+    fun isTowerUnlocked(type: TowerType): Boolean = diamondStore.isUnlocked(type)
 
     /** Called ~60fps from the rendering side to keep enemy positions live. */
     fun syncEnemyPositions() {
@@ -216,6 +255,10 @@ class GameViewModel : ViewModel(), GameBridge {
         _state.update { it.copy(gold = gold) }
     }
 
+    override fun onDiamondsChanged(balance: Int) {
+        _state.update { it.copy(diamonds = balance) }
+    }
+
     // ---- Helpers ----
 
     private fun syncTowerSlots() {
@@ -231,29 +274,52 @@ class GameViewModel : ViewModel(), GameBridge {
     private fun buildTowerInfo(slotId: Int, type: TowerType, level: Int, totalInvested: Int): TowerInfo {
         val inst = game.towerInstance(slotId)
         val tower = inst?.tower ?: when (type) {
-            TowerType.BOLT  -> com.pathrift.anonve.android.game.towers.BoltTower()
-            TowerType.BLAST -> com.pathrift.anonve.android.game.towers.BlastTower()
-            TowerType.FROST -> com.pathrift.anonve.android.game.towers.FrostTower()
+            TowerType.BOLT    -> BoltTower()
+            TowerType.BLAST   -> BlastTower()
+            TowerType.FROST   -> FrostTower()
+            TowerType.PIERCE  -> PierceTower()
+            TowerType.CORE    -> CoreTower()
+            TowerType.INFERNO -> InfernoTower()
+            TowerType.TESLA   -> TeslaTower()
+            TowerType.NOVA    -> NovaTower()
         }
         val upgradeCost = (EconomyConstants.UPGRADE_BASE_COST *
                 EconomyConstants.UPGRADE_GROWTH_RATE.pow((level - 1).toDouble())).toInt()
         val sellValue = (totalInvested * EconomyConstants.SELL_REFUND_PERCENT).toInt()
+        // F2: show effective attack speed per level
+        val effectiveAttackSpeed = tower.attacksPerSecond * (1f + 0.08f * (level - 1))
         return TowerInfo(
             slotId = slotId,
             type = type,
             level = level,
             damage = tower.damagePerHit * (1f + 0.25f * (level - 1)),
             range = tower.rangeTiles.toFloat(),
-            attackSpeed = tower.attacksPerSecond,
+            attackSpeed = effectiveAttackSpeed,
             sellValue = sellValue,
             upgradeCost = upgradeCost
         )
     }
 
     private fun getCost(type: TowerType): Int = when (type) {
-        TowerType.BOLT  -> EconomyConstants.TowerCost.BOLT
-        TowerType.BLAST -> EconomyConstants.TowerCost.BLAST
-        TowerType.FROST -> EconomyConstants.TowerCost.FROST
+        TowerType.BOLT    -> EconomyConstants.TowerCost.BOLT
+        TowerType.BLAST   -> EconomyConstants.TowerCost.BLAST
+        TowerType.FROST   -> EconomyConstants.TowerCost.FROST
+        TowerType.PIERCE  -> 130
+        TowerType.CORE    -> 180
+        TowerType.INFERNO -> 200
+        TowerType.TESLA   -> 300
+        TowerType.NOVA    -> 500
+    }
+
+    private val TowerType.displayName: String get() = when (this) {
+        TowerType.BOLT    -> "Bolt"
+        TowerType.BLAST   -> "Blast"
+        TowerType.FROST   -> "Frost"
+        TowerType.PIERCE  -> "Pierce"
+        TowerType.CORE    -> "Core"
+        TowerType.INFERNO -> "Inferno"
+        TowerType.TESLA   -> "Tesla"
+        TowerType.NOVA    -> "Nova"
     }
 
     override fun onCleared() {

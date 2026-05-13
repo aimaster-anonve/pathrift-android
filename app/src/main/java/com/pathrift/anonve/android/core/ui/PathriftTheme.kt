@@ -30,6 +30,11 @@ val PathriftTextDisabled = Color(0xFF48484A)
 val BoltTowerColor = PathriftNeonBlue
 val BlastTowerColor = PathriftOrange
 val FrostTowerColor = PathriftPurple
+val PierceTowerColor = Color(0xFFCCFF00)   // yellow-green
+val CoreTowerColor = Color(0xFFFF4400)     // red-orange
+val InfernoTowerColor = Color(0xFFFF2200)  // deep red
+val TeslaTowerColor = Color(0xFF00AAFF)    // electric blue
+val NovaTowerColor = Color(0xFFFFD700)     // gold
 
 // ---- Enemy Colors ----
 val RunnerEnemyColor = PathriftDanger

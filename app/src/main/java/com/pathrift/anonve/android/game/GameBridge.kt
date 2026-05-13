@@ -17,4 +17,5 @@ interface GameBridge {
     fun onWaveProgress(cleared: Int, total: Int)
     fun onTowerTapped(slotId: Int)
     fun onGoldChanged(gold: Int)
+    fun onDiamondsChanged(balance: Int)
 }

@@ -2,17 +2,25 @@ package com.pathrift.anonve.android.game
 
 import android.graphics.PointF
 import com.pathrift.anonve.android.core.engine.EconomyConstants
+import com.pathrift.anonve.android.core.storage.DiamondStore
 import com.pathrift.anonve.android.game.enemies.BossEnemy
 import com.pathrift.anonve.android.game.enemies.EnemyInstance
 import com.pathrift.anonve.android.game.enemies.EnemyType
 import com.pathrift.anonve.android.game.enemies.GhostEnemy
+import com.pathrift.anonve.android.game.enemies.JumperEnemy
 import com.pathrift.anonve.android.game.enemies.RunnerEnemy
 import com.pathrift.anonve.android.game.enemies.ShieldEnemy
+import com.pathrift.anonve.android.game.enemies.SplitterEnemy
 import com.pathrift.anonve.android.game.enemies.SwarmEnemy
 import com.pathrift.anonve.android.game.enemies.TankEnemy
 import com.pathrift.anonve.android.game.towers.BlastTower
 import com.pathrift.anonve.android.game.towers.BoltTower
+import com.pathrift.anonve.android.game.towers.CoreTower
 import com.pathrift.anonve.android.game.towers.FrostTower
+import com.pathrift.anonve.android.game.towers.InfernoTower
+import com.pathrift.anonve.android.game.towers.NovaTower
+import com.pathrift.anonve.android.game.towers.PierceTower
+import com.pathrift.anonve.android.game.towers.TeslaTower
 import com.pathrift.anonve.android.game.towers.Tower
 import com.pathrift.anonve.android.game.towers.TowerType
 import kotlinx.coroutines.CoroutineScope
@@ -27,23 +35,19 @@ import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
- * GameEngine — full iOS GameScene.swift parity.
+ * GameEngine — full iOS GameScene.swift parity + Phase 2 features.
  *
- * Manages:
- * - PathSystem layout selection (12 layouts, random on start)
- * - Wave spawning from WaveSystem (9-wave cycle, boss every 10, swarm/ghost scaling)
- * - EnemyInstance movement along PathSystem waypoints
- * - All 6 enemy types: RUNNER, TANK, SHIELD, SWARM, GHOST, BOSS (5 variants)
- * - Tower placement, sell, upgrade, attack, AoE, slow
- * - Shield absorption mechanic (ShieldEnemy)
- * - Ghost slow immunity (90% immune)
- * - Rift Shift every 5th wave — new layout, 65% survivors (min 2)
- * - slotId reassignment after Rift Shift (iOS fix)
- * - Progressive slot unlocking: 6→8→10→12 by wave range
- * - Economy: gold, score, wave rewards
- * - GameBridge callbacks
+ * Phase 2 additions:
+ * - 5 new tower types: Pierce, Core, Inferno, Tesla, Nova
+ * - Attack speed scaling per upgrade level (+8% per level)
+ * - Tower type advantage multipliers
+ * - Pierce shield bypass + Core armor penetration
+ * - Tesla chain lightning
+ * - DiamondStore integration: +2/3/4 per 10-wave milestone
+ * - Splitter enemy (splits into 2 Swarm on death)
+ * - Jumper enemy (teleports forward every 3s)
  */
-class GameEngine(private val bridge: GameBridge) {
+class GameEngine(private val bridge: GameBridge, val diamondStore: DiamondStore) {
 
     val grid = GridSystem()
     private val waveSystem = WaveSystem()
@@ -146,9 +150,14 @@ class GameEngine(private val bridge: GameBridge) {
 
     fun placeTower(slotId: Int, type: TowerType): Boolean {
         val tower = when (type) {
-            TowerType.BOLT  -> BoltTower()
-            TowerType.BLAST -> BlastTower()
-            TowerType.FROST -> FrostTower()
+            TowerType.BOLT    -> BoltTower()
+            TowerType.BLAST   -> BlastTower()
+            TowerType.FROST   -> FrostTower()
+            TowerType.PIERCE  -> PierceTower()
+            TowerType.CORE    -> CoreTower()
+            TowerType.INFERNO -> InfernoTower()
+            TowerType.TESLA   -> TeslaTower()
+            TowerType.NOVA    -> NovaTower()
         }
         if (gold < tower.cost) return false
         val slot = grid.slot(slotId) ?: return false
@@ -227,15 +236,25 @@ class GameEngine(private val bridge: GameBridge) {
                     enemy.currentSpeed
                 }
 
-                val distanceToMove = spd * delta
-                val newProgress = enemy.pathProgress + distanceToMove / pathLen
+                // Jumper jump mechanic
+                val isJumper = enemy.type == EnemyType.JUMPER
+                val shouldJump = isJumper && (now - enemy.lastJumpTime) >= JumperEnemy.JUMP_INTERVAL_MS
+
+                val newProgress = if (shouldJump) {
+                    minOf(1f, enemy.pathProgress + JumperEnemy.JUMP_DISTANCE)
+                } else {
+                    val distanceToMove = spd * delta
+                    enemy.pathProgress + distanceToMove / pathLen
+                }
+
+                val updatedLastJump = if (shouldJump) now else enemy.lastJumpTime
 
                 if (newProgress >= 1f) {
                     toEscape.add(enemy.id)
-                    return@replaceAll enemy.copy(hasReachedEnd = true, pathProgress = 1f)
+                    return@replaceAll enemy.copy(hasReachedEnd = true, pathProgress = 1f, lastJumpTime = updatedLastJump)
                 }
 
-                enemy.copy(pathProgress = newProgress, currentSpeed = spd)
+                enemy.copy(pathProgress = newProgress, currentSpeed = spd, lastJumpTime = updatedLastJump)
             }
 
             // Remove escaped
@@ -265,11 +284,14 @@ class GameEngine(private val bridge: GameBridge) {
         synchronized(_enemies) {
             for ((slotId, inst) in _towers) {
                 val tower = inst.tower
+
+                // F2: Attack speed scaling — +8% per level above 1
+                val effectiveAttacksPerSecond = tower.attacksPerSecond * (1f + 0.08f * (inst.level - 1))
+
                 // Attack cooldown
-                if (now - inst.lastAttackTime < (1000L / tower.attacksPerSecond).toLong()) continue
+                if (now - inst.lastAttackTime < (1000L / effectiveAttacksPerSecond).toLong()) continue
 
                 // Range in screen pixels (tile-based towers used tile coords; here we use pixel range)
-                // rangeTiles * TILE_SIZE_DP gives approximate pixel range
                 val rangePixels = tower.rangeTiles * GridSystem.TILE_SIZE_DP
 
                 val inRange = _enemies.filter { e ->
@@ -287,10 +309,43 @@ class GameEngine(private val bridge: GameBridge) {
                 val damage = tower.damagePerHit * levelMult
 
                 when {
+                    // F5: Pierce — hits all enemies in range, bypasses shield
+                    tower.type == TowerType.PIERCE -> {
+                        for (e in inRange) {
+                            val typeMult = tower.type.damageMultiplier(e.type)
+                            val finalDamage = (damage * typeMult).toInt()
+                            applyDamage(e.id, finalDamage, bypassShield = true)
+                        }
+                    }
+
+                    // F8: Tesla — chain lightning hits primary + 2 nearest
+                    tower.type == TowerType.TESLA -> {
+                        val primary = inRange.maxByOrNull { it.pathProgress } ?: continue
+                        val typeMult = tower.type.damageMultiplier(primary.type)
+                        val primaryDamage = (damage * typeMult).toInt()
+                        applyDamage(primary.id, primaryDamage)
+
+                        // Chain to 2 nearest other enemies within 150px of primary
+                        val primaryPos = PathSystem.positionAt(primary.pathProgress)
+                        val chainTargets = inRange
+                            .filter { it.id != primary.id && it.isAlive }
+                            .sortedBy { e ->
+                                val ePos = PathSystem.positionAt(e.pathProgress)
+                                val dx = ePos.x - primaryPos.x
+                                val dy = ePos.y - primaryPos.y
+                                dx * dx + dy * dy
+                            }
+                            .take(2)
+                        val chainDamage = (18f * levelMult).toInt()
+                        for (chainTarget in chainTargets) {
+                            val chainMult = tower.type.damageMultiplier(chainTarget.type)
+                            applyDamage(chainTarget.id, (chainDamage * chainMult).toInt())
+                        }
+                    }
+
+                    // AoE towers (Blast, Nova): damage all in splash radius
                     tower.aoeRadius > 0f -> {
-                        // AoE: damage all in range
                         val aoePixels = tower.aoeRadius * GridSystem.TILE_SIZE_DP
-                        // Target furthest along path, then splash from its position
                         val primary = inRange.maxByOrNull { it.pathProgress } ?: continue
                         val primaryPos = PathSystem.positionAt(primary.pathProgress)
                         for (e in inRange) {
@@ -298,20 +353,29 @@ class GameEngine(private val bridge: GameBridge) {
                             val dx = ePos.x - primaryPos.x
                             val dy = ePos.y - primaryPos.y
                             if (sqrt(dx * dx + dy * dy) <= aoePixels) {
-                                applyDamage(e.id, damage.toInt())
+                                val typeMult = tower.type.damageMultiplier(e.type)
+                                val finalDamage = (damage * typeMult).toInt()
+                                applyDamage(e.id, finalDamage)
                             }
                         }
                     }
+
+                    // Frost: single target + slow
                     tower.slowFactor < 1f -> {
-                        // Frost: single target + slow
                         val target = inRange.maxByOrNull { it.pathProgress } ?: continue
-                        applyDamage(target.id, damage.toInt())
+                        val typeMult = tower.type.damageMultiplier(target.type)
+                        val finalDamage = (damage * typeMult).toInt()
+                        applyDamage(target.id, finalDamage)
                         applySlow(target.id, tower.slowFactor, durationMs = 2000L)
                     }
+
+                    // Single target: furthest along path
                     else -> {
-                        // Single target: furthest along path
                         val target = inRange.maxByOrNull { it.pathProgress } ?: continue
-                        applyDamage(target.id, damage.toInt())
+                        val typeMult = tower.type.damageMultiplier(target.type)
+                        val penetration = if (tower.type == TowerType.CORE) 0.5f else 0f
+                        val finalDamage = (damage * typeMult).toInt()
+                        applyDamage(target.id, finalDamage, penetration = penetration)
                     }
                 }
 
@@ -320,28 +384,34 @@ class GameEngine(private val bridge: GameBridge) {
         }
     }
 
-    /** Apply damage to enemy, handling shield absorption and armor reduction. */
-    private fun applyDamage(enemyId: Long, rawDamage: Int) {
+    /**
+     * Apply damage to enemy, handling shield absorption and armor reduction.
+     * @param bypassShield When true (Pierce), skips shield absorption entirely.
+     * @param penetration  Armor penetration fraction (0..1). Core uses 0.5 = 50% armor ignored.
+     */
+    private fun applyDamage(enemyId: Long, rawDamage: Int, bypassShield: Boolean = false, penetration: Float = 0f) {
         val idx = _enemies.indexOfFirst { it.id == enemyId }
         if (idx < 0) return
         val enemy = _enemies[idx]
         if (!enemy.isAlive) return
 
         val updated: EnemyInstance = when {
-            // ShieldEnemy: absorb via shieldHp first
-            enemy.type == EnemyType.SHIELD && !enemy.shieldBroken && enemy.shieldHp > 0f -> {
+            // ShieldEnemy: absorb via shieldHp first (unless bypassed by Pierce)
+            enemy.type == EnemyType.SHIELD && !enemy.shieldBroken && enemy.shieldHp > 0f && !bypassShield -> {
                 val dmg = rawDamage.toFloat()
                 if (dmg >= enemy.shieldHp) {
                     val overflow = dmg - enemy.shieldHp
-                    enemy.copy(shieldHp = 0f, shieldBroken = true, currentHp = max(0f, enemy.currentHp - overflow))
+                    val effectiveArmor = enemy.armorReduction * (1f - penetration)
+                    val armoredOverflow = overflow * (1f - effectiveArmor)
+                    enemy.copy(shieldHp = 0f, shieldBroken = true, currentHp = max(0f, enemy.currentHp - armoredOverflow))
                 } else {
                     enemy.copy(shieldHp = enemy.shieldHp - dmg)
                 }
             }
-            // GhostEnemy: armor reduction already 0, but slow immunity handled in applySlow
-            // All others: normal armor reduction
+            // All others (or bypass): armor reduction with optional penetration
             else -> {
-                val actualDmg = rawDamage * (1f - enemy.armorReduction)
+                val effectiveArmor = enemy.armorReduction * (1f - penetration)
+                val actualDmg = rawDamage * (1f - effectiveArmor)
                 enemy.copy(currentHp = max(0f, enemy.currentHp - actualDmg))
             }
         }
@@ -355,6 +425,17 @@ class GameEngine(private val bridge: GameBridge) {
             bridge.onEnemyKilled(updated.type, updated.goldReward)
             bridge.onGoldChanged(gold)
             bridge.onWaveProgress(waveEnemiesCleared, waveEnemyTotal)
+
+            // F12: Splitter death — spawn 2 SWARM at same pathProgress
+            if (updated.type == EnemyType.SPLITTER) {
+                val hpMult = waveSystem.hpScaleMultiplier(currentWave)
+                repeat(2) {
+                    spawnEnemyAtProgress(EnemyType.SWARM, hpMult, updated.pathProgress)
+                }
+                // Increase wave total to account for spawned swarms
+                waveEnemyTotal += 2
+                bridge.onWaveProgress(waveEnemiesCleared, waveEnemyTotal)
+            }
         } else {
             _enemies[idx] = updated
         }
@@ -389,6 +470,17 @@ class GameEngine(private val bridge: GameBridge) {
             score += reward.toLong() * 5
             bridge.onWaveCompleted(currentWave, reward)
             bridge.onGoldChanged(gold)
+
+            // F10: Diamond reward every 10 waves
+            if (currentWave % 10 == 0) {
+                val diamondReward = when {
+                    currentWave <= 30 -> 2
+                    currentWave <= 60 -> 3
+                    else -> 4
+                }
+                diamondStore.earn(diamondReward)
+                bridge.onDiamondsChanged(diamondStore.balance)
+            }
 
             // Rift Shift every 5th wave
             if (currentWave % 5 == 0) {
@@ -507,8 +599,39 @@ class GameEngine(private val bridge: GameBridge) {
                     bossVariant = variant
                 )
             }
+            EnemyType.SPLITTER -> EnemyInstance(
+                id = id, type = type,
+                maxHp = SplitterEnemy.HP * hpMult, currentHp = SplitterEnemy.HP * hpMult,
+                baseSpeed = SplitterEnemy.SPEED, currentSpeed = SplitterEnemy.SPEED,
+                goldReward = SplitterEnemy.GOLD_REWARD,
+                armorReduction = SplitterEnemy.ARMOR_REDUCTION
+            )
+            EnemyType.JUMPER -> EnemyInstance(
+                id = id, type = type,
+                maxHp = JumperEnemy.HP * hpMult, currentHp = JumperEnemy.HP * hpMult,
+                baseSpeed = JumperEnemy.SPEED, currentSpeed = JumperEnemy.SPEED,
+                goldReward = JumperEnemy.GOLD_REWARD,
+                armorReduction = JumperEnemy.ARMOR_REDUCTION
+            )
         }
         synchronized(_enemies) { _enemies.add(instance) }
+    }
+
+    /** Spawn an enemy at a specific path progress (used for Splitter death spawns). */
+    private fun spawnEnemyAtProgress(type: EnemyType, hpMult: Float, pathProgress: Float) {
+        val id = System.nanoTime()
+        val instance = when (type) {
+            EnemyType.SWARM -> EnemyInstance(
+                id = id, type = type,
+                maxHp = SwarmEnemy.HP * hpMult, currentHp = SwarmEnemy.HP * hpMult,
+                baseSpeed = SwarmEnemy.SPEED, currentSpeed = SwarmEnemy.SPEED,
+                goldReward = SwarmEnemy.GOLD_REWARD,
+                armorReduction = SwarmEnemy.ARMOR_REDUCTION,
+                pathProgress = pathProgress
+            )
+            else -> return // Only SWARM supported for Splitter splits
+        }
+        _enemies.add(instance)
     }
 
     private fun triggerGameOver() {
