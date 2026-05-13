@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">PATHRIFT</string>
+
+    <!-- Main Menu -->
+    <string name="main_menu_tagline">The map shifts. The strategy evolves.</string>
+    <string name="main_menu_start">START RUN</string>
+    <string name="main_menu_hint">Place towers on the grid to defend against enemy waves.</string>
+    <string name="main_menu_best_run">BEST RUN</string>
+
+    <!-- Game HUD -->
+    <string name="hud_wave">WAVE</string>
+    <string name="hud_score">SCORE</string>
+    <string name="hud_lives">LIVES</string>
+    <string name="hud_gold">GOLD</string>
+    <string name="hud_start_wave">Start</string>
+    <string name="hud_next_wave">Next Wave</string>
+    <string name="hud_wave_active">Wave in Progress…</string>
+    <string name="hud_select_tower">Select a tower from the panel</string>
+    <string name="hud_place_tower">Tap grid to place tower</string>
+    <string name="hud_cancel">Cancel</string>
+    <string name="hud_towers_label">TOWERS</string>
+
+    <!-- Tower names -->
+    <string name="tower_bolt_name">Bolt Tower</string>
+    <string name="tower_bolt_desc">Fast electrical strikes. Excellent against light enemies.</string>
+    <string name="tower_blast_name">Blast Tower</string>
+    <string name="tower_blast_desc">Explosive AoE. Damages all enemies in blast radius.</string>
+    <string name="tower_frost_name">Frost Tower</string>
+    <string name="tower_frost_desc">Chilling aura slows enemies by 40%. Low damage, high utility.</string>
+
+    <!-- Enemy names -->
+    <string name="enemy_runner_name">Runner</string>
+    <string name="enemy_runner_desc">Fast scout. Low HP, no armor. Overwhelms in numbers.</string>
+    <string name="enemy_tank_name">Tank</string>
+    <string name="enemy_tank_desc">Armored brute. 20% damage reduction. Moves slowly.</string>
+
+    <!-- Run End -->
+    <string name="run_end_title">RUN OVER</string>
+    <string name="run_end_score_label">FINAL SCORE</string>
+    <string name="run_end_wave_label">Waves Survived</string>
+    <string name="run_end_play_again">PLAY AGAIN</string>
+    <string name="run_end_main_menu">Main Menu</string>
+    <string name="run_end_rank">RANK</string>
+
+    <!-- Error messages -->
+    <string name="error_not_enough_gold">Not enough gold!</string>
+    <string name="error_invalid_placement">Cannot place tower here.</string>
+    <string name="error_wave_active">A wave is already in progress.</string>
+
+    <!-- Notifications -->
+    <string name="msg_life_lost">Life lost!</string>
+    <string name="msg_wave_complete">Wave complete!</string>
+    <string name="msg_gold_earned">+%1$d gold</string>
+</resources>

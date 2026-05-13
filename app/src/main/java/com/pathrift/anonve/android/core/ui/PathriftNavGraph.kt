@@ -1,0 +1,77 @@
+package com.pathrift.anonve.android.core.ui
+
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
+import androidx.navigation.NavType
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
+import com.pathrift.anonve.android.core.ui.screens.GameScreen
+import com.pathrift.anonve.android.core.ui.screens.HomeScreen
+import com.pathrift.anonve.android.core.ui.screens.RunEndScreen
+
+sealed class Screen(val route: String) {
+    object Home : Screen("home")
+    object Game : Screen("game")
+    object RunEnd : Screen("run_end/{score}/{wave}") {
+        fun createRoute(score: Long, wave: Int) = "run_end/$score/$wave"
+    }
+}
+
+@Composable
+fun PathriftNavGraph(
+    modifier: Modifier = Modifier,
+    navController: NavHostController = rememberNavController()
+) {
+    NavHost(
+        navController = navController,
+        startDestination = Screen.Home.route,
+        modifier = modifier
+    ) {
+        composable(Screen.Home.route) {
+            HomeScreen(
+                onStartGame = {
+                    navController.navigate(Screen.Game.route)
+                }
+            )
+        }
+
+        composable(Screen.Game.route) {
+            GameScreen(
+                onRunEnded = { score, wave ->
+                    navController.navigate(Screen.RunEnd.createRoute(score, wave)) {
+                        popUpTo(Screen.Game.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(
+            route = Screen.RunEnd.route,
+            arguments = listOf(
+                navArgument("score") { type = NavType.LongType },
+                navArgument("wave") { type = NavType.IntType }
+            )
+        ) { backStackEntry ->
+            val score = backStackEntry.arguments?.getLong("score") ?: 0L
+            val wave = backStackEntry.arguments?.getInt("wave") ?: 0
+            RunEndScreen(
+                score = score,
+                wave = wave,
+                onPlayAgain = {
+                    navController.navigate(Screen.Game.route) {
+                        popUpTo(Screen.Home.route)
+                    }
+                },
+                onMainMenu = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+    }
+}

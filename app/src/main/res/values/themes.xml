@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Pathrift" parent="android:Theme.Material.NoTitleBar.Fullscreen">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">#FF0A0A0F</item>
+        <item name="android:navigationBarColor">#FF0A0A0F</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+</resources>

@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">PATHRIFT</string>
+
+    <!-- Main Menu -->
+    <string name="main_menu_tagline">Harita değişiyor. Strateji sürekli evriliyor.</string>
+    <string name="main_menu_start">OYUNA BAŞLA</string>
+    <string name="main_menu_hint">Düşman dalgalarına karşı savunmak için grid üzerine kule yerleştir.</string>
+    <string name="main_menu_best_run">EN İYİ KOŞ</string>
+
+    <!-- Game HUD -->
+    <string name="hud_wave">DALGA</string>
+    <string name="hud_score">PUAN</string>
+    <string name="hud_lives">CAN</string>
+    <string name="hud_gold">ALTIN</string>
+    <string name="hud_start_wave">Başla</string>
+    <string name="hud_next_wave">Sonraki Dalga</string>
+    <string name="hud_wave_active">Dalga devam ediyor…</string>
+    <string name="hud_select_tower">Panelden bir kule seç</string>
+    <string name="hud_place_tower">Kule yerleştirmek için grid\'e dokun</string>
+    <string name="hud_cancel">İptal</string>
+    <string name="hud_towers_label">KULELER</string>
+
+    <!-- Tower names -->
+    <string name="tower_bolt_name">Şimşek Kulesi</string>
+    <string name="tower_bolt_desc">Hızlı elektrik darbeleri. Hafif düşmanlara karşı mükemmel.</string>
+    <string name="tower_blast_name">Patlama Kulesi</string>
+    <string name="tower_blast_desc">Alan hasarlı patlama. Menzildeki tüm düşmanlara hasar verir.</string>
+    <string name="tower_frost_name">Buz Kulesi</string>
+    <string name="tower_frost_desc">Soğutma alanı düşman hızını %40 yavaşlatır. Düşük hasar, yüksek fayda.</string>
+
+    <!-- Enemy names -->
+    <string name="enemy_runner_name">Koşucu</string>
+    <string name="enemy_runner_desc">Hızlı keşifçi. Düşük HP, zırh yok. Kalabalıkta tehlikeli.</string>
+    <string name="enemy_tank_name">Tank</string>
+    <string name="enemy_tank_desc">Zırhlı canavar. %20 hasar azaltma. Yavaş ama dayanıklı.</string>
+
+    <!-- Run End -->
+    <string name="run_end_title">KOŞ BİTTİ</string>
+    <string name="run_end_score_label">TOPLAM PUAN</string>
+    <string name="run_end_wave_label">Hayatta Kalınan Dalgalar</string>
+    <string name="run_end_play_again">TEKRAR OYNA</string>
+    <string name="run_end_main_menu">Ana Menü</string>
+    <string name="run_end_rank">DERECE</string>
+
+    <!-- Error messages -->
+    <string name="error_not_enough_gold">Yeterli altın yok!</string>
+    <string name="error_invalid_placement">Buraya kule yerleştirilemiyor.</string>
+    <string name="error_wave_active">Dalga zaten devam ediyor.</string>
+
+    <!-- Notifications -->
+    <string name="msg_life_lost">Can kaybedildi!</string>
+    <string name="msg_wave_complete">Dalga tamamlandı!</string>
+    <string name="msg_gold_earned">+%1$d altın</string>
+</resources>
