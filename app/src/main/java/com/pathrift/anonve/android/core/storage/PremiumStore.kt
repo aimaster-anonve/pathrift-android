@@ -10,5 +10,7 @@ class PremiumStore(context: Context) {
         get() = prefs.getBoolean(key, false)
         set(value) = prefs.edit().putBoolean(key, value).apply()
 
-    fun activate() { isPremium = true }
+    fun activate()    { isPremium = true }
+    fun toggle()      { isPremium = !isPremium }
+    fun deactivate()  { isPremium = false }
 }

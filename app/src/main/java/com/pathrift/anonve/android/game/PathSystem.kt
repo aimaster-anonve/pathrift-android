@@ -1,11 +1,10 @@
 package com.pathrift.anonve.android.game
 
 import android.graphics.PointF
-import kotlin.math.pow
 import kotlin.math.sqrt
 
 /**
- * PathSystem — iOS parity. 12 Z-shaped layouts, continuous waypoint path,
+ * PathSystem — 18 layouts (12 Z-shaped + 6 crossing/complex), continuous waypoint path,
  * algorithmic slot placement that never overlaps the path.
  *
  * Call [buildLayout] once per layout change (game start / Rift Shift).
@@ -29,7 +28,8 @@ object PathSystem {
         listOf(0.75f, 0.44f, 0.17f, 0.32f, 0.68f),   // 11: narrow reverse
     )
 
-    val layoutCount: Int get() = layoutParams.size
+    // Total layout count: 12 Z-based + 6 crossing = 18
+    val layoutCount: Int get() = layoutParams.size + 6
 
     var currentLayoutIndex: Int = 0
         private set
@@ -50,25 +50,39 @@ object PathSystem {
         currentWave: Int = 0,
         layoutIndex: Int = -1
     ) {
-        val idx = if (layoutIndex < 0) (0 until layoutParams.size).random() else layoutIndex
+        val W = screenWidth
+        val H = screenHeight
+        val totalLayouts = layoutParams.size + 6  // 18 total
+        val idx = if (layoutIndex < 0) (0 until totalLayouts).random() else layoutIndex
         currentLayoutIndex = idx
-        val p = layoutParams[idx]
-        val y1 = screenHeight * p[0]
-        val y2 = screenHeight * p[1]
-        val y3 = screenHeight * p[2]
-        val xL = screenWidth * p[3]
-        val xR = screenWidth * p[4]
 
-        waypoints = listOf(
-            PointF(-10f, y1),
-            PointF(xR, y1),
-            PointF(xR, y2),
-            PointF(xL, y2),
-            PointF(xL, y3),
-            PointF(screenWidth + 10f, y3)
-        )
+        if (idx < layoutParams.size) {
+            // Z-shaped layouts (indices 0–11)
+            val p = layoutParams[idx]
+            val y1 = H * p[0]
+            val y2 = H * p[1]
+            val y3 = H * p[2]
+            val xL = W * p[3]
+            val xR = W * p[4]
 
-        slotPositions = computeSlots(y1, y2, y3, xL, xR, screenWidth, screenHeight, currentWave)
+            waypoints = listOf(
+                PointF(-10f, y1),
+                PointF(xR, y1),
+                PointF(xR, y2),
+                PointF(xL, y2),
+                PointF(xL, y3),
+                PointF(W + 10f, y3)
+            )
+
+            val rawSlots = computeSlots(y1, y2, y3, xL, xR, W, H, currentWave)
+            slotPositions = guaranteePathCoverage(rawSlots, waypoints, currentWave)
+        } else {
+            // Crossing/complex layouts (indices 12–17)
+            val crossIdx = idx - layoutParams.size
+            waypoints = buildCrossingLayout(crossIdx, W, H)
+            val rawSlots = computeSlotsForCrossing(W, H, currentWave)
+            slotPositions = guaranteePathCoverage(rawSlots, waypoints, currentWave)
+        }
     }
 
     fun totalPathLength(): Float {
@@ -134,6 +148,163 @@ object PathSystem {
             PointF(maxOf(xL + hGap + 6f, W * 0.20f), seg5Side),
             PointF((xL + W) * 0.5f + 8f, seg5Side),
             PointF(minOf(W * 0.80f, W - edge), seg5Side),
+        )
+
+        val result = mutableListOf<PointF>()
+        for (c in candidates) {
+            if (c.x < edge || c.x > W - edge || c.y < edge || c.y > H - edge) continue
+            val tooClose = result.any { e ->
+                val dx = c.x - e.x
+                val dy = c.y - e.y
+                sqrt(dx * dx + dy * dy) < minSep
+            }
+            if (!tooClose) result.add(c)
+        }
+
+        val maxSlots = when {
+            currentWave < 5  -> 6
+            currentWave < 10 -> 8
+            currentWave < 15 -> 10
+            else             -> 12
+        }
+        return result.take(maxSlots)
+    }
+
+    // ---- Guarantee path coverage: entry / mid / exit segments each have at least one slot ----
+
+    private fun guaranteePathCoverage(
+        slots: List<PointF>,
+        wps: List<PointF>,
+        currentWave: Int
+    ): List<PointF> {
+        if (wps.size < 2) return slots
+
+        val result = slots.toMutableList()
+
+        // Divide waypoints into 3 segments
+        val segSize = (wps.size - 1) / 3
+        val segments = listOf(
+            wps.subList(0, segSize + 1),                   // entry
+            wps.subList(segSize, 2 * segSize + 1),         // mid
+            wps.subList(2 * segSize, wps.size)             // exit
+        )
+
+        for (segment in segments) {
+            if (segment.size < 1) continue
+            val midIndex = segment.size / 2
+            val segMid = segment[midIndex]
+
+            // Check if any existing slot is within 120px of this segment midpoint
+            val hasCoverage = result.any { slot ->
+                val dx = slot.x - segMid.x
+                val dy = slot.y - segMid.y
+                sqrt((dx * dx + dy * dy).toDouble()) < 120.0
+            }
+
+            if (!hasCoverage) {
+                // Add guaranteed slot offset 80px perpendicular from segment midpoint
+                val dir = if (midIndex + 1 < segment.size) {
+                    val next = segment[midIndex + 1]
+                    PointF(next.x - segMid.x, next.y - segMid.y)
+                } else if (midIndex > 0) {
+                    val prev = segment[midIndex - 1]
+                    PointF(segMid.x - prev.x, segMid.y - prev.y)
+                } else {
+                    PointF(1f, 0f)
+                }
+                val len = sqrt((dir.x * dir.x + dir.y * dir.y).toDouble()).toFloat()
+                val safeDen = if (len > 0f) len else 1f
+                val perp = PointF(-dir.y / safeDen * 80f, dir.x / safeDen * 80f)
+                result.add(PointF(segMid.x + perp.x, segMid.y + perp.y))
+            }
+        }
+
+        val maxSlots = when {
+            currentWave < 5  -> 6
+            currentWave < 10 -> 8
+            currentWave < 15 -> 10
+            else             -> 12
+        }
+        return result.take(maxSlots)
+    }
+
+    // ---- Crossing / complex path layouts (indices 12–17) ----
+
+    private fun buildCrossingLayout(crossIdx: Int, W: Float, H: Float): List<PointF> {
+        return when (crossIdx) {
+            0 -> listOf(
+                // Cross-0: S-curve (smooth)
+                PointF(-10f, H * 0.5f),
+                PointF(W * 0.25f, H * 0.2f),
+                PointF(W * 0.5f, H * 0.5f),
+                PointF(W * 0.75f, H * 0.8f),
+                PointF(W + 10f, H * 0.5f)
+            )
+            1 -> listOf(
+                // Cross-1: Diamond/X approach
+                PointF(-10f, H * 0.5f),
+                PointF(W * 0.35f, H * 0.15f),
+                PointF(W * 0.65f, H * 0.5f),
+                PointF(W * 0.35f, H * 0.85f),
+                PointF(W * 0.5f, H * 0.5f),
+                PointF(W + 10f, H * 0.5f)
+            )
+            2 -> listOf(
+                // Cross-2: Double zigzag
+                PointF(-10f, H * 0.15f),
+                PointF(W * 0.3f, H * 0.15f),
+                PointF(W * 0.3f, H * 0.85f),
+                PointF(W * 0.7f, H * 0.85f),
+                PointF(W * 0.7f, H * 0.15f),
+                PointF(W + 10f, H * 0.15f)
+            )
+            3 -> listOf(
+                // Cross-3: Spiral approach
+                PointF(-10f, H * 0.75f),
+                PointF(W * 0.5f, H * 0.75f),
+                PointF(W * 0.5f, H * 0.25f),
+                PointF(W * 0.2f, H * 0.25f),
+                PointF(W * 0.7f, H * 0.6f),
+                PointF(W + 10f, H * 0.6f)
+            )
+            4 -> listOf(
+                // Cross-4: W-shape
+                PointF(-10f, H * 0.5f),
+                PointF(W * 0.2f, H * 0.15f),
+                PointF(W * 0.4f, H * 0.55f),
+                PointF(W * 0.6f, H * 0.15f),
+                PointF(W * 0.8f, H * 0.55f),
+                PointF(W + 10f, H * 0.5f)
+            )
+            else -> listOf(
+                // Cross-5: Long diagonal
+                PointF(-10f, H * 0.2f),
+                PointF(W * 0.6f, H * 0.2f),
+                PointF(W * 0.4f, H * 0.8f),
+                PointF(W + 10f, H * 0.8f)
+            )
+        }
+    }
+
+    /** Generate candidate slots spread across the screen for crossing layouts. */
+    private fun computeSlotsForCrossing(W: Float, H: Float, currentWave: Int): List<PointF> {
+        val edge = 30f
+        val minSep = 56f
+
+        val candidates = listOf(
+            PointF(W * 0.12f, H * 0.35f),
+            PointF(W * 0.12f, H * 0.65f),
+            PointF(W * 0.28f, H * 0.20f),
+            PointF(W * 0.28f, H * 0.50f),
+            PointF(W * 0.28f, H * 0.80f),
+            PointF(W * 0.45f, H * 0.35f),
+            PointF(W * 0.45f, H * 0.65f),
+            PointF(W * 0.60f, H * 0.20f),
+            PointF(W * 0.60f, H * 0.50f),
+            PointF(W * 0.60f, H * 0.80f),
+            PointF(W * 0.78f, H * 0.35f),
+            PointF(W * 0.78f, H * 0.65f),
+            PointF(W * 0.88f, H * 0.50f),
         )
 
         val result = mutableListOf<PointF>()

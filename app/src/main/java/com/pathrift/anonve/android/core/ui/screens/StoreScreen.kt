@@ -28,9 +28,11 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
@@ -55,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pathrift.anonve.android.app.PathriftApp
 import com.pathrift.anonve.android.core.ui.BlastTowerColor
+import com.pathrift.anonve.android.core.ui.PathriftDanger
 import com.pathrift.anonve.android.core.ui.BoltTowerColor
 import com.pathrift.anonve.android.core.ui.CoreTowerColor
 import com.pathrift.anonve.android.core.ui.FrostTowerColor
@@ -185,8 +188,8 @@ fun StoreScreen(onBack: () -> Unit) {
             PremiumCard(
                 isPremium = isPremium,
                 onActivate = {
-                    premiumStore.activate()
-                    isPremium = true
+                    premiumStore.toggle()
+                    isPremium = premiumStore.isPremium
                 }
             )
 
@@ -263,12 +266,9 @@ private fun PremiumCard(isPremium: Boolean, onActivate: () -> Unit) {
                 )
             }
             if (isPremium) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = PathriftSuccess,
-                    modifier = Modifier.size(24.dp)
-                )
+                TextButton(onClick = onActivate, contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)) {
+                    Text("DEACTIVATE", color = PathriftDanger, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
 
@@ -285,11 +285,16 @@ private fun PremiumCard(isPremium: Boolean, onActivate: () -> Unit) {
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    text = "GET PREMIUM (Test Mode)",
+                    text = "ACTIVATE PREMIUM (Test Mode)",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Black,
                     color = Color.Black
                 )
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                PremiumBenefit(text = "x2 Speed active")
+                PremiumBenefit(text = "1 Revive per run active")
             }
         }
     }
@@ -400,7 +405,7 @@ private fun TowerStoreCard(
                     disabledContainerColor = PathriftSurface.copy(alpha = 0.5f)
                 ),
                 shape = RoundedCornerShape(8.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Diamond,
