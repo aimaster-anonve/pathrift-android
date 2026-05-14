@@ -166,8 +166,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
         }
     }
 
-    /** Returns true if a tower type is available to place (free or unlocked). */
-    fun isTowerUnlocked(type: TowerType): Boolean = diamondStore.isUnlocked(type)
+    /** Returns true if a tower type is available to place (free or unlocked). Premium bypasses all locks. */
+    fun isTowerUnlocked(type: TowerType): Boolean = premiumStore.isPremium || diamondStore.isUnlocked(type)
 
     /** Called ~60fps from the rendering side to keep enemy positions live. */
     fun syncEnemyPositions() {

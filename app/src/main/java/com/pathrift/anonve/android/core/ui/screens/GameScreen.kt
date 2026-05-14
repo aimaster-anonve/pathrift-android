@@ -378,6 +378,12 @@ private fun CombatHUD(
                             Text("♦", color = Color(0xFF00CCFF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             Text("${state.diamonds}", color = Color(0xFF00CCFF), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                         }
+                        Spacer(Modifier.width(8.dp))
+                        // Kills pill
+                        StatPill {
+                            Text("✕", color = PathriftOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("${state.enemyKills}", color = PathriftOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
                     }
 
                     // RIGHT: Speed + Pause
@@ -414,10 +420,6 @@ private fun CombatHUD(
                         }
                     }
                 }
-                // Wave progress strip — 4dp bar directly below top bar (landscape only)
-                WaveProgressStrip(
-                    progress = if (state.waveEnemyTotal > 0) state.waveEnemiesCleared.toDouble() / state.waveEnemyTotal else 0.0
-                )
             } else {
             // Portrait HUD (existing layout)
             Row(
@@ -507,12 +509,6 @@ private fun CombatHUD(
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // LEFT: Kills (Change 4 — StatPill)
-                StatPill {
-                    Text("✕", color = PathriftOrange, fontSize = 11.sp)
-                    Text("${state.enemyKills}", color = PathriftOrange, fontSize = 13.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                }
-
                 Spacer(Modifier.weight(1f))
 
                 // RIGHT: Progress or Send Wave

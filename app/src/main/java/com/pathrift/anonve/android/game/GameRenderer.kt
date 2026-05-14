@@ -305,77 +305,78 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     }
 
     private fun drawEntryIndicator(canvas: Canvas, pos: PointF) {
+        val t = ((System.currentTimeMillis() % 2000L) / 2000f)
+        val pulse = (0.5f + 0.5f * kotlin.math.sin(t * 2 * Math.PI)).toFloat()
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-        // Outer glow fill
-        paint.color = android.graphics.Color.argb(20, 0, 230, 77)
-        paint.style = Paint.Style.FILL
-        canvas.drawCircle(pos.x, pos.y, 22f, paint)
-
-        // Glow ring
-        paint.color = android.graphics.Color.argb(128, 0, 230, 77)
+        // Outer pulsing ring — neon blue
         paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 2f
-        canvas.drawCircle(pos.x, pos.y, 20f, paint)
+        paint.strokeWidth = 1.5f
+        paint.color = android.graphics.Color.argb((230 * (0.25f + 0.75f * (1f - pulse))).toInt().coerceIn(0, 255), 0, 200, 255)
+        canvas.drawCircle(pos.x, pos.y, 13f + 6f * pulse, paint)
 
-        // Inner filled dot
-        paint.color = android.graphics.Color.argb(255, 0, 230, 77)
-        paint.style = Paint.Style.FILL
-        canvas.drawCircle(pos.x, pos.y, 8f, paint)
+        // Inner ring — neon blue steady
+        paint.strokeWidth = 1.5f
+        paint.color = android.graphics.Color.argb(178, 0, 200, 255)
+        canvas.drawCircle(pos.x, pos.y, 7f, paint)
 
-        // "IN" badge background
-        val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.argb(204, 0, 230, 77)
-            style = Paint.Style.FILL
+        // Right-pointing chevron arrow
+        val ap = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(255, 0, 200, 255)
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+            strokeCap = Paint.Cap.ROUND
         }
-        val badgeRect = RectF(pos.x - 14f, pos.y - 36f, pos.x + 14f, pos.y - 22f)
-        canvas.drawRoundRect(badgeRect, 4f, 4f, badgePaint)
-
-        // "IN" label
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.BLACK
-            textSize = 10f
-            textAlign = Paint.Align.CENTER
-            isFakeBoldText = true
+        val path = android.graphics.Path().apply {
+            moveTo(pos.x + 4f, pos.y)
+            lineTo(pos.x - 2f, pos.y - 5f)
+            moveTo(pos.x + 4f, pos.y)
+            lineTo(pos.x - 2f, pos.y + 5f)
         }
-        canvas.drawText("IN", pos.x, pos.y - 26f, textPaint)
+        canvas.drawPath(path, ap)
     }
 
     private fun drawExitIndicator(canvas: Canvas, pos: PointF) {
+        val t = ((System.currentTimeMillis() % 800L) / 800f)
+        val pulse = (0.5f + 0.5f * kotlin.math.sin(t * 2 * Math.PI)).toFloat()
         val paint = Paint(Paint.ANTI_ALIAS_FLAG)
 
-        // Outer glow fill
-        paint.color = android.graphics.Color.argb(20, 255, 34, 34)
-        paint.style = Paint.Style.FILL
-        canvas.drawCircle(pos.x, pos.y, 22f, paint)
-
-        // Glow ring
-        paint.color = android.graphics.Color.argb(128, 255, 34, 34)
+        // 6 dashed arc segments — red danger ring
         paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 2f
-        canvas.drawCircle(pos.x, pos.y, 20f, paint)
+        paint.strokeWidth = 2.5f
+        paint.strokeCap = Paint.Cap.ROUND
+        paint.color = android.graphics.Color.argb(217, 255, 43, 84)
+        val r = 13f
+        val oval = RectF(pos.x - r, pos.y - r, pos.x + r, pos.y + r)
+        val dashCount = 6
+        val sweep = 360f / dashCount
+        for (i in 0 until dashCount) {
+            canvas.drawArc(oval, i * sweep, sweep * 0.55f, false, paint)
+        }
 
-        // Inner filled dot
-        paint.color = android.graphics.Color.argb(255, 255, 34, 34)
+        // Pulsing core dot — danger
         paint.style = Paint.Style.FILL
-        canvas.drawCircle(pos.x, pos.y, 8f, paint)
+        paint.color = android.graphics.Color.argb((89 + (89 * pulse).toInt()).coerceIn(0, 255), 255, 43, 84)
+        canvas.drawCircle(pos.x, pos.y, 5f, paint)
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1.5f
+        paint.color = android.graphics.Color.argb(204, 255, 43, 84)
+        canvas.drawCircle(pos.x, pos.y, 5f, paint)
 
-        // "OUT" badge background
-        val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.argb(204, 255, 34, 34)
-            style = Paint.Style.FILL
+        // Right-pointing chevron arrow — red
+        val ap = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.argb(255, 255, 43, 84)
+            style = Paint.Style.STROKE
+            strokeWidth = 2f
+            strokeCap = Paint.Cap.ROUND
         }
-        val badgeRect = RectF(pos.x - 16f, pos.y - 36f, pos.x + 16f, pos.y - 22f)
-        canvas.drawRoundRect(badgeRect, 4f, 4f, badgePaint)
-
-        // "OUT" label
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.WHITE
-            textSize = 10f
-            textAlign = Paint.Align.CENTER
-            isFakeBoldText = true
+        val path = android.graphics.Path().apply {
+            moveTo(pos.x + 4f, pos.y)
+            lineTo(pos.x - 2f, pos.y - 5f)
+            moveTo(pos.x + 4f, pos.y)
+            lineTo(pos.x - 2f, pos.y + 5f)
         }
-        canvas.drawText("OUT", pos.x, pos.y - 26f, textPaint)
+        canvas.drawPath(path, ap)
     }
 
     /** Compute perpendicular offset vector for bridge rail rendering. */
