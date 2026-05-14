@@ -10,7 +10,7 @@ class ArtilleryTower : Tower() {
     override val cost = 160
     override val damagePerHit = 55
     override val attacksPerSecond = 0.4f
-    override val rangeTiles = 3.1f
+    override val rangeTiles = 2.5f
     override val aoeRadius = 1.25f
     override val description = "Bridge enemies only. AoE blast. +50% vs Boss."
 }

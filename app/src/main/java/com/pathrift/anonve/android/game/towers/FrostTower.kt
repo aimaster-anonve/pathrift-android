@@ -12,7 +12,7 @@ class FrostTower : Tower() {
     override val cost = EconomyConstants.TowerCost.FROST
     override val damagePerHit = 5
     override val attacksPerSecond = 0.8f
-    override val rangeTiles = 3.0f
+    override val rangeTiles = 2.4f
     override val slowFactor = 0.6f  // 1.0 - 0.40 = 0.60 → enemy speed *= 0.60 → 40% slower
     override val description = "Chilling aura slows enemies 40%. Low damage, high utility."
 }

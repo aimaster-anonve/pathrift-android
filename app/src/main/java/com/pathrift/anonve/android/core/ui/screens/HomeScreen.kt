@@ -72,6 +72,9 @@ import com.pathrift.anonve.android.core.ui.PathriftPurple
 import com.pathrift.anonve.android.core.ui.PathriftSurface
 import com.pathrift.anonve.android.core.ui.PathriftTextPrimary
 import com.pathrift.anonve.android.core.ui.PathriftTextSecondary
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import com.pathrift.anonve.android.app.PathriftApp
 import kotlinx.coroutines.flow.flowOf
 
 @Composable
@@ -85,6 +88,10 @@ fun HomeScreen(
 ) {
     val lang by LanguageManager.current.collectAsState()
     val bestScore by (storage?.bestScore ?: flowOf(0L)).collectAsState(initial = 0L)
+    val context = LocalContext.current
+    val gameSaveStore = remember { (context.applicationContext as PathriftApp).gameSaveStore }
+    val hasSave = remember { gameSaveStore.hasSave() }
+    val savedWave = remember { gameSaveStore.savedWave }
 
     val infiniteTransition = rememberInfiniteTransition(label = "titlePulse")
     val titleScale by infiniteTransition.animateFloat(
@@ -120,7 +127,10 @@ fun HomeScreen(
                 LandscapeHomeContent(
                     titleScale = titleScale,
                     bestScore = bestScore,
-                    onPlay = onStartGame,
+                    onPlay = { gameSaveStore.clear(); onStartGame() },
+                    onContinue = onStartGame,
+                    hasSave = hasSave,
+                    savedWave = savedWave,
                     onHowToPlay = onOpenHowToPlay,
                     onSettings = onOpenSettings,
                     onStore = onOpenStore,
@@ -130,7 +140,10 @@ fun HomeScreen(
                 PortraitHomeContent(
                     titleScale = titleScale,
                     bestScore = bestScore,
-                    onStartGame = onStartGame,
+                    onStartGame = { gameSaveStore.clear(); onStartGame() },
+                    onContinue = onStartGame,
+                    hasSave = hasSave,
+                    savedWave = savedWave,
                     onOpenHowToPlay = onOpenHowToPlay,
                     onOpenSettings = onOpenSettings,
                     onOpenStore = onOpenStore,
@@ -146,6 +159,9 @@ private fun LandscapeHomeContent(
     titleScale: Float,
     bestScore: Long,
     onPlay: () -> Unit,
+    onContinue: () -> Unit = {},
+    hasSave: Boolean = false,
+    savedWave: Int = 0,
     onHowToPlay: () -> Unit,
     onSettings: () -> Unit,
     onStore: () -> Unit,
@@ -233,6 +249,19 @@ private fun LandscapeHomeContent(
         ) {
             Spacer(Modifier.weight(1f))
 
+            if (hasSave) {
+                Button(
+                    onClick = onContinue,
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = PathriftOrange),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Text("↩  CONTINUE — WAVE $savedWave",
+                        fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                }
+                Spacer(Modifier.height(4.dp))
+            }
+
             Button(
                 onClick = onPlay,
                 modifier = Modifier.fillMaxWidth().height(44.dp),
@@ -310,6 +339,9 @@ private fun PortraitHomeContent(
     titleScale: Float,
     bestScore: Long,
     onStartGame: () -> Unit,
+    onContinue: () -> Unit = {},
+    hasSave: Boolean = false,
+    savedWave: Int = 0,
     onOpenHowToPlay: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenStore: () -> Unit,
@@ -375,6 +407,19 @@ private fun PortraitHomeContent(
         }
 
         Spacer(Modifier.height(52.dp))
+
+        if (hasSave) {
+            Button(
+                onClick = onContinue,
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = PathriftOrange),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text("↩  CONTINUE — WAVE $savedWave",
+                    fontSize = 15.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+            }
+            Spacer(Modifier.height(8.dp))
+        }
 
         Button(
             onClick = onStartGame,

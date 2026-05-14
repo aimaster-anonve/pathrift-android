@@ -10,6 +10,6 @@ class SniperTower : Tower() {
     override val cost = 220
     override val damagePerHit = 35
     override val attacksPerSecond = 0.5f
-    override val rangeTiles = 4.0f
+    override val rangeTiles = 3.2f
     override val description = "Targets all layers. Long range single target."
 }

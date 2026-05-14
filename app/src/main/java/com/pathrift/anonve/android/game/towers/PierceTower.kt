@@ -10,6 +10,6 @@ class PierceTower : Tower() {
     override val cost = 130
     override val damagePerHit = 25
     override val attacksPerSecond = 1.0f
-    override val rangeTiles = 3.0f
+    override val rangeTiles = 2.4f
     override val description = "Pierces shields. Hits all enemies in range. +100% vs Shields."
 }

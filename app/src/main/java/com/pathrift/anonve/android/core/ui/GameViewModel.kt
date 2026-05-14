@@ -58,6 +58,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     private val diamondStore: DiamondStore = (application as PathriftApp).diamondStore
     private val premiumStore: PremiumStore = (application as PathriftApp).premiumStore
     private val arsenalStore: ArsenalStore = (application as PathriftApp).arsenalStore
+    private val gameSaveStore: com.pathrift.anonve.android.core.storage.GameSaveStore = (application as PathriftApp).gameSaveStore
 
     private val _state = MutableStateFlow(GameState(diamonds = diamondStore.balance))
     val state: StateFlow<GameState> = _state.asStateFlow()
@@ -200,6 +201,18 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
             kotlinx.coroutines.delay(2000L)
             _state.update { it.copy(waveCompleteMessage = null) }
         }
+        // Save game state after each wave
+        val savedTowers = game.towers.values.map { t ->
+            com.pathrift.anonve.android.core.storage.SavedTower(
+                slotId = t.slotId, type = t.tower.type.name, level = t.level, totalInvested = t.totalInvested
+            )
+        }
+        gameSaveStore.save(
+            wave = wave, lives = game.lives, gold = game.gold,
+            kills = game.totalEnemiesKilled,
+            layoutIndex = com.pathrift.anonve.android.game.PathSystem.currentLayoutIndex,
+            towers = savedTowers
+        )
     }
 
     override fun onEnemyKilled(type: EnemyType, gold: Int) {
@@ -225,6 +238,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
 
     override fun onRunEnded(wave: Int, score: Long) {
         _state.update { it.copy(phase = GamePhase.GAME_OVER, isGameOver = true, lives = 0) }
+        gameSaveStore.clear()
         viewModelScope.launch { _events.emit(GameEvent.RunEnded(wave, score)) }
     }
 

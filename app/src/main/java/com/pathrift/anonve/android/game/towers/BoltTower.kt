@@ -12,6 +12,6 @@ class BoltTower : Tower() {
     override val cost = EconomyConstants.TowerCost.BOLT
     override val damagePerHit = 20
     override val attacksPerSecond = 1.2f
-    override val rangeTiles = 3.0f
+    override val rangeTiles = 2.4f
     override val description = "Fast electrical strikes. Excellent against light enemies."
 }

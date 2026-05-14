@@ -10,6 +10,6 @@ class TeslaTower : Tower() {
     override val cost = 300
     override val damagePerHit = 35
     override val attacksPerSecond = 0.9f
-    override val rangeTiles = 3.1f
+    override val rangeTiles = 2.5f
     override val description = "Chain lightning hits 3 targets. +75% vs Swarms. Unlock: 150♦"
 }

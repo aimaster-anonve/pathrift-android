@@ -90,6 +90,7 @@ import com.pathrift.anonve.android.core.ui.PierceTowerColor
 import com.pathrift.anonve.android.core.ui.SniperTowerColor
 import com.pathrift.anonve.android.core.ui.TeslaTowerColor
 import com.pathrift.anonve.android.core.ui.GameViewModel
+import com.pathrift.anonve.android.core.ui.TowerShapeIcon
 import com.pathrift.anonve.android.core.ui.LanguageManager
 import com.pathrift.anonve.android.core.ui.PathriftBackground
 import com.pathrift.anonve.android.core.ui.PathriftDanger
@@ -705,88 +706,85 @@ private fun TowerInfoBottomPanel(
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)),
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)).clickable(onClick = onDismiss),
         contentAlignment = Alignment.BottomCenter
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 160.dp)
-                .background(PathriftSurface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .navigationBarsPadding(),
+                .heightIn(max = 112.dp)
+                .background(PathriftSurface, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+                .navigationBarsPadding()
+                .clickable(enabled = false) {},
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(modifier = Modifier.padding(top = 10.dp, bottom = 6.dp).size(36.dp, 4.dp).background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
+            Box(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp).size(36.dp, 4.dp).background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: header + stats
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(modifier = Modifier.size(12.dp).background(towerColor, CircleShape))
-                        Spacer(Modifier.width(8.dp))
-                        Text(info.type.name, fontSize = 14.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary, letterSpacing = 1.sp)
-                        Spacer(Modifier.width(6.dp))
-                        Box(modifier = Modifier.background(PathriftNeonBlue.copy(alpha = 0.15f), RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp)) {
-                            Text("Lv.${info.level}", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PathriftNeonBlue, fontFamily = FontFamily.Monospace)
-                        }
-                        Spacer(Modifier.weight(1f))
-                        IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
-                            Text("✕", fontSize = 14.sp, color = PathriftTextSecondary)
-                        }
+                // Left: identity + stats
+                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(10.dp).background(towerColor, CircleShape))
+                    Spacer(Modifier.width(6.dp))
+                    Text(info.type.name, fontSize = 13.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary)
+                    Spacer(Modifier.width(5.dp))
+                    Box(modifier = Modifier.background(PathriftNeonBlue.copy(alpha = 0.15f), RoundedCornerShape(5.dp)).padding(horizontal = 5.dp, vertical = 1.dp)) {
+                        Text("Lv.${info.level}", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PathriftNeonBlue, fontFamily = FontFamily.Monospace)
                     }
-                    Spacer(Modifier.height(6.dp))
+                    info.type.typeAdvantageHint?.let { Text(" ⚡", fontSize = 10.sp, color = PathriftGold) }
+                    Spacer(Modifier.width(8.dp))
+                    // Inline stats
                     Row(
-                        modifier = Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(8.dp)).padding(vertical = 4.dp),
+                        modifier = Modifier.weight(1f).background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(7.dp)).padding(vertical = 3.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         TowerStatItem("DMG", String.format("%.0f", info.damage), PathriftOrange, Modifier.weight(1f))
-                        Box(modifier = Modifier.size(1.dp, 28.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
+                        Box(modifier = Modifier.size(1.dp, 22.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
                         TowerStatItem("RNG", "${info.range.toInt()}t", PathriftNeonBlue, Modifier.weight(1f))
-                        Box(modifier = Modifier.size(1.dp, 28.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
+                        Box(modifier = Modifier.size(1.dp, 22.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
                         TowerStatItem("SPD", String.format("%.1f/s", info.attackSpeed), PathriftPurple, Modifier.weight(1f))
-                    }
-                    info.type.typeAdvantageHint?.let { hint ->
-                        Text(hint, color = Color.Gray, fontSize = 9.sp, modifier = Modifier.padding(top = 2.dp))
                     }
                 }
 
-                // Right: action buttons (140dp)
-                Column(
-                    modifier = Modifier.width(140.dp).padding(start = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                // Right: buttons
+                Row(
+                    modifier = Modifier.padding(start = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Button(
                         onClick = onUpgrade, enabled = canAffordUpgrade,
-                        modifier = Modifier.fillMaxWidth().height(44.dp),
+                        modifier = Modifier.width(80.dp).height(40.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (canAffordUpgrade) PathriftNeonBlue else PathriftSurface,
                             disabledContainerColor = PathriftSurface
                         ),
-                        shape = RoundedCornerShape(12.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(LanguageManager.s("UPGRADE", "GELİŞTİR"), fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                            Text("UPGRADE", fontSize = 10.sp, fontWeight = FontWeight.Bold,
                                 color = if (canAffordUpgrade) PathriftTextPrimary else PathriftTextSecondary)
-                            Text("${info.upgradeCost}g", fontSize = 10.sp,
+                            Text("${info.upgradeCost}g", fontSize = 9.sp,
                                 color = if (canAffordUpgrade) PathriftTextPrimary.copy(0.7f) else PathriftTextSecondary.copy(0.5f))
                         }
                     }
                     Button(
                         onClick = onSell,
-                        modifier = Modifier.fillMaxWidth().height(36.dp),
+                        modifier = Modifier.width(64.dp).height(40.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = PathriftSurface),
                         shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                     ) {
-                        Text(LanguageManager.s("SELL", "SAT"), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PathriftOrange)
-                        Spacer(Modifier.width(4.dp))
-                        Text("+${info.sellValue}g", fontSize = 10.sp, color = PathriftOrange.copy(0.8f))
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("SELL", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PathriftOrange)
+                            Text("+${info.sellValue}g", fontSize = 9.sp, color = PathriftOrange.copy(0.8f))
+                        }
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
+                        Text("✕", fontSize = 13.sp, color = PathriftTextSecondary)
                     }
                 }
             }
@@ -823,7 +821,7 @@ private fun TowerSelectionPanel(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 120.dp)
+                .heightIn(max = 140.dp)
                 .background(PathriftSurface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
                 .navigationBarsPadding()
                 .clickable(enabled = false, onClick = {})
@@ -910,7 +908,7 @@ private fun CompactTowerPickCard(
 
     Box(
         modifier = Modifier
-            .width(60.dp)
+            .width(72.dp)
             .background(
                 PathriftSurface.copy(alpha = alpha),
                 RoundedCornerShape(10.dp)
@@ -927,9 +925,18 @@ private fun CompactTowerPickCard(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(
                 modifier = Modifier
-                    .size(18.dp)
-                    .background(towerColor.copy(alpha = alpha), CircleShape)
-            )
+                    .size(44.dp)
+                    .background(towerColor.copy(alpha = if (isAffordable) 0.1f else 0.05f), CircleShape)
+                    .then(Modifier),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!isUnlocked) {
+                    Text("🔒", fontSize = androidx.compose.ui.unit.TextUnit(14f, androidx.compose.ui.unit.TextUnitType.Sp))
+                } else {
+                    TowerShapeIcon(type = type, color = towerColor.copy(alpha = alpha),
+                        modifier = Modifier.size(28.dp))
+                }
+            }
             Spacer(Modifier.height(3.dp))
             Text(
                 text = type.displayName.uppercase().take(6),

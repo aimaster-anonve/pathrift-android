@@ -10,6 +10,6 @@ class InfernoTower : Tower() {
     override val cost = 200
     override val damagePerHit = 18
     override val attacksPerSecond = 1.5f
-    override val rangeTiles = 2.5f
+    override val rangeTiles = 2.0f
     override val description = "Rapid fire. Bypasses Ghost immunity. +75% vs Ghosts. Unlock: 50♦"
 }

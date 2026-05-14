@@ -10,6 +10,6 @@ class CoreTower : Tower() {
     override val cost = 180
     override val damagePerHit = 45
     override val attacksPerSecond = 0.7f
-    override val rangeTiles = 2.5f
+    override val rangeTiles = 2.0f
     override val description = "Armor penetration 50%. High damage. +60% vs Tanks."
 }

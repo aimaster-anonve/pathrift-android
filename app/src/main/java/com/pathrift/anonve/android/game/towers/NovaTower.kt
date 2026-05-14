@@ -10,7 +10,7 @@ class NovaTower : Tower() {
     override val cost = 500
     override val damagePerHit = 90
     override val attacksPerSecond = 0.35f
-    override val rangeTiles = 3.4f
+    override val rangeTiles = 2.7f
     override val aoeRadius = 2.5f
     override val description = "Massive AoE explosion. Slow fire rate. +50% vs Boss. Unlock: 300♦"
 }
