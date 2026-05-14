@@ -133,17 +133,59 @@ class GameEngine(
         hasUsedRevive = false
     }
 
+    // Set before initLayout to restore a saved game
+    private var pendingSave: com.pathrift.anonve.android.core.storage.GameSaveState? = null
+
+    fun queueRestore(save: com.pathrift.anonve.android.core.storage.GameSaveState) {
+        pendingSave = save
+    }
+
     /** Must be called once screen dimensions are known (before first wave). */
     fun initLayout(width: Float, height: Float) {
         screenWidth = width
         screenHeight = height
-        // Convert dp insets to pixels so PathSystem trims the game canvas away from HUD
         val density = Resources.getSystem().displayMetrics.density
         PathSystem.hudTopInset = 48f * density
         PathSystem.hudBottomInset = 46f * density
         PathSystem.hudHorizontalInset = 8f * density
-        PathSystem.buildLayout(width, height, currentWave = 0, layoutIndex = -1)
+        val layoutIdx = pendingSave?.layoutIndex ?: -1
+        PathSystem.buildLayout(width, height, currentWave = 0, layoutIndex = layoutIdx)
         grid.updateSlots(PathSystem.slotPositions)
+        pendingSave?.let { applyRestore(it) }
+        pendingSave = null
+    }
+
+    private fun applyRestore(save: com.pathrift.anonve.android.core.storage.GameSaveState) {
+        currentWave = save.wave
+        lives = save.lives
+        gold = save.gold
+        totalEnemiesKilled = save.enemyKills
+        score = 0L
+
+        for (t in save.towers) {
+            val type = TowerType.values().firstOrNull { it.name == t.type } ?: continue
+            val slot = grid.slot(t.slotId) ?: continue
+            if (slot.state.isOccupied) continue
+            val tower = when (type) {
+                TowerType.BOLT      -> com.pathrift.anonve.android.game.towers.BoltTower()
+                TowerType.BLAST     -> com.pathrift.anonve.android.game.towers.BlastTower()
+                TowerType.FROST     -> com.pathrift.anonve.android.game.towers.FrostTower()
+                TowerType.PIERCE    -> com.pathrift.anonve.android.game.towers.PierceTower()
+                TowerType.CORE      -> com.pathrift.anonve.android.game.towers.CoreTower()
+                TowerType.INFERNO   -> com.pathrift.anonve.android.game.towers.InfernoTower()
+                TowerType.TESLA     -> com.pathrift.anonve.android.game.towers.TeslaTower()
+                TowerType.NOVA      -> com.pathrift.anonve.android.game.towers.NovaTower()
+                TowerType.SNIPER    -> com.pathrift.anonve.android.game.towers.SniperTower()
+                TowerType.ARTILLERY -> com.pathrift.anonve.android.game.towers.ArtilleryTower()
+            }
+            grid.placeTower(type, t.slotId, t.totalInvested)
+            _towers[t.slotId] = TowerInstance(
+                slotId = t.slotId, tower = tower, position = slot.position,
+                level = t.level, totalInvested = t.totalInvested
+            )
+        }
+        bridge.onGoldChanged(gold)
+        bridge.onStateRestored(currentWave, lives, gold, totalEnemiesKilled)
     }
 
     // ---- Wave Management ----

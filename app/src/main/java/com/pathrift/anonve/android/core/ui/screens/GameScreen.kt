@@ -181,7 +181,10 @@ fun GameScreen(
         if (isPaused) {
             PauseOverlay(
                 onResume = { isPaused = false },
-                onQuit = { onRunEnded(state.score, state.wave) }
+                onQuit = {
+                    gameViewModel.clearSaveOnQuit()
+                    onRunEnded(state.score, state.wave)
+                }
             )
         }
 
@@ -692,103 +695,122 @@ private fun TowerInfoBottomPanel(
     onDismiss: () -> Unit
 ) {
     val canAffordUpgrade = gold >= info.upgradeCost
-    val towerColor = when (info.type) {
-        TowerType.BOLT      -> BoltTowerColor
-        TowerType.BLAST     -> BlastTowerColor
-        TowerType.FROST     -> FrostTowerColor
-        TowerType.PIERCE    -> PierceTowerColor
-        TowerType.CORE      -> CoreTowerColor
-        TowerType.INFERNO   -> InfernoTowerColor
-        TowerType.TESLA     -> TeslaTowerColor
-        TowerType.NOVA      -> NovaTowerColor
-        TowerType.SNIPER    -> SniperTowerColor
-        TowerType.ARTILLERY -> ArtilleryTowerColor
-    }
+    val towerColor = towerDisplayColor(info.type)
 
     Box(
-        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)).clickable(onClick = onDismiss),
+        modifier = Modifier.fillMaxSize()
+            .background(Color.Transparent)
+            .clickable(onClick = onDismiss),
         contentAlignment = Alignment.BottomCenter
     ) {
-        Column(
+        // Single-row compact card — 60dp fixed height
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 112.dp)
-                .background(PathriftSurface, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                .navigationBarsPadding()
-                .clickable(enabled = false) {},
-            horizontalAlignment = Alignment.CenterHorizontally
+                .height(60.dp)
+                .background(PathriftBackground.copy(alpha = 0.94f))
+                .clickable(enabled = false) {}
+                .navigationBarsPadding(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp).size(36.dp, 4.dp).background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
+            // Tower color accent bar
+            Box(
+                modifier = Modifier
+                    .width(4.dp).fillMaxHeight()
+                    .padding(vertical = 10.dp)
+                    .background(towerColor, RoundedCornerShape(2.dp))
+                    .padding(start = 12.dp)
+            )
+            Spacer(Modifier.width(12.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Left: identity + stats
-                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(10.dp).background(towerColor, CircleShape))
-                    Spacer(Modifier.width(6.dp))
-                    Text(info.type.name, fontSize = 13.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary)
-                    Spacer(Modifier.width(5.dp))
-                    Box(modifier = Modifier.background(PathriftNeonBlue.copy(alpha = 0.15f), RoundedCornerShape(5.dp)).padding(horizontal = 5.dp, vertical = 1.dp)) {
-                        Text("Lv.${info.level}", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PathriftNeonBlue, fontFamily = FontFamily.Monospace)
-                    }
-                    info.type.typeAdvantageHint?.let { Text(" ⚡", fontSize = 10.sp, color = PathriftGold) }
-                    Spacer(Modifier.width(8.dp))
-                    // Inline stats
-                    Row(
-                        modifier = Modifier.weight(1f).background(Color.Black.copy(alpha = 0.2f), RoundedCornerShape(7.dp)).padding(vertical = 3.dp),
-                        verticalAlignment = Alignment.CenterVertically
+            // Identity: name + level
+            Column(modifier = Modifier.width(90.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(info.type.displayName.uppercase(), fontSize = 11.sp,
+                        fontWeight = FontWeight.Black, color = PathriftTextPrimary)
+                    Spacer(Modifier.width(4.dp))
+                    Box(modifier = Modifier
+                        .background(PathriftNeonBlue.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 4.dp, vertical = 1.dp)
                     ) {
-                        TowerStatItem("DMG", String.format("%.0f", info.damage), PathriftOrange, Modifier.weight(1f))
-                        Box(modifier = Modifier.size(1.dp, 22.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
-                        TowerStatItem("RNG", "${info.range.toInt()}t", PathriftNeonBlue, Modifier.weight(1f))
-                        Box(modifier = Modifier.size(1.dp, 22.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
-                        TowerStatItem("SPD", String.format("%.1f/s", info.attackSpeed), PathriftPurple, Modifier.weight(1f))
+                        Text("Lv.${info.level}", fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                            color = PathriftNeonBlue, fontFamily = FontFamily.Monospace)
                     }
                 }
+                info.type.typeAdvantageHint?.let {
+                    Text("⚡ advantage", fontSize = 7.sp, color = PathriftGold, fontFamily = FontFamily.Monospace)
+                }
+            }
 
-                // Right: buttons
-                Row(
-                    modifier = Modifier.padding(start = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            // Stats block
+            Row(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(horizontal = 8.dp)
+                    .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                MiniStatItem("DMG", String.format("%.0f", info.damage), PathriftOrange, Modifier.weight(1f))
+                Box(Modifier.size(1.dp, 22.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
+                MiniStatItem("RNG", "${info.range.toInt()}t", PathriftNeonBlue, Modifier.weight(1f))
+                Box(Modifier.size(1.dp, 22.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
+                MiniStatItem("SPD", String.format("%.1f/s", info.attackSpeed), PathriftPurple, Modifier.weight(1f))
+            }
+
+            // Buttons
+            Row(
+                modifier = Modifier.padding(end = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Button(
+                    onClick = onUpgrade, enabled = canAffordUpgrade,
+                    modifier = Modifier.width(72.dp).height(38.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (canAffordUpgrade) PathriftNeonBlue else Color.White.copy(alpha = 0.06f),
+                        disabledContainerColor = Color.White.copy(alpha = 0.06f)
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                 ) {
-                    Button(
-                        onClick = onUpgrade, enabled = canAffordUpgrade,
-                        modifier = Modifier.width(80.dp).height(40.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (canAffordUpgrade) PathriftNeonBlue else PathriftSurface,
-                            disabledContainerColor = PathriftSurface
-                        ),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("UPGRADE", fontSize = 10.sp, fontWeight = FontWeight.Bold,
-                                color = if (canAffordUpgrade) PathriftTextPrimary else PathriftTextSecondary)
-                            Text("${info.upgradeCost}g", fontSize = 9.sp,
-                                color = if (canAffordUpgrade) PathriftTextPrimary.copy(0.7f) else PathriftTextSecondary.copy(0.5f))
-                        }
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("UPGRADE", fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                            color = if (canAffordUpgrade) PathriftBackground else PathriftTextSecondary)
+                        Text("${info.upgradeCost}g", fontSize = 8.sp,
+                            color = if (canAffordUpgrade) PathriftBackground.copy(0.7f) else PathriftTextSecondary.copy(0.5f))
                     }
-                    Button(
-                        onClick = onSell,
-                        modifier = Modifier.width(64.dp).height(40.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = PathriftSurface),
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("SELL", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PathriftOrange)
-                            Text("+${info.sellValue}g", fontSize = 9.sp, color = PathriftOrange.copy(0.8f))
-                        }
+                }
+                Box(
+                    modifier = Modifier.width(56.dp).height(38.dp)
+                        .background(PathriftDanger.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
+                        .border(1.dp, PathriftDanger.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
+                        .clickable(onClick = onSell),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("SELL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PathriftDanger)
+                        Text("+${info.sellValue}g", fontSize = 8.sp, color = PathriftDanger.copy(0.8f))
                     }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Text("✕", fontSize = 13.sp, color = PathriftTextSecondary)
-                    }
+                }
+                Box(
+                    modifier = Modifier.size(28.dp)
+                        .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                        .clickable(onClick = onDismiss),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("✕", fontSize = 11.sp, color = PathriftTextSecondary)
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MiniStatItem(label: String, value: String, color: Color, modifier: Modifier = Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = PathriftTextPrimary, fontFamily = FontFamily.Monospace)
+        Text(label, fontSize = 7.sp, fontWeight = FontWeight.SemiBold, color = color, letterSpacing = 0.8.sp, fontFamily = FontFamily.Monospace)
     }
 }
 

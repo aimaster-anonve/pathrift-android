@@ -72,6 +72,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     val game = GameEngine(this, diamondStore, arsenalStore, premiumStore)
 
     init {
+        // If a save exists, restore it (PLAY clears the save first; CONTINUE keeps it)
+        gameSaveStore.load()?.let { save -> game.queueRestore(save) }
         game.start(viewModelScope)
     }
 
@@ -389,6 +391,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     override fun onLifeRestored(lives: Int) {
         _state.update { it.copy(lives = lives) }
         viewModelScope.launch { _events.emit(GameEvent.ShowMessage("Revived! 1 life restored.")) }
+    }
+
+    fun clearSaveOnQuit() { gameSaveStore.clear() }
+
+    override fun onStateRestored(wave: Int, lives: Int, gold: Int, kills: Int) {
+        _state.update { it.copy(wave = wave, lives = lives, gold = gold, enemyKills = kills) }
     }
 
     override fun onCleared() {

@@ -21,4 +21,5 @@ interface GameBridge {
     fun onSpeedChanged(multiplier: Float)
     fun onReviveAvailable()
     fun onLifeRestored(lives: Int)
+    fun onStateRestored(wave: Int, lives: Int, gold: Int, kills: Int)
 }
