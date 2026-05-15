@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -486,15 +487,21 @@ private fun CombatHUD(
                 }
                 Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Row {
-                        for (i in 0 until 3) {
-                            Icon(
-                                imageVector = if (i < state.lives) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                contentDescription = null,
-                                tint = if (i < state.lives) PathriftDanger else PathriftTextSecondary.copy(alpha = 0.3f),
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
+                    // Compact lives stat — Build 5.3.2
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Icon(
+                            imageVector = if (state.lives > 0) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                            contentDescription = null,
+                            tint = if (state.lives > 0) PathriftDanger else Color.Gray,
+                            modifier = Modifier.size(13.dp)
+                        )
+                        Text(
+                            text = "${state.lives}",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = if (state.lives > 0) PathriftDanger else Color.Gray
+                        )
                     }
                     Spacer(Modifier.width(8.dp))
                     // Speed toggle button

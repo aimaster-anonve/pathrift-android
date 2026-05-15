@@ -228,20 +228,27 @@ object PathSystem {
         val seg5Side = if (fwd) y3 - vGap else y3 + vGap
         val srx = minOf(xR + hGap, W - edge)
 
+        // Slot candidate list — far-end (right/exit zone) FIRST so take(slotCount) always includes them
+        // Build 5.3.2: reordered to guarantee far-end coverage
         val candidates = listOf(
-            PointF(W * 0.14f, seg1Side),
-            PointF(W * 0.40f, seg1Side),
-            PointF(minOf(W * 0.64f, xR - hGap - 8f), seg1Side),
+            // 1. FAR END (path exit zone) — first, so prefix(slotCount) never cuts these
+            PointF(W * 0.86f, seg5Side),
+            PointF(W * 0.72f, seg5Side),
+            PointF((xL + W) * 0.5f, seg5Side),
+            PointF(srx, y2 + (y3 - y2) * 0.50f),
+            // 2. MID-RIGHT
             PointF(srx, y1 + (y2 - y1) * 0.27f),
             PointF(srx, y1 + (y2 - y1) * 0.73f),
-            PointF(maxOf(W * 0.36f, xL + hGap + 12f), seg3Side),
-            PointF(minOf(W * 0.62f, xR - hGap - 12f), seg3Side),
+            // 3. MIDDLE
+            PointF(maxOf(W * 0.38f, xL + hGap + 10f), seg3Side),
+            PointF(minOf(W * 0.62f, xR - hGap - 10f), seg3Side),
+            // 4. MID-LEFT
             PointF(xL + hGap, y2 + (y3 - y2) * 0.33f),
             PointF(xL + hGap, y2 + (y3 - y2) * 0.68f),
-            PointF(srx, y2 + (y3 - y2) * 0.46f),
-            PointF(maxOf(xL + hGap + 6f, W * 0.20f), seg5Side),
-            PointF((xL + W) * 0.5f + 8f, seg5Side),
-            PointF(minOf(W * 0.80f, W - edge), seg5Side),
+            // 5. NEAR START (last priority)
+            PointF(W * 0.14f, seg1Side),
+            PointF(W * 0.38f, seg1Side),
+            PointF(minOf(W * 0.62f, xR - hGap - 8f), seg1Side),
         )
 
         val result = mutableListOf<PointF>()
