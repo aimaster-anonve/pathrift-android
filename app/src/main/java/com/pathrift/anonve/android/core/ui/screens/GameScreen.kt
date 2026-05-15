@@ -65,9 +65,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import android.content.res.Configuration
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -336,112 +334,13 @@ private fun CombatHUD(
     onShowNextWaveInfo: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-
     Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopStart)
         ) {
-            if (isLandscape) {
-                // Three-section landscape top bar: [Wave] [Lives+Gold+Diamond] [Speed+Pause]
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Black.copy(alpha = 0.75f),
-                                    Color.Black.copy(alpha = 0.45f)
-                                )
-                            )
-                        )
-                        .systemBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // LEFT: Wave
-                    Text(
-                        text = if (state.wave == 0) "W--" else "W${state.wave}",
-                        fontSize = 15.sp, fontWeight = FontWeight.Black,
-                        color = PathriftNeonBlue, fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.width(56.dp)
-                    )
-
-                    // CENTER (weight 1): Lives + Gold + Diamond
-                    Row(
-                        modifier = Modifier.weight(1f),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Lives pill
-                        StatPill {
-                            for (i in 0 until EconomyConstants.STARTING_LIVES) {
-                                Icon(
-                                    imageVector = if (i < state.lives) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                    contentDescription = null,
-                                    tint = if (i < state.lives) PathriftDanger else PathriftTextSecondary.copy(alpha = 0.3f),
-                                    modifier = Modifier.size(12.dp)
-                                )
-                            }
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        // Gold pill
-                        StatPill {
-                            Text("💰", fontSize = 11.sp)
-                            Text("${state.gold}", color = PathriftGold, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        // Diamond pill
-                        StatPill {
-                            Text("♦", color = Color(0xFF00CCFF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Text("${state.diamonds}", color = Color(0xFF00CCFF), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                        }
-                        Spacer(Modifier.width(8.dp))
-                        // Kills pill
-                        StatPill {
-                            Text("✕", color = PathriftOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            Text("${state.enemyKills}", color = PathriftOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                        }
-                    }
-
-                    // RIGHT: Speed + Pause
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(
-                                    if (state.speedMultiplier == 2f) Color(0xFF00CCFF).copy(alpha = 0.2f)
-                                    else Color.White.copy(alpha = 0.07f)
-                                )
-                                .border(
-                                    1.dp,
-                                    if (state.speedMultiplier == 2f) Color(0xFF00CCFF).copy(alpha = 0.5f)
-                                    else Color.White.copy(alpha = 0.1f),
-                                    RoundedCornerShape(8.dp)
-                                )
-                                .clickable { onToggleSpeed() }
-                                .padding(horizontal = 8.dp, vertical = 5.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                                Icon(Icons.Default.Speed, contentDescription = null,
-                                    tint = if (state.speedMultiplier == 2f) Color(0xFF00CCFF) else Color.Gray,
-                                    modifier = Modifier.size(10.dp))
-                                Text(
-                                    if (state.speedMultiplier == 1f) "×1" else "×2",
-                                    color = if (state.speedMultiplier == 2f) Color(0xFF00CCFF) else Color.Gray,
-                                    fontWeight = FontWeight.Bold, fontSize = 12.sp
-                                )
-                            }
-                        }
-                        IconButton(onClick = onPause, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Pause, contentDescription = null, tint = PathriftTextSecondary, modifier = Modifier.size(16.dp))
-                        }
-                    }
-                }
-            } else {
-            // Portrait HUD (existing layout)
+            // Portrait HUD — always active (game is portrait-locked)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -458,12 +357,12 @@ private fun CombatHUD(
                 Spacer(Modifier.width(14.dp))
                 HudStatPill(LanguageManager.s("DIAMONDS", "ELMAS"), "♦${state.diamonds}", Color(0xFF00CCFF))
                 Spacer(Modifier.weight(1f))
-                // Wave card IS the info button (Build 5.3.3)
+                // Wave card IS the info button (Build 5.3.4)
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0f, 0.78f, 1f, 0.10f))
-                        .border(1.dp, Color(0f, 0.78f, 1f, 0.35f), RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(9.dp))
+                        .background(Color(0f, 0.78f, 1f, 0.15f))
+                        .border(1.dp, Color(0f, 0.78f, 1f, 0.6f), RoundedCornerShape(9.dp))
                         .clickable { onShowNextWaveInfo() }
                         .padding(horizontal = 10.dp, vertical = 3.dp),
                     contentAlignment = Alignment.Center
@@ -487,8 +386,8 @@ private fun CombatHUD(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(3.dp)
                         ) {
-                            Icon(Icons.Filled.Info, null, tint = Color(0f, 0.78f, 1f, 0.7f), modifier = Modifier.size(8.dp))
-                            Text("INFO", fontSize = 7.sp, fontFamily = FontFamily.Monospace, letterSpacing = 0.5.sp, color = Color(0f, 0.78f, 1f, 0.7f))
+                            Icon(Icons.Filled.Info, null, tint = Color(0f, 0.78f, 1f, 0.7f), modifier = Modifier.size(9.dp))
+                            Text("INFO", fontSize = 9.sp, fontFamily = FontFamily.Monospace, letterSpacing = 0.5.sp, color = Color(0f, 0.78f, 1f, 0.7f))
                         }
                     }
                 }
@@ -531,7 +430,6 @@ private fun CombatHUD(
                     }
                 }
             }
-            } // end portrait else
             state.waveCompleteMessage?.let { msg ->
                 Box(
                     modifier = Modifier.fillMaxWidth()
@@ -544,45 +442,23 @@ private fun CombatHUD(
             }
         }
 
-        if (isLandscape) {
-            // Landscape bottom bar: compact kills left, progress/send right
+        // Portrait bottom bar — Build 5.3.1: NextWaveBanner removed, START WAVE button shown directly
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomStart)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, PathriftBackground.copy(alpha = 0.9f))))
+                .padding(horizontal = 16.dp, vertical = 6.dp)
+        ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomStart)
-                    .background(
-                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))
-                    )
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange)
                 Spacer(Modifier.weight(1f))
-
-                // RIGHT: Progress or Send Wave
                 when {
                     state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
                     state.phase != GamePhase.GAME_OVER -> SendWaveButton(onClick = onNextWave)
-                }
-            }
-        } else {
-            // Portrait bottom bar — Build 5.3.1: NextWaveBanner removed, START WAVE button shown directly
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomStart)
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, PathriftBackground.copy(alpha = 0.9f))))
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange)
-                    Spacer(Modifier.weight(1f))
-                    when {
-                        state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
-                        state.phase != GamePhase.GAME_OVER -> SendWaveButton(onClick = onNextWave)
-                    }
                 }
             }
         }
