@@ -104,6 +104,8 @@ import com.pathrift.anonve.android.game.GamePhase
 import com.pathrift.anonve.android.game.GameRenderer
 import com.pathrift.anonve.android.game.GameState
 import com.pathrift.anonve.android.game.TowerInfo
+import com.pathrift.anonve.android.game.WaveDefinition
+import com.pathrift.anonve.android.game.enemies.EnemyType
 import com.pathrift.anonve.android.game.towers.TowerType
 
 // ==============================
@@ -150,6 +152,7 @@ fun GameScreen(
             onNextWave = gameViewModel::startNextWave,
             onPause = { isPaused = true },
             onToggleSpeed = gameViewModel::toggleSpeed,
+            onShowNextWaveInfo = { gameViewModel.showNextWaveInfo = true },
             modifier = Modifier.fillMaxSize()
         )
 
@@ -160,6 +163,14 @@ fun GameScreen(
                 onUpgrade = { gameViewModel.upgradeSelectedTower() },
                 onSell = { gameViewModel.sellSelectedTower() },
                 onDismiss = { gameViewModel.clearTowerSelection() }
+            )
+        }
+
+        // PATHRIFT-157: Next Wave Info Panel
+        if (gameViewModel.showNextWaveInfo) {
+            NextWaveInfoPanel(
+                waveDef = gameViewModel.nextWaveDefinition,
+                onDismiss = { gameViewModel.showNextWaveInfo = false }
             )
         }
 
@@ -318,6 +329,7 @@ private fun CombatHUD(
     onNextWave: () -> Unit,
     onPause: () -> Unit,
     onToggleSpeed: () -> Unit = {},
+    onShowNextWaveInfo: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -442,18 +454,24 @@ private fun CombatHUD(
                 Spacer(Modifier.width(14.dp))
                 HudStatPill(LanguageManager.s("DIAMONDS", "ELMAS"), "♦${state.diamonds}", Color(0xFF00CCFF))
                 Spacer(Modifier.weight(1f))
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = if (state.wave == 0) LanguageManager.s("READY", "HAZIR") else LanguageManager.s("WAVE", "DALGA"),
-                        fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                        color = PathriftTextSecondary, letterSpacing = 2.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = if (state.wave == 0) "--" else "${state.wave}",
-                        fontSize = 24.sp, fontWeight = FontWeight.Black,
-                        color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = if (state.wave == 0) LanguageManager.s("READY", "HAZIR") else LanguageManager.s("WAVE", "DALGA"),
+                            fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                            color = PathriftTextSecondary, letterSpacing = 2.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = if (state.wave == 0) "--" else "${state.wave}",
+                            fontSize = 24.sp, fontWeight = FontWeight.Black,
+                            color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    // PATHRIFT-157: Next wave info button
+                    IconButton(onClick = onShowNextWaveInfo, modifier = Modifier.size(28.dp)) {
+                        Text("ℹ", fontSize = 14.sp, color = PathriftNeonBlue)
+                    }
                 }
                 Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1063,6 +1081,101 @@ private fun TowerPickCard(
                     fontFamily = FontFamily.Monospace
                 )
             }
+        }
+    }
+}
+
+// PATHRIFT-157: Enemy type indicator colors for NextWaveInfoPanel
+private val EnemyType.indicatorColor: Color get() = when(this) {
+    EnemyType.RUNNER   -> Color(0.2f, 0.5f, 1.0f)
+    EnemyType.TANK     -> Color(0.5f, 0.5f, 0.5f)
+    EnemyType.BOSS     -> Color(0.8f, 0.2f, 1.0f)
+    EnemyType.SHIELD   -> Color(0.2f, 0.8f, 0.3f)
+    EnemyType.SWARM    -> Color(1.0f, 0.9f, 0.2f)
+    EnemyType.GHOST    -> Color(0.8f, 0.8f, 1.0f)
+    EnemyType.SPLITTER -> Color(1.0f, 0.7f, 0.0f)
+    EnemyType.JUMPER   -> Color(0.0f, 0.8f, 0.6f)
+    EnemyType.HEALER   -> Color(0.2f, 1.0f, 0.4f)
+    EnemyType.PHANTOM  -> Color(0.7f, 0.3f, 1.0f)
+}
+
+// PATHRIFT-157: Next Wave Info Panel
+@Composable
+fun NextWaveInfoPanel(
+    waveDef: WaveDefinition,
+    onDismiss: () -> Unit
+) {
+    val isBoss = waveDef.spawnGroups.any { it.type == EnemyType.BOSS }
+    Box(
+        modifier = androidx.compose.ui.Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.55f))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = androidx.compose.ui.Modifier
+                .background(Color(0xFF12121A), RoundedCornerShape(16.dp))
+                .padding(20.dp)
+                .clickable(enabled = false, onClick = {})
+                .width(220.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "WAVE ${waveDef.waveNumber}",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Black,
+                color = Color(0xFF00C8FF),
+                fontFamily = FontFamily.Monospace,
+                letterSpacing = 2.sp
+            )
+            Spacer(androidx.compose.ui.Modifier.height(4.dp))
+            if (isBoss) {
+                Text(
+                    text = "⚠ BOSS WAVE",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFFFF2E14),
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            Spacer(androidx.compose.ui.Modifier.height(10.dp))
+            for (group in waveDef.spawnGroups) {
+                Row(
+                    modifier = androidx.compose.ui.Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = androidx.compose.ui.Modifier
+                            .size(10.dp)
+                            .background(group.type.indicatorColor, CircleShape)
+                    )
+                    Text(
+                        text = group.type.name.lowercase().replaceFirstChar { it.uppercase() },
+                        fontSize = 11.sp,
+                        color = Color.White,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = androidx.compose.ui.Modifier.weight(1f)
+                    )
+                    Text(
+                        text = "×${group.count}",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = group.type.indicatorColor,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+            Spacer(androidx.compose.ui.Modifier.height(12.dp))
+            Text(
+                text = "tap to close",
+                fontSize = 9.sp,
+                color = Color.Gray,
+                fontFamily = FontFamily.Monospace
+            )
         }
     }
 }

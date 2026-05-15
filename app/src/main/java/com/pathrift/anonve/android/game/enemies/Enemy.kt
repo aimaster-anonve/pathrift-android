@@ -10,7 +10,9 @@ enum class EnemyType {
     SWARM,
     GHOST,
     SPLITTER,
-    JUMPER
+    JUMPER,
+    HEALER,   // PATHRIFT-159: support/heal aura enemy
+    PHANTOM   // PATHRIFT-159: 40% dodge single-target projectiles
 }
 
 /**
@@ -47,7 +49,14 @@ data class EnemyInstance(
     // Jumper
     val lastJumpTime: Long = 0L,
     // Z-layer path system
-    val pathLayer: PathLayer = PathLayer.GROUND
+    val pathLayer: PathLayer = PathLayer.GROUND,
+    // Healer: last time aura heal fired (ms timestamp)
+    val lastHealTime: Long = 0L,
+    // Phantom: brief dodge flash visual flag
+    val dodgeFlashing: Boolean = false,
+    // Boss ability state
+    val bossAbilityTriggered: Boolean = false,
+    val bossShellActive: Boolean = false
 ) {
     val isAlive: Boolean get() = currentHp > 0f && !hasReachedEnd
     val isDead: Boolean get() = currentHp <= 0f

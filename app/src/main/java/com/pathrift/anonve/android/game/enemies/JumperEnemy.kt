@@ -8,6 +8,6 @@ object JumperEnemy {
     const val SPEED = 55f
     const val GOLD_REWARD = 15
     const val ARMOR_REDUCTION = 0.10f
-    const val JUMP_INTERVAL_MS = 3000L
-    const val JUMP_DISTANCE = 0.20f
+    const val JUMP_INTERVAL_MS = 5000L  // was 3000L (PATHRIFT-153)
+    const val JUMP_DISTANCE = 0.10f    // was 0.20f (PATHRIFT-153)
 }

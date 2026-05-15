@@ -245,11 +245,12 @@ object PathSystem {
             if (!tooClose) result.add(c)
         }
 
+        // PATHRIFT-156: Updated slot count thresholds
         val maxSlots = when {
-            currentWave < 5  -> 6
-            currentWave < 10 -> 8
-            currentWave < 15 -> 10
-            else             -> 12
+            currentWave < 5  -> 5
+            currentWave < 10 -> 7
+            currentWave < 20 -> 9
+            else             -> 11
         }
         return result.take(maxSlots)
     }
@@ -304,11 +305,12 @@ object PathSystem {
             }
         }
 
+        // PATHRIFT-156: Updated slot count thresholds
         val maxSlots = when {
-            currentWave < 5  -> 6
-            currentWave < 10 -> 8
-            currentWave < 15 -> 10
-            else             -> 12
+            currentWave < 5  -> 5
+            currentWave < 10 -> 7
+            currentWave < 20 -> 9
+            else             -> 11
         }
         return result.take(maxSlots)
     }
@@ -413,11 +415,12 @@ object PathSystem {
             if (!tooClose) result.add(c)
         }
 
+        // PATHRIFT-156: Updated slot count thresholds
         val maxSlots = when {
-            currentWave < 5  -> 6
-            currentWave < 10 -> 8
-            currentWave < 15 -> 10
-            else             -> 12
+            currentWave < 5  -> 5
+            currentWave < 10 -> 7
+            currentWave < 20 -> 9
+            else             -> 11
         }
         return result.take(maxSlots)
     }

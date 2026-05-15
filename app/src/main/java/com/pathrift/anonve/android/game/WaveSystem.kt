@@ -34,6 +34,15 @@ data class SpawnGroup(
  * - Spawn interval reduces by 80ms per cycle, minimum 800ms
  * - HP scaling: exponential multiplier per wave tier
  */
+/**
+ * Holds a single entry describing how many of a given type spawn.
+ * Used for the NextWaveInfoPanel (PATHRIFT-157).
+ */
+data class EnemySpawnEntry(
+    val type: EnemyType,
+    val count: Int
+)
+
 class WaveSystem {
 
     private val basePatterns: List<WaveDefinition> = listOf(
@@ -50,7 +59,30 @@ class WaveSystem {
 
     private val cycleSize = 9
 
+    // Expose CYCLE_SIZE for helpers
+    val CYCLE_SIZE: Int get() = cycleSize
+
     fun isBossWave(wave: Int): Boolean = wave % 10 == 0
+
+    /**
+     * Compute cycle number for a given wave number (PATHRIFT-154).
+     * Cycle 0/1 = waves 1–18, Cycle 2 = waves 19–27, Cycle 3 = waves 28–36, Cycle 4+ = waves 37+
+     */
+    fun cycleNumber(waveNumber: Int): Int {
+        if (isBossWave(waveNumber)) return 0
+        val bossesBeforeThisWave = waveNumber / 10
+        val positionInNonBoss = waveNumber - bossesBeforeThisWave
+        return (positionInNonBoss - 1) / cycleSize
+    }
+
+    /**
+     * Synchronize internal wave state to a restored wave number (PATHRIFT-151).
+     * Ensures cycleNumber() returns correct values after session restore.
+     */
+    fun syncWave(waveNumber: Int) {
+        // No internal mutable state needed — all cycle math is derived from waveNumber directly.
+        // This method is a hook for future stateful additions and fulfills the restore protocol.
+    }
 
     fun getWaveDefinition(wave: Int): WaveDefinition {
         if (isBossWave(wave)) {
@@ -95,9 +127,25 @@ class WaveSystem {
             scaledGroups.add(SpawnGroup(EnemyType.JUMPER, 1 + cycleNumber))
         }
 
+        // Cycle 4+ (wave 37+): inject healer every 4th pattern slot offset 3 (PATHRIFT-159)
+        if (cycleNumber >= 4 && patternIndex % 4 == 3) {
+            scaledGroups.add(SpawnGroup(EnemyType.HEALER, 1 + cycleNumber - 3))
+        }
+
+        // Cycle 4+ (wave 37+): inject phantom every 3rd pattern slot offset 2, not index 2 (PATHRIFT-159)
+        if (cycleNumber >= 4 && patternIndex % 3 == 2 && patternIndex != 2) {
+            scaledGroups.add(SpawnGroup(EnemyType.PHANTOM, 1 + cycleNumber - 3))
+        }
+
         val interval = maxOf(800L, base.spawnIntervalMs - cycleNumber * 80L)
         return WaveDefinition(wave, scaledGroups, interval)
     }
+
+    /**
+     * Returns a wave definition for preview purposes (NextWaveInfoPanel).
+     * Delegates to getWaveDefinition (PATHRIFT-157).
+     */
+    fun waveDefinition(wave: Int): WaveDefinition = getWaveDefinition(wave.coerceAtLeast(1))
 
     /** Exponential HP scaling — mirrors iOS hpScaleMultiplier(for:). */
     fun hpScaleMultiplier(wave: Int): Float = when {
@@ -109,10 +157,11 @@ class WaveSystem {
 
     fun goldRewardForWave(wave: Int): Int = EconomyConstants.goldRewardForWave(wave)
 
+    // PATHRIFT-156: Updated slot count thresholds
     fun activeSlotCount(wave: Int): Int = when {
-        wave < 5  -> 6
-        wave < 10 -> 8
-        wave < 15 -> 10
-        else      -> 12
+        wave < 5  -> 5
+        wave < 10 -> 7
+        wave < 20 -> 9
+        else      -> 11
     }
 }

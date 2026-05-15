@@ -27,6 +27,9 @@ import com.pathrift.anonve.android.game.towers.PierceTower
 import com.pathrift.anonve.android.game.towers.SniperTower
 import com.pathrift.anonve.android.game.towers.TeslaTower
 import com.pathrift.anonve.android.game.towers.TowerType
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -70,6 +73,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     val enemies: StateFlow<List<EnemyInstance>> = _enemies.asStateFlow()
 
     val game = GameEngine(this, diamondStore, arsenalStore, premiumStore)
+
+    // PATHRIFT-157: Next wave info panel state
+    var showNextWaveInfo by mutableStateOf(false)
+    val nextWaveDefinition get() = game.waveSystem.waveDefinition(game.currentWave + 1)
 
     init {
         // If a save exists, restore it (PLAY clears the save first; CONTINUE keeps it)

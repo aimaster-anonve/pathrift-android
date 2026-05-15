@@ -11,7 +11,9 @@ import com.pathrift.anonve.android.game.enemies.BossEnemy
 import com.pathrift.anonve.android.game.enemies.EnemyInstance
 import com.pathrift.anonve.android.game.enemies.EnemyType
 import com.pathrift.anonve.android.game.enemies.GhostEnemy
+import com.pathrift.anonve.android.game.enemies.HealerEnemy
 import com.pathrift.anonve.android.game.enemies.JumperEnemy
+import com.pathrift.anonve.android.game.enemies.PhantomEnemy
 import com.pathrift.anonve.android.game.enemies.RunnerEnemy
 import com.pathrift.anonve.android.game.enemies.ShieldEnemy
 import com.pathrift.anonve.android.game.enemies.SplitterEnemy
@@ -63,7 +65,7 @@ class GameEngine(
 ) {
 
     val grid = GridSystem()
-    private val waveSystem = WaveSystem()
+    val waveSystem = WaveSystem()   // internal — exposed for ViewModel preview (PATHRIFT-157)
 
     // Active tower instances keyed by slotId
     private val _towers = mutableMapOf<Int, TowerInstance>()
@@ -94,6 +96,12 @@ class GameEngine(
 
     // Speed multiplier (1.0 = normal, 2.0 = fast)
     var speedMultiplier: Float = 1.0f
+
+    // Boss ability state (PATHRIFT-155)
+    /** When > currentTime: all towers fire at 40% attack rate (Rift Pulse debuff). */
+    var riftPulseEndTime: Double = 0.0
+    /** When > currentTime: all towers within radius are disabled (Gravity Well). */
+    var gravityWellEndTime: Double = 0.0
 
     // Revive state
     var hasUsedRevive: Boolean = false
@@ -131,6 +139,8 @@ class GameEngine(
         waveEnemiesCleared = 0
         speedMultiplier = 1.0f
         hasUsedRevive = false
+        riftPulseEndTime = 0.0
+        gravityWellEndTime = 0.0
     }
 
     // Set before initLayout to restore a saved game
@@ -157,6 +167,7 @@ class GameEngine(
 
     private fun applyRestore(save: com.pathrift.anonve.android.core.storage.GameSaveState) {
         currentWave = save.wave
+        waveSystem.syncWave(save.wave)   // PATHRIFT-151: keep wave system in sync
         lives = save.lives
         gold = save.gold
         totalEnemiesKilled = save.enemyKills
@@ -295,6 +306,7 @@ class GameEngine(
         val toKill = mutableListOf<Long>()
         val toEscape = mutableListOf<Long>()
         val now = System.currentTimeMillis()
+        val nowSec = now / 1000.0
 
         synchronized(_enemies) {
             _enemies.replaceAll { enemy ->
@@ -359,12 +371,20 @@ class GameEngine(
             _enemies.removeAll { it.isDead }
         }
 
-        applyTowerAttacks(delta)
+        // Boss ability tick — PATHRIFT-155
+        tickBossAbilities(nowSec)
+
+        // Healer aura tick — PATHRIFT-159
+        tickHealerAuras(now)
+
+        applyTowerAttacks(delta, nowSec)
         checkWaveCompletion()
     }
 
-    private fun applyTowerAttacks(delta: Float) {
+    private fun applyTowerAttacks(delta: Float, nowSec: Double = System.currentTimeMillis() / 1000.0) {
         val now = System.currentTimeMillis()
+        val riftPulseActive = nowSec < riftPulseEndTime
+        val gravityWellActive = nowSec < gravityWellEndTime
         synchronized(_enemies) {
             for ((slotId, inst) in _towers) {
                 val tower = inst.tower
@@ -374,7 +394,15 @@ class GameEngine(
                 val permSpdBonus = arsenalStore.permSpeedBonus(tower.type)
 
                 // F2: Attack speed scaling — +8% per level above 1, plus permanent speed bonus
-                val effectiveAttacksPerSecond = tower.attacksPerSecond * (1f + 0.08f * (inst.level - 1)) * (1f + permSpdBonus)
+                var effectiveAttacksPerSecond = tower.attacksPerSecond * (1f + 0.08f * (inst.level - 1)) * (1f + permSpdBonus)
+
+                // PATHRIFT-155: Rift Pulse debuff reduces attack rate to 40%
+                if (riftPulseActive) {
+                    effectiveAttacksPerSecond *= 0.40f
+                }
+
+                // PATHRIFT-155: Gravity Well disables towers
+                if (gravityWellActive) continue
 
                 // Attack cooldown
                 if (now - inst.lastAttackTime < (1000L / effectiveAttacksPerSecond).toLong()) continue
@@ -420,14 +448,14 @@ class GameEngine(
                         }
                     }
 
-                    // F8: Tesla — chain lightning hits primary + 2 nearest
+                    // F8: Tesla — chain lightning hits primary + 2 nearest (AoE chain = no dodge for chain targets)
                     tower.type == TowerType.TESLA -> {
                         val primary = inRange.maxByOrNull { it.pathProgress } ?: continue
                         val primaryPos = PathSystem.positionAt(primary.pathProgress)
                         targetFacingAngle = atan2(primaryPos.y - inst.position.y, primaryPos.x - inst.position.x)
                         val typeMult = tower.type.damageMultiplier(primary.type)
                         val primaryDamage = (damage * typeMult).toInt()
-                        applyDamage(primary.id, primaryDamage)
+                        applyDamage(primary.id, primaryDamage, isAoe = true)  // Tesla is chain = AoE bypass
 
                         // Chain to 2 nearest other enemies within 150px of primary
                         val chainTargets = inRange
@@ -442,11 +470,11 @@ class GameEngine(
                         val chainDamage = (18f * levelMult).toInt()
                         for (chainTarget in chainTargets) {
                             val chainMult = tower.type.damageMultiplier(chainTarget.type)
-                            applyDamage(chainTarget.id, (chainDamage * chainMult).toInt())
+                            applyDamage(chainTarget.id, (chainDamage * chainMult).toInt(), isAoe = true)
                         }
                     }
 
-                    // AoE towers (Blast, Nova): damage all in splash radius
+                    // AoE towers (Blast, Nova): damage all in splash radius — always bypass Phantom dodge
                     tower.aoeRadius > 0f -> {
                         val aoePixels = tower.aoeRadius * GridSystem.TILE_SIZE_DP
                         val primary = inRange.maxByOrNull { it.pathProgress } ?: continue
@@ -459,7 +487,7 @@ class GameEngine(
                             if (sqrt(dx * dx + dy * dy) <= aoePixels) {
                                 val typeMult = tower.type.damageMultiplier(e.type)
                                 val finalDamage = (damage * typeMult).toInt()
-                                applyDamage(e.id, finalDamage)
+                                applyDamage(e.id, finalDamage, isAoe = true)
                             }
                         }
                     }
@@ -494,14 +522,30 @@ class GameEngine(
 
     /**
      * Apply damage to enemy, handling shield absorption and armor reduction.
-     * @param bypassShield When true (Pierce), skips shield absorption entirely.
+     * @param bypassShield When true (Pierce/AoE), skips shield absorption and Phantom dodge.
      * @param penetration  Armor penetration fraction (0..1). Core uses 0.5 = 50% armor ignored.
+     * @param isAoe        When true, bypasses Phantom dodge check.
      */
-    private fun applyDamage(enemyId: Long, rawDamage: Int, bypassShield: Boolean = false, penetration: Float = 0f) {
+    private fun applyDamage(
+        enemyId: Long, rawDamage: Int,
+        bypassShield: Boolean = false,
+        penetration: Float = 0f,
+        isAoe: Boolean = false
+    ) {
         val idx = _enemies.indexOfFirst { it.id == enemyId }
         if (idx < 0) return
         val enemy = _enemies[idx]
         if (!enemy.isAlive) return
+
+        // PATHRIFT-155: Boss Iron Colossus shell immunity
+        if (enemy.bossShellActive) return
+
+        // PATHRIFT-159: Phantom dodge — single-target hits have 40% miss chance
+        if (!isAoe && enemy.type == EnemyType.PHANTOM && Math.random() < PhantomEnemy.DODGE_CHANCE) {
+            // Dodge: mark flash and return without damage
+            _enemies[idx] = enemy.copy(dodgeFlashing = true)
+            return
+        }
 
         val updated: EnemyInstance = when {
             // ShieldEnemy: absorb via shieldHp first (unless bypassed by Pierce)
@@ -520,17 +564,21 @@ class GameEngine(
             else -> {
                 val effectiveArmor = enemy.armorReduction * (1f - penetration)
                 val actualDmg = rawDamage * (1f - effectiveArmor)
-                enemy.copy(currentHp = max(0f, enemy.currentHp - actualDmg))
+                enemy.copy(currentHp = max(0f, enemy.currentHp - actualDmg), dodgeFlashing = false)
             }
         }
 
         if (updated.currentHp <= 0f) {
             _enemies.removeAt(idx)
-            gold += updated.goldReward
-            score += updated.goldReward * 2L
+            // PATHRIFT-154: cycle-based kill gold scaling
+            val cycle = waveSystem.cycleNumber(currentWave)
+            val cycleScale = EconomyConstants.killGoldMultiplier(cycle)
+            val scaledGold = maxOf(1, (updated.goldReward * cycleScale).toInt())
+            gold += scaledGold
+            score += scaledGold * 2L
             totalEnemiesKilled++
             waveEnemiesCleared++
-            bridge.onEnemyKilled(updated.type, updated.goldReward)
+            bridge.onEnemyKilled(updated.type, scaledGold)
             bridge.onGoldChanged(gold)
             bridge.onWaveProgress(waveEnemiesCleared, waveEnemyTotal)
 
@@ -544,6 +592,8 @@ class GameEngine(
                 waveEnemyTotal += 2
                 bridge.onWaveProgress(waveEnemiesCleared, waveEnemyTotal)
             }
+            // PATHRIFT-159: Healer death — no special behavior
+            // PATHRIFT-159: Phantom death — no special behavior
         } else {
             _enemies[idx] = updated
         }
@@ -654,6 +704,141 @@ class GameEngine(
         bridge.onRiftShift()
     }
 
+    // ---- Boss Abilities (PATHRIFT-155) ----
+
+    private fun tickBossAbilities(nowSec: Double) {
+        synchronized(_enemies) {
+            for (i in _enemies.indices) {
+                val e = _enemies[i]
+                if (e.type != EnemyType.BOSS || !e.isAlive) continue
+                val hpRatio = if (e.maxHp > 0f) e.currentHp / e.maxHp else 0f
+
+                val (triggered, shellActive) = when (e.bossVariant) {
+                    0 -> { // Rift Guardian — Rift Pulse once at 50% HP
+                        if (!e.bossAbilityTriggered && hpRatio <= 0.5f) {
+                            triggerRiftPulse(nowSec, duration = 4.0)
+                            Pair(true, false)
+                        } else Pair(e.bossAbilityTriggered, false)
+                    }
+                    1 -> { // Iron Colossus — Shell Mode
+                        if (!e.bossAbilityTriggered && hpRatio <= 0.5f) {
+                            // First trigger
+                            val shell = (nowSec % 8.0) < 2.0
+                            Pair(true, shell)
+                        } else if (e.bossAbilityTriggered) {
+                            val shell = (nowSec % 8.0) < 2.0
+                            Pair(true, shell)
+                        } else Pair(false, false)
+                    }
+                    2 -> { // Swarm Queen — Brood Burst once at 50% HP
+                        if (!e.bossAbilityTriggered && hpRatio <= 0.5f) {
+                            spawnBroodBurst(e.pathProgress, count = 6)
+                            Pair(true, false)
+                        } else Pair(e.bossAbilityTriggered, false)
+                    }
+                    3 -> { // Phase Runner — Overdrive once at 50% HP
+                        if (!e.bossAbilityTriggered && hpRatio <= 0.5f) {
+                            // Speed doubled — handled via currentSpeed override
+                            val overdriveSpeed = e.baseSpeed * 2.0f
+                            _enemies[i] = e.copy(currentSpeed = overdriveSpeed, bossAbilityTriggered = true)
+                            scheduleSpeedReset(e.id, after = 5.0)
+                            return@synchronized  // Updated in-place, skip end-of-loop copy
+                        } else Pair(e.bossAbilityTriggered, false)
+                    }
+                    4 -> { // Void Titan — Gravity Well every 10s
+                        val lastGravity = e.lastJumpTime / 1000.0
+                        if (nowSec - lastGravity >= 10.0) {
+                            triggerGravityWell(nowSec, duration = 2.0)
+                            _enemies[i] = e.copy(lastJumpTime = (nowSec * 1000.0).toLong())
+                            return@synchronized
+                        } else Pair(e.bossAbilityTriggered, e.bossShellActive)
+                    }
+                    else -> Pair(e.bossAbilityTriggered, false)
+                }
+
+                if (triggered != e.bossAbilityTriggered || shellActive != e.bossShellActive) {
+                    _enemies[i] = e.copy(bossAbilityTriggered = triggered, bossShellActive = shellActive)
+                }
+            }
+        }
+    }
+
+    /** Rift Pulse: slow all tower attack rates to 40% for duration seconds. */
+    fun triggerRiftPulse(nowSec: Double, duration: Double) {
+        riftPulseEndTime = nowSec + duration
+    }
+
+    /** Brood Burst: spawn count SWARM enemies at given path progress. */
+    fun spawnBroodBurst(pathProgress: Float, count: Int) {
+        val hpMult = waveSystem.hpScaleMultiplier(currentWave)
+        synchronized(_enemies) {
+            repeat(count) {
+                val id = System.nanoTime()
+                _enemies.add(EnemyInstance(
+                    id = id, type = EnemyType.SWARM,
+                    maxHp = com.pathrift.anonve.android.game.enemies.SwarmEnemy.HP * hpMult,
+                    currentHp = com.pathrift.anonve.android.game.enemies.SwarmEnemy.HP * hpMult,
+                    baseSpeed = com.pathrift.anonve.android.game.enemies.SwarmEnemy.SPEED,
+                    currentSpeed = com.pathrift.anonve.android.game.enemies.SwarmEnemy.SPEED,
+                    goldReward = com.pathrift.anonve.android.game.enemies.SwarmEnemy.GOLD_REWARD,
+                    armorReduction = com.pathrift.anonve.android.game.enemies.SwarmEnemy.ARMOR_REDUCTION,
+                    pathProgress = pathProgress
+                ))
+            }
+            waveEnemyTotal += count
+            bridge.onWaveProgress(waveEnemiesCleared, waveEnemyTotal)
+        }
+    }
+
+    /** Schedule speed reset for Phase Runner after overdrive expires. */
+    private fun scheduleSpeedReset(enemyId: Long, after: Double) {
+        gameScope?.launch(Dispatchers.Default) {
+            delay((after * 1000).toLong())
+            synchronized(_enemies) {
+                val idx = _enemies.indexOfFirst { it.id == enemyId }
+                if (idx >= 0) {
+                    val e = _enemies[idx]
+                    _enemies[idx] = e.copy(currentSpeed = e.baseSpeed)
+                }
+            }
+        }
+    }
+
+    /** Gravity Well: disable all towers and clear in-flight conceptual projectiles for duration. */
+    fun triggerGravityWell(nowSec: Double, duration: Double) {
+        gravityWellEndTime = nowSec + duration
+        // In the engine we have no projectile list — tower attacks simply miss during this window.
+        // Tower disable is handled in applyTowerAttacks via gravityWellEndTime check.
+    }
+
+    // ---- Healer Aura Tick (PATHRIFT-159) ----
+
+    private fun tickHealerAuras(now: Long) {
+        synchronized(_enemies) {
+            val healers = _enemies.filter { it.type == EnemyType.HEALER && it.isAlive }
+            if (healers.isEmpty()) return
+
+            for (i in _enemies.indices) {
+                val healer = _enemies[i]
+                if (healer.type != EnemyType.HEALER || !healer.isAlive) continue
+                if (now - healer.lastHealTime < HealerEnemy.HEAL_INTERVAL_MS) continue
+
+                // Heal enemies within radius (progress-based)
+                for (j in _enemies.indices) {
+                    val target = _enemies[j]
+                    if (!target.isAlive) continue
+                    if (target.id == healer.id) continue
+                    if (kotlin.math.abs(target.pathProgress - healer.pathProgress) > HealerEnemy.HEAL_RADIUS_PROGRESS) continue
+                    val healed = minOf(target.maxHp, target.currentHp + HealerEnemy.HEAL_AMOUNT)
+                    if (healed > target.currentHp) {
+                        _enemies[j] = target.copy(currentHp = healed)
+                    }
+                }
+                _enemies[i] = healer.copy(lastHealTime = now)
+            }
+        }
+    }
+
     // ---- Enemy Spawning ----
 
     private fun spawnEnemy(type: EnemyType, hpMult: Float) {
@@ -720,6 +905,20 @@ class GameEngine(
                 baseSpeed = JumperEnemy.SPEED, currentSpeed = JumperEnemy.SPEED,
                 goldReward = JumperEnemy.GOLD_REWARD,
                 armorReduction = JumperEnemy.ARMOR_REDUCTION
+            )
+            EnemyType.HEALER -> EnemyInstance(
+                id = id, type = type,
+                maxHp = HealerEnemy.HP * hpMult, currentHp = HealerEnemy.HP * hpMult,
+                baseSpeed = HealerEnemy.SPEED, currentSpeed = HealerEnemy.SPEED,
+                goldReward = HealerEnemy.GOLD_REWARD,
+                armorReduction = HealerEnemy.ARMOR_REDUCTION
+            )
+            EnemyType.PHANTOM -> EnemyInstance(
+                id = id, type = type,
+                maxHp = PhantomEnemy.HP * hpMult, currentHp = PhantomEnemy.HP * hpMult,
+                baseSpeed = PhantomEnemy.SPEED, currentSpeed = PhantomEnemy.SPEED,
+                goldReward = PhantomEnemy.GOLD_REWARD,
+                armorReduction = PhantomEnemy.ARMOR_REDUCTION
             )
         }
         synchronized(_enemies) { _enemies.add(instance) }

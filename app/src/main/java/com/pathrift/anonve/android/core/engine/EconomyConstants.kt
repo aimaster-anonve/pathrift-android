@@ -13,8 +13,16 @@ object EconomyConstants {
 
     fun goldRewardForWave(wave: Int): Int {
         val base = 55
-        val waveBonus = minOf(wave * 4, 80)
-        return base + waveBonus
+        val waveBonus = minOf(wave * 3, 60)   // was wave*4, 80 (PATHRIFT-154)
+        return base + waveBonus               // new cap: 115 gold/wave (at wave 20+)
+    }
+
+    /** Kill gold multiplier based on cycle depth — reduces per-kill income in later cycles (PATHRIFT-154). */
+    fun killGoldMultiplier(cycle: Int): Double = when {
+        cycle <= 1 -> 1.00   // Cycle 1: full reward
+        cycle == 2 -> 0.85   // Cycle 2 (wave 19+): -15%
+        cycle == 3 -> 0.75   // Cycle 3 (wave 28+): -25%
+        else       -> 0.65   // Cycle 4+ (wave 37+): -35%
     }
 
     object TowerCost {
@@ -30,5 +38,9 @@ object EconomyConstants {
         const val SWARM = 3
         const val GHOST = 10
         const val BOSS = 120
+        const val SPLITTER = 8
+        const val JUMPER = 15
+        const val HEALER = 14   // PATHRIFT-159
+        const val PHANTOM = 10  // PATHRIFT-159
     }
 }
