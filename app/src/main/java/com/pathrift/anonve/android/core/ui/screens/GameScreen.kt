@@ -35,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
@@ -468,9 +469,15 @@ private fun CombatHUD(
                             color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
                         )
                     }
-                    // PATHRIFT-157: Next wave info button
+                    // PATHRIFT-157 / Build 5.1: Next wave info button — filled icon, more visible
+                    Spacer(Modifier.width(6.dp))
                     IconButton(onClick = onShowNextWaveInfo, modifier = Modifier.size(28.dp)) {
-                        Text("ℹ", fontSize = 14.sp, color = PathriftNeonBlue)
+                        Icon(
+                            imageVector = Icons.Filled.Info,
+                            contentDescription = "Next wave info",
+                            tint = Color(0f, 0.78f, 1f),
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                 }
                 Spacer(Modifier.weight(1f))

@@ -4,8 +4,8 @@ package com.pathrift.anonve.android.core.engine
  * Central registry of all economy constants — iOS parity.
  */
 object EconomyConstants {
-    const val STARTING_GOLD = 250
-    const val STARTING_LIVES = 5
+    const val STARTING_GOLD = 300       // was 250 (Build 5.1 balance)
+    const val STARTING_LIVES = 8        // was 5 (Build 5.1 balance)
     const val SELL_REFUND_PERCENT = 0.70
     const val RIFT_SELL_PERCENT = 0.50
     const val UPGRADE_BASE_COST = 80
@@ -13,16 +13,16 @@ object EconomyConstants {
 
     fun goldRewardForWave(wave: Int): Int {
         val base = 55
-        val waveBonus = minOf(wave * 3, 60)   // was wave*4, 80 (PATHRIFT-154)
-        return base + waveBonus               // new cap: 115 gold/wave (at wave 20+)
+        val bonus = minOf(wave * 3, 75)  // cap 130 at wave 25+ (was 115 at wave 20+)
+        return base + bonus
     }
 
-    /** Kill gold multiplier based on cycle depth — reduces per-kill income in later cycles (PATHRIFT-154). */
+    /** Kill gold multiplier based on cycle depth — Build 5.1 balance tuning (iOS parity). */
     fun killGoldMultiplier(cycle: Int): Double = when {
         cycle <= 1 -> 1.00   // Cycle 1: full reward
-        cycle == 2 -> 0.85   // Cycle 2 (wave 19+): -15%
-        cycle == 3 -> 0.75   // Cycle 3 (wave 28+): -25%
-        else       -> 0.65   // Cycle 4+ (wave 37+): -35%
+        cycle == 2 -> 0.90   // Cycle 2 (wave 19+): -10% (was -15%)
+        cycle == 3 -> 0.82   // Cycle 3 (wave 28+): -18% (was -25%)
+        else       -> 0.72   // Cycle 4+ (wave 37+): -28% (was -35%)
     }
 
     object TowerCost {

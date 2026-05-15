@@ -325,22 +325,45 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             canvas.drawCircle(wps[i].x, wps[i].y, 4f, accentPaint)
         }
 
-        // Second pass: bridge segments with elevated visual
+        // Second pass: bridge segments — warm brown-grey deck + orange rails (Build 5.1)
+        // Deck: warm stone 0xFF382F26 — clearly different from cold blue-black ground 0xFF19191F
         val bridgeFillPaint = Paint().apply {
-            color = Color.argb(255, 36, 36, 56)  // (0.14, 0.14, 0.22) lighter
+            color = Color.argb(255, 56, 47, 38)  // 0xFF382F26 warm brown-grey concrete
             style = Paint.Style.FILL; isAntiAlias = true
         }
-        val bridgeEdgePaint = Paint().apply {
-            color = Color.argb(140, 0, 200, 255) // stronger cyan edge
-            style = Paint.Style.STROKE; strokeWidth = 1f; isAntiAlias = true
-        }
+        // Orange guard rails — highly visible
         val bridgeRailPaint = Paint().apply {
-            color = Color.argb(255, 77, 77, 115)  // (0.30, 0.30, 0.45) guard rail
-            style = Paint.Style.STROKE; strokeWidth = 2f; strokeCap = Paint.Cap.ROUND; isAntiAlias = true
+            color = Color.argb(255, 255, 140, 0)  // 0xFFFF8C00 orange
+            style = Paint.Style.STROKE; strokeWidth = 3f; strokeCap = Paint.Cap.ROUND; isAntiAlias = true
         }
+        // Darker amber support struts
+        val bridgeStrutPaint = Paint().apply {
+            color = Color.argb(255, 204, 114, 0)  // 0xFFCC7200 darker amber
+            style = Paint.Style.STROKE; strokeWidth = 2f; isAntiAlias = true
+        }
+        // Drop shadow for elevation illusion: +3dp right, -4dp down, alpha 0.55
         val bridgeShadowPaint = Paint().apply {
-            color = Color.argb(102, 0, 0, 0)
+            color = Color.argb(140, 0, 0, 0)  // alpha ~0.55
             style = Paint.Style.FILL; isAntiAlias = true
+        }
+        // Deck texture lines — semi-transparent warm grey
+        val bridgeTexturePaint = Paint().apply {
+            color = Color.argb(153, 77, 64, 53)  // 0x994D4035
+            style = Paint.Style.STROKE; strokeWidth = 0.7f; isAntiAlias = true
+        }
+        // Transition ring paint — pulsing orange at ground→bridge waypoints
+        val bridgeTransitionPaint = Paint().apply {
+            color = Color.argb(204, 255, 140, 0)
+            style = Paint.Style.STROKE; strokeWidth = 2.5f; isAntiAlias = true
+        }
+
+        // Collect bridge waypoint indices for transition markers
+        val bridgeEntryIndices = mutableSetOf<Int>()
+        for (i in 1 until wps.size) {
+            val fromLayer = PathSystem.layerAt(i - 1)
+            val toLayer = PathSystem.layerAt(i)
+            if (fromLayer != PathLayer.BRIDGE && toLayer == PathLayer.BRIDGE) bridgeEntryIndices.add(i - 1)
+            if (fromLayer == PathLayer.BRIDGE && toLayer != PathLayer.BRIDGE) bridgeEntryIndices.add(i)
         }
 
         for (i in 1 until wps.size) {
@@ -349,29 +372,52 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             if (fromLayer != PathLayer.BRIDGE && toLayer != PathLayer.BRIDGE) continue
             val from = wps[i - 1]; val to = wps[i]
 
-            // Shadow (offset down 3px)
+            // Drop shadow (offset +3dp right, -4dp down)
             val shadowSeg = buildCorridorSegment(
-                PointF(from.x, from.y + 3f), PointF(to.x, to.y + 3f), halfWidth
+                PointF(from.x + 3f, from.y - 4f), PointF(to.x + 3f, to.y - 4f), halfWidth
             )
             canvas.drawPath(shadowSeg, bridgeShadowPaint)
 
-            // Bridge fill
+            // Bridge deck fill — warm brown-grey
             val bridgeSeg = buildCorridorSegment(from, to, halfWidth)
             canvas.drawPath(bridgeSeg, bridgeFillPaint)
 
-            // Bridge edge lines
             val dx = to.x - from.x; val dy = to.y - from.y
             val len = sqrt(dx * dx + dy * dy)
             if (len > 0f) {
                 val px = -dy / len * halfWidth; val py = dx / len * halfWidth
-                canvas.drawLine(from.x + px, from.y + py, to.x + px, to.y + py, bridgeEdgePaint)
-                canvas.drawLine(from.x - px, from.y - py, to.x - px, to.y - py, bridgeEdgePaint)
-                // Rails (inner edge)
-                val railOff = halfWidth - 2f
+
+                // Deck texture: parallel lines across bridge width every 5dp along length
+                val textureSteps = (len / 5f).toInt().coerceAtMost(64)
+                for (s in 0..textureSteps) {
+                    val t = if (textureSteps > 0) s.toFloat() / textureSteps else 0f
+                    val mx = from.x + dx * t; val my = from.y + dy * t
+                    canvas.drawLine(mx + px, my + py, mx - px, my - py, bridgeTexturePaint)
+                }
+
+                // Support struts at regular intervals (~40dp)
+                val strutSteps = (len / 40f).toInt().coerceAtLeast(1)
+                for (s in 0..strutSteps) {
+                    val t = if (strutSteps > 0) s.toFloat() / strutSteps else 0f
+                    val mx = from.x + dx * t; val my = from.y + dy * t
+                    canvas.drawLine(mx + px, my + py, mx - px, my - py, bridgeStrutPaint)
+                }
+
+                // Orange guard rails on both edges (inner of halfWidth)
+                val railOff = halfWidth - 1.5f
                 val rpx = -dy / len * railOff; val rpy = dx / len * railOff
                 canvas.drawLine(from.x + rpx, from.y + rpy, to.x + rpx, to.y + rpy, bridgeRailPaint)
                 canvas.drawLine(from.x - rpx, from.y - rpy, to.x - rpx, to.y - rpy, bridgeRailPaint)
             }
+        }
+
+        // Bridge transition markers — pulsing orange ring at ground→bridge waypoints
+        val bridgePulseT = ((System.currentTimeMillis() % 1600L) / 1600f)
+        val bridgePulseAlpha = (128 + (76 * sin(bridgePulseT * 2 * PI.toFloat())).toInt()).coerceIn(80, 220)
+        for (idx in bridgeEntryIndices) {
+            val pos = wps[idx]
+            val markerPaint = Paint(bridgeTransitionPaint).apply { alpha = bridgePulseAlpha }
+            canvas.drawCircle(pos.x, pos.y, halfWidth + 4f, markerPaint)
         }
 
         // Entry / exit indicators
@@ -641,22 +687,22 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 }
             }
             TowerType.PIERCE -> {
-                // Elongated octagon 16×28
+                // Elongated octagon 24×28 — minimum 20dp width enforced (was 16px)
                 val cut = 5f
                 val ep = Path()
-                ep.moveTo(cx-8f+cut, cy-14f); ep.lineTo(cx+8f-cut, cy-14f)
-                ep.lineTo(cx+8f, cy-14f+cut); ep.lineTo(cx+8f, cy+14f-cut)
-                ep.lineTo(cx+8f-cut, cy+14f); ep.lineTo(cx-8f+cut, cy+14f)
-                ep.lineTo(cx-8f, cy+14f-cut); ep.lineTo(cx-8f, cy-14f+cut)
+                ep.moveTo(cx-12f+cut, cy-14f); ep.lineTo(cx+12f-cut, cy-14f)
+                ep.lineTo(cx+12f, cy-14f+cut); ep.lineTo(cx+12f, cy+14f-cut)
+                ep.lineTo(cx+12f-cut, cy+14f); ep.lineTo(cx-12f+cut, cy+14f)
+                ep.lineTo(cx-12f, cy+14f-cut); ep.lineTo(cx-12f, cy-14f+cut)
                 ep.close()
                 canvas.drawPath(ep, Paint(aa).apply { color=Color.argb(255,10,36,5); style=Paint.Style.FILL })
                 canvas.drawPath(ep, Paint(aa).apply { color=Color.parseColor("#66FF1A"); style=Paint.Style.STROKE; strokeWidth=1.5f })
-                // Long barrel
+                // Long barrel — 4dp wide
                 canvas.drawRect(cx-2f, cy-26f, cx+2f, cy-12f, Paint(aa).apply { color=Color.parseColor("#66FF1A"); style=Paint.Style.FILL })
                 // Reticle sight lines
                 val reticlePaint = Paint(aa).apply { color=Color.argb(127,102,255,26); style=Paint.Style.STROKE; strokeWidth=0.75f }
-                canvas.drawLine(cx-6f, cy-3f, cx+6f, cy-3f, reticlePaint)
-                canvas.drawLine(cx-6f, cy+3f, cx+6f, cy+3f, reticlePaint)
+                canvas.drawLine(cx-10f, cy-3f, cx+10f, cy-3f, reticlePaint)
+                canvas.drawLine(cx-10f, cy+3f, cx+10f, cy+3f, reticlePaint)
             }
             TowerType.CORE -> {
                 // Square 26×26
@@ -723,25 +769,41 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 canvas.drawRect(cx-2.5f, cy-20f, cx+2.5f, cy-10f, Paint(aa).apply { color=Color.parseColor("#FFD11A"); style=Paint.Style.FILL })
             }
             TowerType.SNIPER -> {
-                // Narrow tall rect 10×32, corners clipped 2pt
-                val snipPath = Path()
-                val sw = 5f; val sh = 16f  // half-width, half-height
-                snipPath.moveTo(cx-sw+2f, cy-sh); snipPath.lineTo(cx+sw-2f, cy-sh)
-                snipPath.lineTo(cx+sw, cy-sh+2f); snipPath.lineTo(cx+sw, cy+sh-2f)
-                snipPath.lineTo(cx+sw-2f, cy+sh); snipPath.lineTo(cx-sw+2f, cy+sh)
-                snipPath.lineTo(cx-sw, cy+sh-2f); snipPath.lineTo(cx-sw, cy-sh+2f)
-                snipPath.close()
-                canvas.drawPath(snipPath, Paint(aa).apply { color=Color.argb(255,15,26,31); style=Paint.Style.FILL })
-                canvas.drawPath(snipPath, Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=1.25f })
-                // Long barrel
-                canvas.drawRect(cx-1.5f, cy-sh-16f, cx+1.5f, cy-sh,
+                // SNIPER: hexagonal base (radius 14dp) + octagon turret (radius 10dp) + long barrel 4dp×22dp
+                // Hexagonal base — minimum 20dp width enforced (was 10px)
+                val hexBasePath = Path()
+                for (i in 0 until 6) {
+                    val a = (i * 60f) * (PI / 180f).toFloat()
+                    val x = cx + cos(a) * 14f; val y = cy + sin(a) * 14f
+                    if (i == 0) hexBasePath.moveTo(x, y) else hexBasePath.lineTo(x, y)
+                }
+                hexBasePath.close()
+                canvas.drawPath(hexBasePath, Paint(aa).apply { color=Color.argb(255,10,20,26); style=Paint.Style.FILL })
+                canvas.drawPath(hexBasePath, Paint(aa).apply { color=Color.parseColor("#66CCCC"); style=Paint.Style.STROKE; strokeWidth=1.5f })
+
+                // Octagon turret — radius 10dp
+                val octTurretPath = Path()
+                for (i in 0 until 8) {
+                    val a = (i * 45f - 22.5f) * (PI / 180f).toFloat()
+                    val x = cx + cos(a) * 10f; val y = cy + sin(a) * 10f
+                    if (i == 0) octTurretPath.moveTo(x, y) else octTurretPath.lineTo(x, y)
+                }
+                octTurretPath.close()
+                canvas.drawPath(octTurretPath, Paint(aa).apply { color=Color.argb(255,15,26,31); style=Paint.Style.FILL })
+                canvas.drawPath(octTurretPath, Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=1.25f })
+
+                // Long barrel — 4dp wide × 22dp long, pointing up (Y-)
+                canvas.drawRoundRect(RectF(cx-2f, cy-32f, cx+2f, cy-10f), 2f, 2f,
                     Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.FILL })
-                // Scope circle at 30% from top
-                val scopeY = cy - sh + sh*0.6f
-                canvas.drawCircle(cx, scopeY, 3.5f, Paint(aa).apply { color=Color.argb(64,153,230,255); style=Paint.Style.FILL })
-                canvas.drawCircle(cx, scopeY, 3.5f, Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=1f })
-                canvas.drawLine(cx-3.5f, scopeY, cx+3.5f, scopeY,
-                    Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=0.5f })
+
+                // Scope circle on turret body (at center-ish)
+                val scopeY = cy - 2f
+                canvas.drawCircle(cx, scopeY, 4f, Paint(aa).apply { color=Color.argb(76,153,230,255); style=Paint.Style.FILL })
+                canvas.drawCircle(cx, scopeY, 4f, Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=1f })
+                canvas.drawLine(cx-4f, scopeY, cx+4f, scopeY,
+                    Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=0.6f })
+                canvas.drawLine(cx, scopeY-4f, cx, scopeY+4f,
+                    Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=0.6f })
             }
             TowerType.ARTILLERY -> {
                 // Wide squat hexagon 30×22 (flat-top)

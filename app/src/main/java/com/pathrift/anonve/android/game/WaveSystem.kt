@@ -147,12 +147,13 @@ class WaveSystem {
      */
     fun waveDefinition(wave: Int): WaveDefinition = getWaveDefinition(wave.coerceAtLeast(1))
 
-    /** Exponential HP scaling — mirrors iOS hpScaleMultiplier(for:). */
-    fun hpScaleMultiplier(wave: Int): Float = when {
-        wave <= 5  -> 1.0f
-        wave <= 10 -> 1.0f + (wave - 5) * 0.15f
-        wave <= 20 -> 1.75f + (wave - 10) * 0.20f
-        else       -> 3.75f + (wave - 20) * 0.30f
+    /** Exponential HP scaling — Build 5.1 balance tuning (iOS parity). */
+    fun hpScaleMultiplier(waveNumber: Int): Float = when {
+        waveNumber <= 5  -> 1.0f
+        waveNumber <= 10 -> 1.0f + (waveNumber - 5) * 0.10f   // 1.0→1.5 (was 0.15)
+        waveNumber <= 20 -> 1.5f + (waveNumber - 10) * 0.15f  // 1.5→3.0 (was 1.75+0.20)
+        waveNumber <= 30 -> 3.0f + (waveNumber - 20) * 0.20f  // 3.0→5.0 (new breakpoint)
+        else             -> 5.0f + (waveNumber - 30) * 0.25f  // 5.0+ (was 3.75+0.30 from 20)
     }
 
     fun goldRewardForWave(wave: Int): Int = EconomyConstants.goldRewardForWave(wave)
