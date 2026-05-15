@@ -466,46 +466,55 @@ private fun TowerStoreCard(
                 fontFamily = FontFamily.Monospace
             )
         }
-        if (isUnlocked) {
-            Box(
-                Modifier
-                    .background(PathriftSuccess.copy(0.15f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            ) {
-                Text("OWNED", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PathriftSuccess)
+        when {
+            // Free tower — no diamond cost
+            type.diamondCost == 0 -> {
+                Box(
+                    Modifier
+                        .background(PathriftSuccess.copy(0.15f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text("FREE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PathriftSuccess)
+                }
             }
-        } else if (type.diamondCost == 0) {
-            Box(
-                Modifier
-                    .background(PathriftSuccess.copy(0.15f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 5.dp)
-            ) {
-                Text("FREE", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PathriftSuccess)
+            // Premium tower already owned
+            isUnlocked -> {
+                Box(
+                    Modifier
+                        .background(PathriftSuccess.copy(0.15f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                ) {
+                    Text("OWNED ✓", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = PathriftSuccess)
+                }
             }
-        } else {
-            Button(
-                onClick = onUnlock,
-                enabled = canAfford,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = PathriftNeonBlue,
-                    disabledContainerColor = PathriftSurface.copy(alpha = 0.5f)
-                ),
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Diamond,
-                    contentDescription = null,
-                    modifier = Modifier.size(10.dp),
-                    tint = if (canAfford) Color.Black else PathriftTextSecondary
-                )
-                Spacer(Modifier.width(4.dp))
-                Text(
-                    "${type.diamondCost}",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (canAfford) Color.Black else PathriftTextSecondary
-                )
+            // Premium tower — locked, show lock icon + diamond cost
+            else -> {
+                Box(contentAlignment = Alignment.TopEnd) {
+                    Button(
+                        onClick = onUnlock,
+                        enabled = canAfford,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PathriftNeonBlue.copy(alpha = 0.15f),
+                            disabledContainerColor = PathriftSurface.copy(alpha = 0.5f)
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            modifier = Modifier.size(10.dp),
+                            tint = if (canAfford) Color(0xFF00CCFF) else PathriftTextSecondary
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "♦ ${type.diamondCost}",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (canAfford) Color(0xFF00CCFF) else PathriftTextSecondary
+                        )
+                    }
+                }
             }
         }
     }

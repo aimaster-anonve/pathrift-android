@@ -1,11 +1,6 @@
 package com.pathrift.anonve.android.core.ui.screens
 
 import android.widget.FrameLayout
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -462,19 +457,32 @@ private fun CombatHUD(
                 Spacer(Modifier.width(14.dp))
                 HudStatPill(LanguageManager.s("DIAMONDS", "ELMAS"), "♦${state.diamonds}", Color(0xFF00CCFF))
                 Spacer(Modifier.weight(1f))
-                // Build 5.3: Info button removed — replaced by NextWaveBanner above START WAVE button
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = if (state.wave == 0) LanguageManager.s("READY", "HAZIR") else LanguageManager.s("WAVE", "DALGA"),
-                        fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                        color = PathriftTextSecondary, letterSpacing = 2.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = if (state.wave == 0) "--" else "${state.wave}",
-                        fontSize = 24.sp, fontWeight = FontWeight.Black,
-                        color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
-                    )
+                // Wave stat — wave number + info button (Build 5.3.1)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = if (state.wave == 0) LanguageManager.s("READY", "HAZIR") else LanguageManager.s("WAVE", "DALGA"),
+                            fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                            color = PathriftTextSecondary, letterSpacing = 2.sp,
+                            fontFamily = FontFamily.Monospace
+                        )
+                        Text(
+                            text = if (state.wave == 0) "--" else "${state.wave}",
+                            fontSize = 24.sp, fontWeight = FontWeight.Black,
+                            color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
+                        )
+                    }
+                    // Info button
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color(0f, 0.78f, 1f, 0.18f))
+                            .clickable { onShowNextWaveInfo() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Filled.Info, contentDescription = "Wave info", tint = Color(0f, 0.78f, 1f), modifier = Modifier.size(16.dp))
+                    }
                 }
                 Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -543,7 +551,7 @@ private fun CombatHUD(
                 }
             }
         } else {
-            // Portrait bottom bar — Build 5.3: NextWaveBanner above SendWaveButton
+            // Portrait bottom bar — Build 5.3.1: NextWaveBanner removed, START WAVE button shown directly
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -551,18 +559,6 @@ private fun CombatHUD(
                     .background(Brush.verticalGradient(listOf(Color.Transparent, PathriftBackground.copy(alpha = 0.9f))))
                     .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
-                // NextWaveBanner — visible only when wave is not active (Build 5.3)
-                AnimatedVisibility(
-                    visible = state.phase != GamePhase.WAVE_ACTIVE && state.phase != GamePhase.GAME_OVER,
-                    enter = slideInVertically(initialOffsetY = { it }),
-                    exit = slideOutVertically(targetOffsetY = { it })
-                ) {
-                    NextWaveBanner(
-                        waveDef = nextWaveDefinition,
-                        onTap = onShowNextWaveInfo
-                    )
-                }
-                Spacer(Modifier.height(4.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
