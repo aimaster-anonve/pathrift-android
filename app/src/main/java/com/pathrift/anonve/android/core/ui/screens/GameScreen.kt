@@ -458,31 +458,38 @@ private fun CombatHUD(
                 Spacer(Modifier.width(14.dp))
                 HudStatPill(LanguageManager.s("DIAMONDS", "ELMAS"), "♦${state.diamonds}", Color(0xFF00CCFF))
                 Spacer(Modifier.weight(1f))
-                // Wave stat — wave number + info button (Build 5.3.1)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // Wave card IS the info button (Build 5.3.3)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0f, 0.78f, 1f, 0.10f))
+                        .border(1.dp, Color(0f, 0.78f, 1f, 0.35f), RoundedCornerShape(8.dp))
+                        .clickable { onShowNextWaveInfo() }
+                        .padding(horizontal = 10.dp, vertical = 3.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(0.dp)) {
                         Text(
-                            text = if (state.wave == 0) LanguageManager.s("READY", "HAZIR") else LanguageManager.s("WAVE", "DALGA"),
-                            fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                            color = PathriftTextSecondary, letterSpacing = 2.sp,
-                            fontFamily = FontFamily.Monospace
+                            text = if (state.wave == 0) "READY" else "WAVE",
+                            fontSize = 8.sp,
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 2.sp,
+                            color = Color.Gray
                         )
                         Text(
                             text = if (state.wave == 0) "--" else "${state.wave}",
-                            fontSize = 24.sp, fontWeight = FontWeight.Black,
-                            color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0f, 0.78f, 1f),
+                            fontFamily = FontFamily.Monospace
                         )
-                    }
-                    // Info button
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(Color(0f, 0.78f, 1f, 0.18f))
-                            .clickable { onShowNextWaveInfo() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(Icons.Filled.Info, contentDescription = "Wave info", tint = Color(0f, 0.78f, 1f), modifier = Modifier.size(16.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Icon(Icons.Filled.Info, null, tint = Color(0f, 0.78f, 1f, 0.7f), modifier = Modifier.size(8.dp))
+                            Text("INFO", fontSize = 7.sp, fontFamily = FontFamily.Monospace, letterSpacing = 0.5.sp, color = Color(0f, 0.78f, 1f, 0.7f))
+                        }
                     }
                 }
                 Spacer(Modifier.weight(1f))
