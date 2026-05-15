@@ -1,5 +1,6 @@
 package com.pathrift.anonve.android.core.ui.screens
 
+import android.content.res.Configuration
 import android.widget.FrameLayout
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -65,6 +66,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -334,102 +336,220 @@ private fun CombatHUD(
     onShowNextWaveInfo: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     Box(modifier = modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.TopStart)
         ) {
-            // Portrait HUD — always active (game is portrait-locked)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(PathriftBackground.copy(alpha = 0.9f), Color.Transparent)
-                        )
-                    )
-                    .systemBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                HudStatPill(LanguageManager.s("GOLD", "ALTIN"), "${state.gold}", PathriftNeonBlue)
-                Spacer(Modifier.width(14.dp))
-                HudStatPill(LanguageManager.s("DIAMONDS", "ELMAS"), "♦${state.diamonds}", Color(0xFF00CCFF))
-                Spacer(Modifier.weight(1f))
-                // Wave card IS the info button (Build 5.3.4)
-                Box(
+            if (isLandscape) {
+                // Three-section landscape top bar: [Wave+Info] [Lives+Gold+Diamond] [Speed+Pause]
+                Row(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(Color(0f, 0.78f, 1f, 0.15f))
-                        .border(1.dp, Color(0f, 0.78f, 1f, 0.6f), RoundedCornerShape(9.dp))
-                        .clickable { onShowNextWaveInfo() }
-                        .padding(horizontal = 10.dp, vertical = 3.dp),
-                    contentAlignment = Alignment.Center
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.Black.copy(alpha = 0.75f),
+                                    Color.Black.copy(alpha = 0.45f)
+                                )
+                            )
+                        )
+                        .systemBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                    // LEFT: Wave number + Info button — Build 5.3.5
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.width(90.dp)
+                    ) {
                         Text(
-                            text = if (state.wave == 0) "READY" else "WAVE",
-                            fontSize = 8.sp,
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 2.sp,
-                            color = Color.Gray
-                        )
-                        Text(
-                            text = if (state.wave == 0) "--" else "${state.wave}",
-                            fontSize = 22.sp,
+                            text = if (state.wave == 0) "W--" else "W${state.wave}",
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Black,
-                            color = Color(0f, 0.78f, 1f),
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
+                            color = Color(0f, 0.78f, 1f)
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        IconButton(
+                            onClick = { onShowNextWaveInfo() },
+                            modifier = Modifier.size(28.dp)
                         ) {
-                            Icon(Icons.Filled.Info, null, tint = Color(0f, 0.78f, 1f, 0.7f), modifier = Modifier.size(9.dp))
-                            Text("INFO", fontSize = 9.sp, fontFamily = FontFamily.Monospace, letterSpacing = 0.5.sp, color = Color(0f, 0.78f, 1f, 0.7f))
+                            Icon(
+                                imageVector = Icons.Filled.Info,
+                                contentDescription = "Wave info",
+                                tint = Color(0f, 0.78f, 1f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    // CENTER (weight 1): Lives + Gold + Diamond + Kills
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Lives pill
+                        StatPill {
+                            for (i in 0 until EconomyConstants.STARTING_LIVES) {
+                                Icon(
+                                    imageVector = if (i < state.lives) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    contentDescription = null,
+                                    tint = if (i < state.lives) PathriftDanger else PathriftTextSecondary.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(12.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        // Gold pill
+                        StatPill {
+                            Text("💰", fontSize = 11.sp)
+                            Text("${state.gold}", color = PathriftGold, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        // Diamond pill
+                        StatPill {
+                            Text("♦", color = Color(0xFF00CCFF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("${state.diamonds}", color = Color(0xFF00CCFF), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        // Kills pill
+                        StatPill {
+                            Text("✕", color = PathriftOrange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("${state.enemyKills}", color = PathriftOrange, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+
+                    // RIGHT: Speed + Pause
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    if (state.speedMultiplier == 2f) Color(0xFF00CCFF).copy(alpha = 0.2f)
+                                    else Color.White.copy(alpha = 0.07f)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (state.speedMultiplier == 2f) Color(0xFF00CCFF).copy(alpha = 0.5f)
+                                    else Color.White.copy(alpha = 0.1f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable { onToggleSpeed() }
+                                .padding(horizontal = 8.dp, vertical = 5.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                                Icon(Icons.Default.Speed, contentDescription = null,
+                                    tint = if (state.speedMultiplier == 2f) Color(0xFF00CCFF) else Color.Gray,
+                                    modifier = Modifier.size(10.dp))
+                                Text(
+                                    if (state.speedMultiplier == 1f) "×1" else "×2",
+                                    color = if (state.speedMultiplier == 2f) Color(0xFF00CCFF) else Color.Gray,
+                                    fontWeight = FontWeight.Bold, fontSize = 12.sp
+                                )
+                            }
+                        }
+                        IconButton(onClick = onPause, modifier = Modifier.size(28.dp)) {
+                            Icon(Icons.Default.Pause, contentDescription = null, tint = PathriftTextSecondary, modifier = Modifier.size(16.dp))
                         }
                     }
                 }
-                Spacer(Modifier.weight(1f))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Compact lives stat — Build 5.3.2
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Icon(
-                            imageVector = if (state.lives > 0) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                            contentDescription = null,
-                            tint = if (state.lives > 0) PathriftDanger else Color.Gray,
-                            modifier = Modifier.size(13.dp)
+            } else {
+                // Portrait HUD — always active (game is portrait-locked)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(PathriftBackground.copy(alpha = 0.9f), Color.Transparent)
+                            )
                         )
-                        Text(
-                            text = "${state.lives}",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontFamily = FontFamily.Monospace,
-                            color = if (state.lives > 0) PathriftDanger else Color.Gray
-                        )
-                    }
-                    Spacer(Modifier.width(8.dp))
-                    // Speed toggle button
-                    TextButton(
-                        onClick = onToggleSpeed,
+                        .systemBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HudStatPill(LanguageManager.s("GOLD", "ALTIN"), "${state.gold}", PathriftNeonBlue)
+                    Spacer(Modifier.width(14.dp))
+                    HudStatPill(LanguageManager.s("DIAMONDS", "ELMAS"), "♦${state.diamonds}", Color(0xFF00CCFF))
+                    Spacer(Modifier.weight(1f))
+                    // Wave card IS the info button (Build 5.3.4)
+                    Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color.Black.copy(alpha = 0.4f))
+                            .clip(RoundedCornerShape(9.dp))
+                            .background(Color(0f, 0.78f, 1f, 0.15f))
+                            .border(1.dp, Color(0f, 0.78f, 1f, 0.6f), RoundedCornerShape(9.dp))
+                            .clickable { onShowNextWaveInfo() }
+                            .padding(horizontal = 10.dp, vertical = 3.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = if (state.speedMultiplier == 1.0f) "x1" else "x2",
-                            color = if (state.speedMultiplier == 2.0f) Color(0xFF00CCFF) else Color.Gray,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                            Text(
+                                text = if (state.wave == 0) "READY" else "WAVE",
+                                fontSize = 8.sp,
+                                fontFamily = FontFamily.Monospace,
+                                letterSpacing = 2.sp,
+                                color = Color.Gray
+                            )
+                            Text(
+                                text = if (state.wave == 0) "--" else "${state.wave}",
+                                fontSize = 22.sp,
+                                fontWeight = FontWeight.Black,
+                                color = Color(0f, 0.78f, 1f),
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(3.dp)
+                            ) {
+                                Icon(Icons.Filled.Info, null, tint = Color(0f, 0.78f, 1f, 0.7f), modifier = Modifier.size(9.dp))
+                                Text("INFO", fontSize = 9.sp, fontFamily = FontFamily.Monospace, letterSpacing = 0.5.sp, color = Color(0f, 0.78f, 1f, 0.7f))
+                            }
+                        }
                     }
-                    Spacer(Modifier.width(6.dp))
-                    IconButton(onClick = onPause, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Pause, "pause", tint = PathriftTextSecondary.copy(alpha = 0.8f), modifier = Modifier.size(22.dp))
+                    Spacer(Modifier.weight(1f))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Compact lives stat — Build 5.3.2
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                            Icon(
+                                imageVector = if (state.lives > 0) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                                contentDescription = null,
+                                tint = if (state.lives > 0) PathriftDanger else Color.Gray,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "${state.lives}",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (state.lives > 0) PathriftDanger else Color.Gray
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        // Speed toggle button
+                        TextButton(
+                            onClick = onToggleSpeed,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color.Black.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = if (state.speedMultiplier == 1.0f) "x1" else "x2",
+                                color = if (state.speedMultiplier == 2.0f) Color(0xFF00CCFF) else Color.Gray,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        IconButton(onClick = onPause, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Default.Pause, "pause", tint = PathriftTextSecondary.copy(alpha = 0.8f), modifier = Modifier.size(22.dp))
+                        }
                     }
                 }
-            }
+            } // end portrait else
             state.waveCompleteMessage?.let { msg ->
                 Box(
                     modifier = Modifier.fillMaxWidth()
@@ -442,23 +562,43 @@ private fun CombatHUD(
             }
         }
 
-        // Portrait bottom bar — Build 5.3.1: NextWaveBanner removed, START WAVE button shown directly
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomStart)
-                .background(Brush.verticalGradient(listOf(Color.Transparent, PathriftBackground.copy(alpha = 0.9f))))
-                .padding(horizontal = 16.dp, vertical = 6.dp)
-        ) {
+        if (isLandscape) {
+            // Landscape bottom bar: progress/send wave right
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomStart)
+                    .background(
+                        Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))
+                    )
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange)
                 Spacer(Modifier.weight(1f))
                 when {
                     state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
                     state.phase != GamePhase.GAME_OVER -> SendWaveButton(onClick = onNextWave)
+                }
+            }
+        } else {
+            // Portrait bottom bar — Build 5.3.1: NextWaveBanner removed, START WAVE button shown directly
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomStart)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, PathriftBackground.copy(alpha = 0.9f))))
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange)
+                    Spacer(Modifier.weight(1f))
+                    when {
+                        state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
+                        state.phase != GamePhase.GAME_OVER -> SendWaveButton(onClick = onNextWave)
+                    }
                 }
             }
         }
