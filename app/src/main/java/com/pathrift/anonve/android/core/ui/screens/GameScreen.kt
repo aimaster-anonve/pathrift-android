@@ -469,14 +469,21 @@ private fun CombatHUD(
                             color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
                         )
                     }
-                    // PATHRIFT-157 / Build 5.1: Next wave info button — filled icon, more visible
-                    Spacer(Modifier.width(6.dp))
-                    IconButton(onClick = onShowNextWaveInfo, modifier = Modifier.size(28.dp)) {
+                    // Build 5.2: Info button — always visible, distinct background, wave 0 included
+                    Spacer(Modifier.width(4.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(26.dp)
+                            .clip(CircleShape)
+                            .background(Color(0f, 0.78f, 1f, 0.18f))
+                            .clickable { onShowNextWaveInfo() },
+                        contentAlignment = Alignment.Center
+                    ) {
                         Icon(
                             imageVector = Icons.Filled.Info,
-                            contentDescription = "Next wave info",
+                            contentDescription = "Wave info",
                             tint = Color(0f, 0.78f, 1f),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }

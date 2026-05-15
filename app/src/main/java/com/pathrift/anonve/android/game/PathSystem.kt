@@ -15,7 +15,8 @@ enum class PathLayer { GROUND, BRIDGE }
  */
 object PathSystem {
 
-    // 12 layout parameter sets: (y1%, y2%, y3%, xL%, xR%) — fractions of screen H/W
+    // 18 layout parameter sets: (y1%, y2%, y3%, xL%, xR%) — fractions of screen H/W
+    // Build 5.2: added 6 new creative layouts (indices 12–17), total 18 Z-based + 6 crossing = 24
     private val layoutParams: List<List<Float>> = listOf(
         listOf(0.20f, 0.50f, 0.78f, 0.26f, 0.74f),   // 0: standard forward Z
         listOf(0.78f, 0.50f, 0.22f, 0.28f, 0.72f),   // 1: reverse Z
@@ -29,9 +30,16 @@ object PathSystem {
         listOf(0.20f, 0.44f, 0.80f, 0.35f, 0.65f),   // 9: compressed mid
         listOf(0.18f, 0.58f, 0.82f, 0.24f, 0.76f),   // 10: lower compressed
         listOf(0.75f, 0.44f, 0.17f, 0.32f, 0.68f),   // 11: narrow reverse
+        // --- Build 5.2 new layouts ---
+        listOf(0.10f, 0.55f, 0.90f, 0.20f, 0.80f),   // 12: zigzag extreme — wide swing top→bottom
+        listOf(0.88f, 0.44f, 0.12f, 0.22f, 0.78f),   // 13: S-curve reverse — start bottom, finish top
+        listOf(0.25f, 0.75f, 0.25f, 0.30f, 0.70f),   // 14: U-turn — top→bottom→top
+        listOf(0.75f, 0.25f, 0.75f, 0.30f, 0.70f),   // 15: inverted U-turn — bottom→top→bottom
+        listOf(0.15f, 0.50f, 0.85f, 0.12f, 0.88f),   // 16: corner rush — extreme wide corridor
+        listOf(0.30f, 0.68f, 0.30f, 0.18f, 0.82f),   // 17: double loop — symmetric oscillation
     )
 
-    // Total layout count: 12 Z-based + 6 crossing = 18
+    // Total layout count: 18 Z-based + 6 crossing = 24
     val layoutCount: Int get() = layoutParams.size + 6
 
     var currentLayoutIndex: Int = 0
@@ -96,7 +104,7 @@ object PathSystem {
         val xOff = contentOffsetX
         val yOff = contentMinY
 
-        val totalLayouts = layoutParams.size + 6  // 18 total
+        val totalLayouts = layoutParams.size + 6  // 24 total (Build 5.2)
         val idx = if (layoutIndex < 0) (0 until totalLayouts).random() else layoutIndex
         currentLayoutIndex = idx
 

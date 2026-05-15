@@ -5,7 +5,7 @@ package com.pathrift.anonve.android.core.engine
  */
 object EconomyConstants {
     const val STARTING_GOLD = 300       // was 250 (Build 5.1 balance)
-    const val STARTING_LIVES = 8        // was 5 (Build 5.1 balance)
+    const val STARTING_LIVES = 5        // Build 5.2: reverted from 8 back to 5
     const val SELL_REFUND_PERCENT = 0.70
     const val RIFT_SELL_PERCENT = 0.50
     const val UPGRADE_BASE_COST = 80

@@ -279,18 +279,15 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         return path
     }
 
-    // Render the path as filled corridor with edge glow lines and texture (PATHRIFT-163)
+    // Render the path as filled corridor with edge glow lines and texture (Build 5.2: uniform style, no bridge visual distinction)
     private fun drawPath(canvas: Canvas, W: Float, H: Float) {
         val wps = PathSystem.waypoints
         if (wps.size < 2) return
         val halfWidth = 16f  // 32pt corridor = 16pt each side
 
-        // First pass: draw all ground path segments as filled corridors
+        // All segments rendered identically — 0xFF1A1A28 fill + 0x4D00C8FF cyan edge lines
+        // Bridge vs ground visual distinction removed (Build 5.2); Z-layer logic still applies in GameEngine
         for (i in 1 until wps.size) {
-            val fromLayer = PathSystem.layerAt(i - 1)
-            val toLayer = PathSystem.layerAt(i)
-            if (fromLayer == PathLayer.BRIDGE || toLayer == PathLayer.BRIDGE) continue
-
             val from = wps[i - 1]; val to = wps[i]
             val seg = buildCorridorSegment(from, to, halfWidth)
             canvas.drawPath(seg, pathCorridorFillPaint)
@@ -313,111 +310,14 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             }
         }
 
-        // Waypoint joints (circular caps) — ground
+        // Waypoint joints (circular caps) — all segments uniform
         val jointFillPaint = Paint(pathCorridorFillPaint)
+        val accentPaint = Paint().apply {
+            color = Color.argb(102, 0, 200, 255); style = Paint.Style.STROKE; strokeWidth = 1f
+        }
         for (i in wps.indices) {
-            if (PathSystem.layerAt(i) == PathLayer.BRIDGE) continue
             canvas.drawCircle(wps[i].x, wps[i].y, halfWidth, jointFillPaint)
-            // Accent dot
-            val accentPaint = Paint().apply {
-                color = Color.argb(102, 0, 200, 255); style = Paint.Style.STROKE; strokeWidth = 1f
-            }
             canvas.drawCircle(wps[i].x, wps[i].y, 4f, accentPaint)
-        }
-
-        // Second pass: bridge segments — warm brown-grey deck + orange rails (Build 5.1)
-        // Deck: warm stone 0xFF382F26 — clearly different from cold blue-black ground 0xFF19191F
-        val bridgeFillPaint = Paint().apply {
-            color = Color.argb(255, 56, 47, 38)  // 0xFF382F26 warm brown-grey concrete
-            style = Paint.Style.FILL; isAntiAlias = true
-        }
-        // Orange guard rails — highly visible
-        val bridgeRailPaint = Paint().apply {
-            color = Color.argb(255, 255, 140, 0)  // 0xFFFF8C00 orange
-            style = Paint.Style.STROKE; strokeWidth = 3f; strokeCap = Paint.Cap.ROUND; isAntiAlias = true
-        }
-        // Darker amber support struts
-        val bridgeStrutPaint = Paint().apply {
-            color = Color.argb(255, 204, 114, 0)  // 0xFFCC7200 darker amber
-            style = Paint.Style.STROKE; strokeWidth = 2f; isAntiAlias = true
-        }
-        // Drop shadow for elevation illusion: +3dp right, -4dp down, alpha 0.55
-        val bridgeShadowPaint = Paint().apply {
-            color = Color.argb(140, 0, 0, 0)  // alpha ~0.55
-            style = Paint.Style.FILL; isAntiAlias = true
-        }
-        // Deck texture lines — semi-transparent warm grey
-        val bridgeTexturePaint = Paint().apply {
-            color = Color.argb(153, 77, 64, 53)  // 0x994D4035
-            style = Paint.Style.STROKE; strokeWidth = 0.7f; isAntiAlias = true
-        }
-        // Transition ring paint — pulsing orange at ground→bridge waypoints
-        val bridgeTransitionPaint = Paint().apply {
-            color = Color.argb(204, 255, 140, 0)
-            style = Paint.Style.STROKE; strokeWidth = 2.5f; isAntiAlias = true
-        }
-
-        // Collect bridge waypoint indices for transition markers
-        val bridgeEntryIndices = mutableSetOf<Int>()
-        for (i in 1 until wps.size) {
-            val fromLayer = PathSystem.layerAt(i - 1)
-            val toLayer = PathSystem.layerAt(i)
-            if (fromLayer != PathLayer.BRIDGE && toLayer == PathLayer.BRIDGE) bridgeEntryIndices.add(i - 1)
-            if (fromLayer == PathLayer.BRIDGE && toLayer != PathLayer.BRIDGE) bridgeEntryIndices.add(i)
-        }
-
-        for (i in 1 until wps.size) {
-            val fromLayer = PathSystem.layerAt(i - 1)
-            val toLayer = PathSystem.layerAt(i)
-            if (fromLayer != PathLayer.BRIDGE && toLayer != PathLayer.BRIDGE) continue
-            val from = wps[i - 1]; val to = wps[i]
-
-            // Drop shadow (offset +3dp right, -4dp down)
-            val shadowSeg = buildCorridorSegment(
-                PointF(from.x + 3f, from.y - 4f), PointF(to.x + 3f, to.y - 4f), halfWidth
-            )
-            canvas.drawPath(shadowSeg, bridgeShadowPaint)
-
-            // Bridge deck fill — warm brown-grey
-            val bridgeSeg = buildCorridorSegment(from, to, halfWidth)
-            canvas.drawPath(bridgeSeg, bridgeFillPaint)
-
-            val dx = to.x - from.x; val dy = to.y - from.y
-            val len = sqrt(dx * dx + dy * dy)
-            if (len > 0f) {
-                val px = -dy / len * halfWidth; val py = dx / len * halfWidth
-
-                // Deck texture: parallel lines across bridge width every 5dp along length
-                val textureSteps = (len / 5f).toInt().coerceAtMost(64)
-                for (s in 0..textureSteps) {
-                    val t = if (textureSteps > 0) s.toFloat() / textureSteps else 0f
-                    val mx = from.x + dx * t; val my = from.y + dy * t
-                    canvas.drawLine(mx + px, my + py, mx - px, my - py, bridgeTexturePaint)
-                }
-
-                // Support struts at regular intervals (~40dp)
-                val strutSteps = (len / 40f).toInt().coerceAtLeast(1)
-                for (s in 0..strutSteps) {
-                    val t = if (strutSteps > 0) s.toFloat() / strutSteps else 0f
-                    val mx = from.x + dx * t; val my = from.y + dy * t
-                    canvas.drawLine(mx + px, my + py, mx - px, my - py, bridgeStrutPaint)
-                }
-
-                // Orange guard rails on both edges (inner of halfWidth)
-                val railOff = halfWidth - 1.5f
-                val rpx = -dy / len * railOff; val rpy = dx / len * railOff
-                canvas.drawLine(from.x + rpx, from.y + rpy, to.x + rpx, to.y + rpy, bridgeRailPaint)
-                canvas.drawLine(from.x - rpx, from.y - rpy, to.x - rpx, to.y - rpy, bridgeRailPaint)
-            }
-        }
-
-        // Bridge transition markers — pulsing orange ring at ground→bridge waypoints
-        val bridgePulseT = ((System.currentTimeMillis() % 1600L) / 1600f)
-        val bridgePulseAlpha = (128 + (76 * sin(bridgePulseT * 2 * PI.toFloat())).toInt()).coerceIn(80, 220)
-        for (idx in bridgeEntryIndices) {
-            val pos = wps[idx]
-            val markerPaint = Paint(bridgeTransitionPaint).apply { alpha = bridgePulseAlpha }
-            canvas.drawCircle(pos.x, pos.y, halfWidth + 4f, markerPaint)
         }
 
         // Entry / exit indicators
@@ -502,14 +402,6 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             lineTo(pos.x - 2f, pos.y + 5f)
         }
         canvas.drawPath(path, ap)
-    }
-
-    /** Compute perpendicular offset vector for bridge rail rendering. */
-    private fun computePerpendicular(from: PointF, to: PointF, distance: Float): PointF {
-        val dx = to.x - from.x
-        val dy = to.y - from.y
-        val len = sqrt(dx * dx + dy * dy)
-        return if (len > 0) PointF(-dy / len * distance, dx / len * distance) else PointF(0f, distance)
     }
 
     // Build an octagon path centered at (cx, cy) with given radius (PATHRIFT-161)

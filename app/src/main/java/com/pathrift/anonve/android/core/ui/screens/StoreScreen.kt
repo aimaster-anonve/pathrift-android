@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pathrift.anonve.android.app.PathriftApp
+import com.pathrift.anonve.android.core.ui.ArtilleryTowerColor
 import com.pathrift.anonve.android.core.ui.BlastTowerColor
 import com.pathrift.anonve.android.core.ui.PathriftDanger
 import com.pathrift.anonve.android.core.ui.BoltTowerColor
@@ -75,7 +76,9 @@ import com.pathrift.anonve.android.core.ui.PathriftSurface
 import com.pathrift.anonve.android.core.ui.PathriftTextPrimary
 import com.pathrift.anonve.android.core.ui.PathriftTextSecondary
 import com.pathrift.anonve.android.core.ui.PierceTowerColor
+import com.pathrift.anonve.android.core.ui.SniperTowerColor
 import com.pathrift.anonve.android.core.ui.TeslaTowerColor
+import com.pathrift.anonve.android.core.ui.TowerShapeIcon
 import com.pathrift.anonve.android.game.towers.TowerType
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -422,13 +425,21 @@ private fun TowerStoreCard(
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        // Build 5.2: TowerShapeIcon — unique geometric shape per tower type
         Box(
-            Modifier
-                .size(36.dp)
+            modifier = Modifier
+                .size(40.dp)
                 .clip(CircleShape)
                 .background(color.copy(alpha = 0.15f))
-                .border(1.dp, color.copy(alpha = 0.5f), CircleShape)
-        )
+                .border(1.dp, color.copy(alpha = 0.5f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            TowerShapeIcon(
+                type = type,
+                color = color,
+                modifier = Modifier.size(26.dp)
+            )
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
