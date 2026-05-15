@@ -131,7 +131,8 @@ object PathSystem {
             waypointLayers = List(waypoints.size) { PathLayer.GROUND }
 
             val rawSlots = computeSlots(y1, y2, y3, xL, xR, xOff + W, yOff + H, currentWave)
-            val filteredSlots = rawSlots.filter { isSlotClearOfPath(it, waypoints, clearance = 36f) }
+            // Build 5.3: clearance = 28f (slot half=16 + path half=8.5 + margin=3.5, was 36f)
+            val filteredSlots = rawSlots.filter { isSlotClearOfPath(it, waypoints, clearance = 28f) }
             slotPositions = guaranteePathCoverage(filteredSlots, waypoints, currentWave)
         } else {
             // Crossing/complex layouts (indices 12–17)
@@ -148,7 +149,8 @@ object PathSystem {
             }
 
             val rawSlots = computeSlotsForCrossing(xOff + W, yOff + H, xOff, yOff, currentWave)
-            val filteredSlots = rawSlots.filter { isSlotClearOfPath(it, waypoints, clearance = 36f) }
+            // Build 5.3: clearance = 28f (slot half=16 + path half=8.5 + margin=3.5, was 36f)
+            val filteredSlots = rawSlots.filter { isSlotClearOfPath(it, waypoints, clearance = 28f) }
             slotPositions = guaranteePathCoverage(filteredSlots, waypoints, currentWave)
         }
     }
@@ -195,7 +197,7 @@ object PathSystem {
         return sqrt((px - cx).pow(2) + (py - cy).pow(2))
     }
 
-    private fun isSlotClearOfPath(slot: PointF, waypoints: List<PointF>, clearance: Float = 36f): Boolean {
+    private fun isSlotClearOfPath(slot: PointF, waypoints: List<PointF>, clearance: Float = 28f): Boolean {
         for (i in 1 until waypoints.size) {
             val dist = distanceFromPointToSegment(
                 slot.x, slot.y,

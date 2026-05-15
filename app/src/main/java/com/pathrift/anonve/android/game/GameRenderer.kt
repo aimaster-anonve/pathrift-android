@@ -245,22 +245,39 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         }
     }
 
-    // Path fill and edge paints — DESIGN_SPEC_BUILD5 Section 3 (PATHRIFT-163)
+    // Path fill and edge paints — DESIGN_SPEC_BUILD5_3 Section 2 (Build 5.3)
     private val pathCorridorFillPaint = Paint().apply {
-        color = Color.argb(255, 26, 26, 40)   // (0.10, 0.10, 0.16) — path.fill slate
+        color = Color.argb(255, 56, 50, 79)   // (0.22, 0.20, 0.32) — violet-slate, clearly distinct from grid
         style = Paint.Style.FILL
         isAntiAlias = true
     }
-    private val pathEdgePaint = Paint().apply {
-        color = Color.argb(76, 0, 200, 255)   // (0.00, 0.78, 1.00, 0.30) — muted cyan edge
+    // Inner glow line (each edge): 2pt width, alpha=0x8C≈55%
+    private val pathEdgeInnerPaint = Paint().apply {
+        color = Color.argb(0x8C, 0, 200, 255)   // (0.00, 0.78, 1.00, 0.55) — primary cyan glow
+        style = Paint.Style.STROKE
+        strokeWidth = 2.0f
+        strokeCap = Paint.Cap.ROUND
+        isAntiAlias = true
+    }
+    // Outer glow line (each edge): 1pt width, alpha=0x40≈25%
+    private val pathEdgeOuterPaint = Paint().apply {
+        color = Color.argb(0x40, 0, 200, 255)   // (0.00, 0.78, 1.00, 0.25) — soft falloff
         style = Paint.Style.STROKE
         strokeWidth = 1.0f
+        strokeCap = Paint.Cap.ROUND
         isAntiAlias = true
     }
     private val pathTexturePaint = Paint().apply {
-        color = Color.argb(127, 41, 41, 61)   // (0.16, 0.16, 0.24, 0.50) texture lines
+        color = Color.argb(31, 255, 255, 255)   // (1.0, 1.0, 1.0, 0.12) — near-white tick marks
         style = Paint.Style.STROKE
         strokeWidth = 0.5f
+        isAntiAlias = true
+    }
+    // Waypoint joint stroke — alpha 50%, blue accent
+    private val pathJointStrokePaint = Paint().apply {
+        color = Color.argb(0x80, 0, 158, 255)   // (0.00, 0.62, 1.00, 0.50)
+        style = Paint.Style.STROKE
+        strokeWidth = 1.5f
         isAntiAlias = true
     }
 
@@ -279,45 +296,48 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         return path
     }
 
-    // Render the path as filled corridor with edge glow lines and texture (Build 5.2: uniform style, no bridge visual distinction)
+    // Render the path as filled corridor with dual-edge glow lines and texture (Build 5.3 path visibility spec)
     private fun drawPath(canvas: Canvas, W: Float, H: Float) {
         val wps = PathSystem.waypoints
         if (wps.size < 2) return
-        val halfWidth = 16f  // 32pt corridor = 16pt each side
+        val halfWidth = 8.5f  // 17pt corridor (new width) = 8.5pt each side
 
-        // All segments rendered identically — 0xFF1A1A28 fill + 0x4D00C8FF cyan edge lines
-        // Bridge vs ground visual distinction removed (Build 5.2); Z-layer logic still applies in GameEngine
+        // All segments: violet-slate fill + 2-line glow per edge (inner 2pt@55%, outer 1pt@25%)
         for (i in 1 until wps.size) {
             val from = wps[i - 1]; val to = wps[i]
             val seg = buildCorridorSegment(from, to, halfWidth)
             canvas.drawPath(seg, pathCorridorFillPaint)
 
-            // Edge lines
             val dx = to.x - from.x; val dy = to.y - from.y
             val len = sqrt(dx * dx + dy * dy)
             if (len > 0f) {
                 val px = -dy / len * halfWidth; val py = dx / len * halfWidth
-                canvas.drawLine(from.x + px, from.y + py, to.x + px, to.y + py, pathEdgePaint)
-                canvas.drawLine(from.x - px, from.y - py, to.x - px, to.y - py, pathEdgePaint)
 
-                // Texture lines — perpendicular, every 4pt along length
-                val steps = (len / 4f).toInt().coerceAtMost(32)
+                // Left edge — inner glow (2pt) + outer glow (1pt)
+                canvas.drawLine(from.x + px, from.y + py, to.x + px, to.y + py, pathEdgeInnerPaint)
+                canvas.drawLine(from.x + px, from.y + py, to.x + px, to.y + py, pathEdgeOuterPaint)
+
+                // Right edge — inner glow (2pt) + outer glow (1pt)
+                canvas.drawLine(from.x - px, from.y - py, to.x - px, to.y - py, pathEdgeInnerPaint)
+                canvas.drawLine(from.x - px, from.y - py, to.x - px, to.y - py, pathEdgeOuterPaint)
+
+                // Texture tick marks — perpendicular, every 8pt along length (optional, near-white 12%)
+                val steps = (len / 8f).toInt().coerceAtMost(24)
                 for (s in 0..steps) {
                     val t = if (steps > 0) s.toFloat() / steps else 0f
                     val mx = from.x + dx * t; val my = from.y + dy * t
-                    canvas.drawLine(mx + px, my + py, mx - px, my - py, pathTexturePaint)
+                    val tickHalf = halfWidth * 0.5f
+                    val nx = -dy / len * tickHalf; val ny = dx / len * tickHalf
+                    canvas.drawLine(mx + nx, my + ny, mx - nx, my - ny, pathTexturePaint)
                 }
             }
         }
 
-        // Waypoint joints (circular caps) — all segments uniform
+        // Waypoint joints (circular caps) — fill with path color, stroke with blue accent (Build 5.3)
         val jointFillPaint = Paint(pathCorridorFillPaint)
-        val accentPaint = Paint().apply {
-            color = Color.argb(102, 0, 200, 255); style = Paint.Style.STROKE; strokeWidth = 1f
-        }
         for (i in wps.indices) {
             canvas.drawCircle(wps[i].x, wps[i].y, halfWidth, jointFillPaint)
-            canvas.drawCircle(wps[i].x, wps[i].y, 4f, accentPaint)
+            canvas.drawCircle(wps[i].x, wps[i].y, halfWidth, pathJointStrokePaint)
         }
 
         // Entry / exit indicators
@@ -417,11 +437,11 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         return path
     }
 
-    // Tower slot backgrounds — octagon shape (PATHRIFT-161, DESIGN_SPEC_BUILD5 Section 1)
+    // Tower slot backgrounds — octagon shape (Build 5.3: 0.70× scale-down per DESIGN_SPEC_BUILD5_3 Section 1)
     private fun drawTowerSlots(canvas: Canvas) {
-        val slotRadius = 24f
-        val innerRingRadius = 8f
-        val dotRadius = 2f
+        val slotRadius = 16f       // was 24f → 32dp visual size (×0.70)
+        val innerRingRadius = 5.6f // was 8f → (×0.70)
+        val dotRadius = 1.5f       // was 2f → (×0.70)
         val pulseT = ((System.currentTimeMillis() % 2400L) / 2400f)
         val pulseAlpha = (102 + (40 * sin(pulseT * 2 * PI.toFloat())).toInt()).coerceIn(62, 166)
 
@@ -433,7 +453,7 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         val strokePaint = Paint().apply {
             color = Color.argb(pulseAlpha, 0, 200, 255)  // accent.cyan with pulsing alpha
             style = Paint.Style.STROKE
-            strokeWidth = 1.5f
+            strokeWidth = 1.0f   // was 1.5f → (×0.70)
             isAntiAlias = true
         }
         val innerRingPaint = Paint().apply {
@@ -455,7 +475,7 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         val selectedStrokePaint = Paint().apply {
             color = Color.argb(255, 0, 200, 255) // full cyan
             style = Paint.Style.STROKE
-            strokeWidth = 2.5f
+            strokeWidth = 2.0f   // was 2.5f → proportionally reduced
             isAntiAlias = true
         }
 
@@ -519,203 +539,203 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     private fun drawTowerBody(canvas: Canvas, type: TowerType, cx: Float, cy: Float) {
         val aa = Paint.ANTI_ALIAS_FLAG
+        // Build 5.3: all tower visual dimensions scaled ×0.70. Body max radius 16→11, barrel width 4→3.
 
         when (type) {
             TowerType.BOLT -> {
-                // Hexagon body, radius 14, flat-top
+                // Hexagon body, radius 10 (was 14, ×0.70), flat-top
                 val hexPath = Path()
                 for (i in 0 until 6) {
                     val a = (i * 60f) * (PI / 180f).toFloat()
-                    val x = cx + cos(a) * 14f; val y = cy + sin(a) * 14f
+                    val x = cx + cos(a) * 10f; val y = cy + sin(a) * 10f
                     if (i == 0) hexPath.moveTo(x, y) else hexPath.lineTo(x, y)
                 }
                 hexPath.close()
                 canvas.drawPath(hexPath, Paint(aa).apply { color = Color.argb(255,0,31,56); style=Paint.Style.FILL })
-                canvas.drawPath(hexPath, Paint(aa).apply { color=Color.parseColor("#00C8FF"); style=Paint.Style.STROKE; strokeWidth=1.5f })
-                // Barrel up
-                canvas.drawRoundRect(RectF(cx-2.5f, cy-22f, cx+2.5f, cy-11f), 2f, 2f,
+                canvas.drawPath(hexPath, Paint(aa).apply { color=Color.parseColor("#00C8FF"); style=Paint.Style.STROKE; strokeWidth=1.0f })
+                // Barrel up — 3dp wide (was 5dp), 7.5dp long (was 11dp)
+                canvas.drawRoundRect(RectF(cx-1.5f, cy-15.5f, cx+1.5f, cy-8f), 1.5f, 1.5f,
                     Paint(aa).apply { color=Color.parseColor("#00C8FF"); style=Paint.Style.FILL })
                 // Circuit trace lines
                 val tracePaint = Paint(aa).apply { color=Color.argb(153,0,200,255); style=Paint.Style.STROKE; strokeWidth=0.75f }
                 for (angle in listOf(30f, 90f, 150f)) {
                     val rad = angle * (PI/180f).toFloat()
-                    canvas.drawLine(cx, cy, cx + cos(rad)*12f, cy + sin(rad)*12f, tracePaint)
+                    canvas.drawLine(cx, cy, cx + cos(rad)*8.5f, cy + sin(rad)*8.5f, tracePaint)
                 }
             }
             TowerType.BLAST -> {
-                // Circle body, radius 14
-                canvas.drawCircle(cx, cy, 14f, Paint(aa).apply { color=Color.argb(255,51,20,0); style=Paint.Style.FILL })
-                canvas.drawCircle(cx, cy, 14f, Paint(aa).apply { color=Color.parseColor("#FF7300"); style=Paint.Style.STROKE; strokeWidth=2f })
-                // Wide barrel with flared tip
-                canvas.drawRect(cx-3f, cy-22f, cx+3f, cy-11f,
+                // Circle body, radius 10 (was 14, ×0.70)
+                canvas.drawCircle(cx, cy, 10f, Paint(aa).apply { color=Color.argb(255,51,20,0); style=Paint.Style.FILL })
+                canvas.drawCircle(cx, cy, 10f, Paint(aa).apply { color=Color.parseColor("#FF7300"); style=Paint.Style.STROKE; strokeWidth=1.5f })
+                // Wide barrel — 3dp wide (was 6dp), 7.5dp long (was 11dp)
+                canvas.drawRect(cx-1.5f, cy-15.5f, cx+1.5f, cy-8f,
                     Paint(aa).apply { color=Color.parseColor("#FF7300"); style=Paint.Style.FILL })
                 // Exhaust pipes at 120° intervals from top
                 val exhaustPaint = Paint(aa).apply { color=Color.argb(255,38,15,0); style=Paint.Style.FILL }
                 val exhaustStroke = Paint(aa).apply { color=Color.parseColor("#FF7300"); style=Paint.Style.STROKE; strokeWidth=1f }
                 for (angle in listOf(120f, 240f)) {
                     val rad = (angle - 90f) * (PI/180f).toFloat()
-                    val ex = cx + cos(rad)*14f; val ey = cy + sin(rad)*14f
-                    canvas.drawRect(ex-2.5f, ey-3.5f, ex+2.5f, ey+3.5f, exhaustPaint)
-                    canvas.drawRect(ex-2.5f, ey-3.5f, ex+2.5f, ey+3.5f, exhaustStroke)
+                    val ex = cx + cos(rad)*10f; val ey = cy + sin(rad)*10f
+                    canvas.drawRect(ex-1.5f, ey-2.5f, ex+1.5f, ey+2.5f, exhaustPaint)
+                    canvas.drawRect(ex-1.5f, ey-2.5f, ex+1.5f, ey+2.5f, exhaustStroke)
                 }
             }
             TowerType.FROST -> {
-                // Diamond (rhombus) 28×28
+                // Diamond (rhombus) 20×20 (was 28×28, ×0.70)
                 val dPath = Path()
-                dPath.moveTo(cx, cy-14f); dPath.lineTo(cx+14f, cy); dPath.lineTo(cx, cy+14f); dPath.lineTo(cx-14f, cy)
+                dPath.moveTo(cx, cy-10f); dPath.lineTo(cx+10f, cy); dPath.lineTo(cx, cy+10f); dPath.lineTo(cx-10f, cy)
                 dPath.close()
                 canvas.drawPath(dPath, Paint(aa).apply { color=Color.argb(255,15,5,36); style=Paint.Style.FILL })
-                canvas.drawPath(dPath, Paint(aa).apply { color=Color.parseColor("#8F2EFF"); style=Paint.Style.STROKE; strokeWidth=1.5f })
-                // Barrel
-                canvas.drawRect(cx-2f, cy-22f, cx+2f, cy-12f, Paint(aa).apply { color=Color.parseColor("#8F2EFF"); style=Paint.Style.FILL })
+                canvas.drawPath(dPath, Paint(aa).apply { color=Color.parseColor("#8F2EFF"); style=Paint.Style.STROKE; strokeWidth=1.0f })
+                // Barrel — 1.5dp wide (was 2dp), 7dp long (was 10dp)
+                canvas.drawRect(cx-1.5f, cy-15.5f, cx+1.5f, cy-8.5f, Paint(aa).apply { color=Color.parseColor("#8F2EFF"); style=Paint.Style.FILL })
                 // Crystal spike tips at 4 diamond corners
                 val spikePaint = Paint(aa).apply { color=Color.argb(178,179,217,255); style=Paint.Style.FILL }
-                for ((dx,dy) in listOf(Pair(0f,-14f),Pair(14f,0f),Pair(0f,14f),Pair(-14f,0f))) {
+                for ((dx2,dy2) in listOf(Pair(0f,-10f),Pair(10f,0f),Pair(0f,10f),Pair(-10f,0f))) {
                     val sp = Path()
-                    sp.moveTo(cx+dx-2f, cy+dy); sp.lineTo(cx+dx+2f, cy+dy)
-                    sp.lineTo(cx+dx, cy+dy + (if (dy < 0) -6f else if (dy > 0) 6f else 0f) + (if (dx < 0) -6f else if (dx > 0) 6f else 0f))
+                    sp.moveTo(cx+dx2-1.5f, cy+dy2); sp.lineTo(cx+dx2+1.5f, cy+dy2)
+                    sp.lineTo(cx+dx2, cy+dy2 + (if (dy2 < 0) -4f else if (dy2 > 0) 4f else 0f) + (if (dx2 < 0) -4f else if (dx2 > 0) 4f else 0f))
                     sp.close()
                     canvas.drawPath(sp, spikePaint)
                 }
             }
             TowerType.PIERCE -> {
-                // Elongated octagon 24×28 — minimum 20dp width enforced (was 16px)
-                val cut = 5f
+                // Elongated octagon ~17×20 (×0.70 of 24×28)
+                val cut = 3.5f
                 val ep = Path()
-                ep.moveTo(cx-12f+cut, cy-14f); ep.lineTo(cx+12f-cut, cy-14f)
-                ep.lineTo(cx+12f, cy-14f+cut); ep.lineTo(cx+12f, cy+14f-cut)
-                ep.lineTo(cx+12f-cut, cy+14f); ep.lineTo(cx-12f+cut, cy+14f)
-                ep.lineTo(cx-12f, cy+14f-cut); ep.lineTo(cx-12f, cy-14f+cut)
+                ep.moveTo(cx-8.5f+cut, cy-10f); ep.lineTo(cx+8.5f-cut, cy-10f)
+                ep.lineTo(cx+8.5f, cy-10f+cut); ep.lineTo(cx+8.5f, cy+10f-cut)
+                ep.lineTo(cx+8.5f-cut, cy+10f); ep.lineTo(cx-8.5f+cut, cy+10f)
+                ep.lineTo(cx-8.5f, cy+10f-cut); ep.lineTo(cx-8.5f, cy-10f+cut)
                 ep.close()
                 canvas.drawPath(ep, Paint(aa).apply { color=Color.argb(255,10,36,5); style=Paint.Style.FILL })
-                canvas.drawPath(ep, Paint(aa).apply { color=Color.parseColor("#66FF1A"); style=Paint.Style.STROKE; strokeWidth=1.5f })
-                // Long barrel — 4dp wide
-                canvas.drawRect(cx-2f, cy-26f, cx+2f, cy-12f, Paint(aa).apply { color=Color.parseColor("#66FF1A"); style=Paint.Style.FILL })
+                canvas.drawPath(ep, Paint(aa).apply { color=Color.parseColor("#66FF1A"); style=Paint.Style.STROKE; strokeWidth=1.0f })
+                // Long barrel — 3dp wide (was 4dp), 9.5dp long (was 14dp)
+                canvas.drawRect(cx-1.5f, cy-18f, cx+1.5f, cy-8.5f, Paint(aa).apply { color=Color.parseColor("#66FF1A"); style=Paint.Style.FILL })
                 // Reticle sight lines
                 val reticlePaint = Paint(aa).apply { color=Color.argb(127,102,255,26); style=Paint.Style.STROKE; strokeWidth=0.75f }
-                canvas.drawLine(cx-10f, cy-3f, cx+10f, cy-3f, reticlePaint)
-                canvas.drawLine(cx-10f, cy+3f, cx+10f, cy+3f, reticlePaint)
+                canvas.drawLine(cx-7f, cy-2f, cx+7f, cy-2f, reticlePaint)
+                canvas.drawLine(cx-7f, cy+2f, cx+7f, cy+2f, reticlePaint)
             }
             TowerType.CORE -> {
-                // Square 26×26
-                canvas.drawRect(cx-13f, cy-13f, cx+13f, cy+13f, Paint(aa).apply { color=Color.argb(255,46,13,0); style=Paint.Style.FILL })
-                canvas.drawRect(cx-13f, cy-13f, cx+13f, cy+13f, Paint(aa).apply { color=Color.parseColor("#FF590D"); style=Paint.Style.STROKE; strokeWidth=2f })
-                // Barrel
-                canvas.drawRect(cx-3.5f, cy-21f, cx+3.5f, cy-13f, Paint(aa).apply { color=Color.parseColor("#FF590D"); style=Paint.Style.FILL })
+                // Square 18×18 (was 26×26, ×0.70)
+                canvas.drawRect(cx-9f, cy-9f, cx+9f, cy+9f, Paint(aa).apply { color=Color.argb(255,46,13,0); style=Paint.Style.FILL })
+                canvas.drawRect(cx-9f, cy-9f, cx+9f, cy+9f, Paint(aa).apply { color=Color.parseColor("#FF590D"); style=Paint.Style.STROKE; strokeWidth=1.5f })
+                // Barrel — 3dp wide (was 4.5dp), 5.5dp long (was 8dp)
+                canvas.drawRect(cx-1.5f, cy-14.5f, cx+1.5f, cy-9f, Paint(aa).apply { color=Color.parseColor("#FF590D"); style=Paint.Style.FILL })
                 // Corner rivets
                 val rivetFill = Paint(aa).apply { color=Color.argb(255,230,71,10); style=Paint.Style.FILL }
                 val rivetStroke = Paint(aa).apply { color=Color.parseColor("#FF590D"); style=Paint.Style.STROKE; strokeWidth=1f }
-                for ((rx,ry) in listOf(Pair(-9f,-9f),Pair(9f,-9f),Pair(-9f,9f),Pair(9f,9f))) {
-                    canvas.drawCircle(cx+rx, cy+ry, 2.5f, rivetFill)
-                    canvas.drawCircle(cx+rx, cy+ry, 2.5f, rivetStroke)
+                for ((rx,ry) in listOf(Pair(-6f,-6f),Pair(6f,-6f),Pair(-6f,6f),Pair(6f,6f))) {
+                    canvas.drawCircle(cx+rx, cy+ry, 1.5f, rivetFill)
+                    canvas.drawCircle(cx+rx, cy+ry, 1.5f, rivetStroke)
                 }
                 // Diagonal cross
                 val crossPaint = Paint(aa).apply { color=Color.argb(76,255,89,13); style=Paint.Style.STROKE; strokeWidth=0.75f }
-                canvas.drawLine(cx-10f, cy-10f, cx+10f, cy+10f, crossPaint)
-                canvas.drawLine(cx+10f, cy-10f, cx-10f, cy+10f, crossPaint)
+                canvas.drawLine(cx-7f, cy-7f, cx+7f, cy+7f, crossPaint)
+                canvas.drawLine(cx+7f, cy-7f, cx-7f, cy+7f, crossPaint)
             }
             TowerType.INFERNO -> {
-                // Irregular pentagon (flame lean)
+                // Irregular pentagon (flame lean) ~0.70× scale
                 val ip = Path()
-                ip.moveTo(cx, cy-14f); ip.lineTo(cx+12f, cy-4f); ip.lineTo(cx+10f, cy+14f)
-                ip.lineTo(cx-11f, cy+14f); ip.lineTo(cx-13f, cy-5f)
+                ip.moveTo(cx, cy-10f); ip.lineTo(cx+8.5f, cy-3f); ip.lineTo(cx+7f, cy+10f)
+                ip.lineTo(cx-7.5f, cy+10f); ip.lineTo(cx-9f, cy-3.5f)
                 ip.close()
                 canvas.drawPath(ip, Paint(aa).apply { color=Color.argb(255,51,8,0); style=Paint.Style.FILL })
-                canvas.drawPath(ip, Paint(aa).apply { color=Color.parseColor("#FF2E14"); style=Paint.Style.STROKE; strokeWidth=1.75f })
-                // Barrel with 3 micro-prong tips
-                canvas.drawRect(cx-2.5f, cy-22f, cx+2.5f, cy-11f, Paint(aa).apply { color=Color.parseColor("#FF2E14"); style=Paint.Style.FILL })
+                canvas.drawPath(ip, Paint(aa).apply { color=Color.parseColor("#FF2E14"); style=Paint.Style.STROKE; strokeWidth=1.25f })
+                // Barrel — 3dp wide (was 5dp), 7.5dp long (was 11dp)
+                canvas.drawRect(cx-1.5f, cy-15.5f, cx+1.5f, cy-8f, Paint(aa).apply { color=Color.parseColor("#FF2E14"); style=Paint.Style.FILL })
                 // Flame tips
                 val flamePaint = Paint(aa).apply { color=Color.argb(204,255,140,26); style=Paint.Style.FILL }
-                for ((fx, fh) in listOf(Triple(cx-5f, cy-14f, 4f), Triple(cx, cy-15f, 6f), Triple(cx+5f, cy-13f, 3f))) {
-                    val fp2 = Path(); fp2.moveTo(fx-2f, fh); fp2.lineTo(fx+2f, fh); fp2.lineTo(fx, fh-fh.coerceAtLeast(0f)*0f - 5f); fp2.close()
+                for ((fx, fh) in listOf(Triple(cx-3.5f, cy-10f, 3f), Triple(cx, cy-10.5f, 4.5f), Triple(cx+3.5f, cy-9f, 2.5f))) {
+                    val fp2 = Path(); fp2.moveTo(fx-1.5f, fh); fp2.lineTo(fx+1.5f, fh); fp2.lineTo(fx, fh - 3.5f); fp2.close()
                     canvas.drawPath(fp2, flamePaint)
                 }
             }
             TowerType.TESLA -> {
-                // Circle, radius 13
-                canvas.drawCircle(cx, cy, 13f, Paint(aa).apply { color=Color.argb(255,5,20,46); style=Paint.Style.FILL })
-                canvas.drawCircle(cx, cy, 13f, Paint(aa).apply { color=Color.parseColor("#33A6FF"); style=Paint.Style.STROKE; strokeWidth=1.5f })
-                // Barrel
-                canvas.drawRect(cx-2.5f, cy-21f, cx+2.5f, cy-13f, Paint(aa).apply { color=Color.parseColor("#33A6FF"); style=Paint.Style.FILL })
+                // Circle, radius 9 (was 13, ×0.70)
+                canvas.drawCircle(cx, cy, 9f, Paint(aa).apply { color=Color.argb(255,5,20,46); style=Paint.Style.FILL })
+                canvas.drawCircle(cx, cy, 9f, Paint(aa).apply { color=Color.parseColor("#33A6FF"); style=Paint.Style.STROKE; strokeWidth=1.0f })
+                // Barrel — 3dp wide (was 5dp), 5.5dp long (was 8dp)
+                canvas.drawRect(cx-1.5f, cy-14.5f, cx+1.5f, cy-9f, Paint(aa).apply { color=Color.parseColor("#33A6FF"); style=Paint.Style.FILL })
                 // Arc coil rings
-                val arcPaint1 = Paint(aa).apply { color=Color.argb(178,51,166,255); style=Paint.Style.STROKE; strokeWidth=2f }
-                val arcPaint2 = Paint(aa).apply { color=Color.argb(102,51,166,255); style=Paint.Style.STROKE; strokeWidth=1f }
-                canvas.drawArc(RectF(cx-19f, cy-19f, cx+19f, cy+19f), 210f, 120f, false, arcPaint1)
-                canvas.drawArc(RectF(cx-16f, cy-16f, cx+16f, cy+16f), 240f, 60f, false, arcPaint2)
+                val arcPaint1 = Paint(aa).apply { color=Color.argb(178,51,166,255); style=Paint.Style.STROKE; strokeWidth=1.5f }
+                val arcPaint2 = Paint(aa).apply { color=Color.argb(102,51,166,255); style=Paint.Style.STROKE; strokeWidth=0.75f }
+                canvas.drawArc(RectF(cx-13f, cy-13f, cx+13f, cy+13f), 210f, 120f, false, arcPaint1)
+                canvas.drawArc(RectF(cx-11f, cy-11f, cx+11f, cy+11f), 240f, 60f, false, arcPaint2)
             }
             TowerType.NOVA -> {
-                // 6-pointed star outer=14, inner=7
+                // 6-pointed star outer=10, inner=5 (was 14/7, ×0.70)
                 val starPath = Path()
                 for (i in 0 until 12) {
                     val a = (i * 30f - 90f) * (PI / 180f).toFloat()
-                    val r = if (i % 2 == 0) 14f else 7f
+                    val r = if (i % 2 == 0) 10f else 5f
                     val x = cx + cos(a) * r; val y = cy + sin(a) * r
                     if (i == 0) starPath.moveTo(x, y) else starPath.lineTo(x, y)
                 }
                 starPath.close()
                 canvas.drawPath(starPath, Paint(aa).apply { color=Color.argb(255,46,36,0); style=Paint.Style.FILL })
-                canvas.drawPath(starPath, Paint(aa).apply { color=Color.parseColor("#FFD11A"); style=Paint.Style.STROKE; strokeWidth=1.5f })
+                canvas.drawPath(starPath, Paint(aa).apply { color=Color.parseColor("#FFD11A"); style=Paint.Style.STROKE; strokeWidth=1.0f })
                 // Center lens
-                canvas.drawCircle(cx, cy, 4f, Paint(aa).apply { color=Color.argb(153,255,209,26); style=Paint.Style.FILL })
-                // Barrel
-                canvas.drawRect(cx-2.5f, cy-20f, cx+2.5f, cy-10f, Paint(aa).apply { color=Color.parseColor("#FFD11A"); style=Paint.Style.FILL })
+                canvas.drawCircle(cx, cy, 3f, Paint(aa).apply { color=Color.argb(153,255,209,26); style=Paint.Style.FILL })
+                // Barrel — 3dp wide (was 5dp), 7dp long (was 10dp)
+                canvas.drawRect(cx-1.5f, cy-14f, cx+1.5f, cy-7f, Paint(aa).apply { color=Color.parseColor("#FFD11A"); style=Paint.Style.FILL })
             }
             TowerType.SNIPER -> {
-                // SNIPER: hexagonal base (radius 14dp) + octagon turret (radius 10dp) + long barrel 4dp×22dp
-                // Hexagonal base — minimum 20dp width enforced (was 10px)
+                // SNIPER: hexagonal base radius 10 (was 14) + octagon turret radius 7 (was 10) + long barrel 3dp×15dp (was 4dp×22dp)
                 val hexBasePath = Path()
                 for (i in 0 until 6) {
                     val a = (i * 60f) * (PI / 180f).toFloat()
-                    val x = cx + cos(a) * 14f; val y = cy + sin(a) * 14f
+                    val x = cx + cos(a) * 10f; val y = cy + sin(a) * 10f
                     if (i == 0) hexBasePath.moveTo(x, y) else hexBasePath.lineTo(x, y)
                 }
                 hexBasePath.close()
                 canvas.drawPath(hexBasePath, Paint(aa).apply { color=Color.argb(255,10,20,26); style=Paint.Style.FILL })
-                canvas.drawPath(hexBasePath, Paint(aa).apply { color=Color.parseColor("#66CCCC"); style=Paint.Style.STROKE; strokeWidth=1.5f })
+                canvas.drawPath(hexBasePath, Paint(aa).apply { color=Color.parseColor("#66CCCC"); style=Paint.Style.STROKE; strokeWidth=1.0f })
 
-                // Octagon turret — radius 10dp
+                // Octagon turret — radius 7dp
                 val octTurretPath = Path()
                 for (i in 0 until 8) {
                     val a = (i * 45f - 22.5f) * (PI / 180f).toFloat()
-                    val x = cx + cos(a) * 10f; val y = cy + sin(a) * 10f
+                    val x = cx + cos(a) * 7f; val y = cy + sin(a) * 7f
                     if (i == 0) octTurretPath.moveTo(x, y) else octTurretPath.lineTo(x, y)
                 }
                 octTurretPath.close()
                 canvas.drawPath(octTurretPath, Paint(aa).apply { color=Color.argb(255,15,26,31); style=Paint.Style.FILL })
-                canvas.drawPath(octTurretPath, Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=1.25f })
+                canvas.drawPath(octTurretPath, Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=0.9f })
 
-                // Long barrel — 4dp wide × 22dp long, pointing up (Y-)
-                canvas.drawRoundRect(RectF(cx-2f, cy-32f, cx+2f, cy-10f), 2f, 2f,
+                // Long barrel — 3dp wide × 15dp long, pointing up (Y-)
+                canvas.drawRoundRect(RectF(cx-1.5f, cy-22.5f, cx+1.5f, cy-7f), 1.5f, 1.5f,
                     Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.FILL })
 
-                // Scope circle on turret body (at center-ish)
-                val scopeY = cy - 2f
-                canvas.drawCircle(cx, scopeY, 4f, Paint(aa).apply { color=Color.argb(76,153,230,255); style=Paint.Style.FILL })
-                canvas.drawCircle(cx, scopeY, 4f, Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=1f })
-                canvas.drawLine(cx-4f, scopeY, cx+4f, scopeY,
+                // Scope circle on turret body
+                val scopeY = cy - 1.5f
+                canvas.drawCircle(cx, scopeY, 3f, Paint(aa).apply { color=Color.argb(76,153,230,255); style=Paint.Style.FILL })
+                canvas.drawCircle(cx, scopeY, 3f, Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=0.75f })
+                canvas.drawLine(cx-3f, scopeY, cx+3f, scopeY,
                     Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=0.6f })
-                canvas.drawLine(cx, scopeY-4f, cx, scopeY+4f,
+                canvas.drawLine(cx, scopeY-3f, cx, scopeY+3f,
                     Paint(aa).apply { color=Color.parseColor("#D9FFFF"); style=Paint.Style.STROKE; strokeWidth=0.6f })
             }
             TowerType.ARTILLERY -> {
-                // Wide squat hexagon 30×22 (flat-top)
+                // Wide squat hexagon ~21×15 (×0.70 of 30×22, flat-top)
                 val artPath = Path()
                 for (i in 0 until 6) {
                     val a = (i * 60f) * (PI / 180f).toFloat()
-                    val x = cx + cos(a) * 15f; val y = cy + sin(a) * 11f  // squashed
+                    val x = cx + cos(a) * 10.5f; val y = cy + sin(a) * 7.5f  // squashed
                     if (i == 0) artPath.moveTo(x, y) else artPath.lineTo(x, y)
                 }
                 artPath.close()
                 canvas.drawPath(artPath, Paint(aa).apply { color=Color.argb(255,36,26,3); style=Paint.Style.FILL })
-                canvas.drawPath(artPath, Paint(aa).apply { color=Color.parseColor("#BF941F"); style=Paint.Style.STROKE; strokeWidth=2f })
-                // Wide barrel
-                canvas.drawRect(cx-4f, cy-22f, cx+4f, cy-9f, Paint(aa).apply { color=Color.parseColor("#BF941F"); style=Paint.Style.FILL })
+                canvas.drawPath(artPath, Paint(aa).apply { color=Color.parseColor("#BF941F"); style=Paint.Style.STROKE; strokeWidth=1.5f })
+                // Wide barrel — 3dp wide (was 4dp→×0.75 ~3dp), 9dp long (was 13dp)
+                canvas.drawRect(cx-1.5f, cy-15.5f, cx+1.5f, cy-6.5f, Paint(aa).apply { color=Color.parseColor("#BF941F"); style=Paint.Style.FILL })
                 // End plate
-                canvas.drawRect(cx-4f, cy-22f, cx+4f, cy-19f, Paint(aa).apply { color=Color.parseColor("#BF941F"); style=Paint.Style.FILL })
+                canvas.drawRect(cx-1.5f, cy-15.5f, cx+1.5f, cy-13.5f, Paint(aa).apply { color=Color.parseColor("#BF941F"); style=Paint.Style.FILL })
                 // Armor bands
                 val bandPaint = Paint(aa).apply { color=Color.argb(102,191,148,31); style=Paint.Style.FILL }
-                canvas.drawRect(cx-12f, cy-2f, cx+12f, cy, bandPaint)
-                canvas.drawRect(cx-12f, cy+4f, cx+12f, cy+6f, bandPaint)
+                canvas.drawRect(cx-8.5f, cy-1.5f, cx+8.5f, cy, bandPaint)
+                canvas.drawRect(cx-8.5f, cy+3f, cx+8.5f, cy+4.5f, bandPaint)
             }
         }
     }
@@ -775,23 +795,23 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     }
 
     private fun drawRunnerEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
-        // Elongated oval / capsule 10×16, electric blue (DESIGN_SPEC Section 4.1)
-        val rw = 5f; val rh = 8f
+        // Elongated oval / capsule ~7×11 (×0.70 of 10×16), electric blue (Build 5.3 scale)
+        val rw = 3.5f; val rh = 5.5f
         canvas.drawOval(RectF(cx-rw, cy-rh, cx+rw, cy+rh),
             Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(255,0,64,179); style=Paint.Style.FILL })
         canvas.drawOval(RectF(cx-rw, cy-rh, cx+rw, cy+rh),
-            Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.parseColor("#3399FF"); style=Paint.Style.STROKE; strokeWidth=1.25f })
+            Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.parseColor("#3399FF"); style=Paint.Style.STROKE; strokeWidth=0.9f })
         // Motion lines trailing behind (below body)
         val motionPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(153,77,179,255); style=Paint.Style.STROKE; strokeWidth=0.75f }
-        canvas.drawLine(cx-5f, cy+rh+3f, cx+5f, cy+rh+3f, motionPaint)
-        canvas.drawLine(cx-7f, cy+rh+6f, cx+7f, cy+rh+6f, motionPaint)
-        canvas.drawLine(cx-4f, cy+rh+9f, cx+4f, cy+rh+9f, motionPaint)
-        drawHealthBar(canvas, cx, cy, rh, e.currentHp, e.maxHp, barWidth = 20f, barHeight = 3f)
+        canvas.drawLine(cx-3.5f, cy+rh+2f, cx+3.5f, cy+rh+2f, motionPaint)
+        canvas.drawLine(cx-5f, cy+rh+4f, cx+5f, cy+rh+4f, motionPaint)
+        canvas.drawLine(cx-3f, cy+rh+6f, cx+3f, cy+rh+6f, motionPaint)
+        drawHealthBar(canvas, cx, cy, rh, e.currentHp, e.maxHp, barWidth = 22f, barHeight = 3f)
     }
 
     private fun drawTankEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
-        // Heavy angular square 20×20, gunmetal (DESIGN_SPEC Section 4.2)
-        val half = 10f; val cut = 3f
+        // Heavy angular square 14×14 (×0.70 of 20×20), gunmetal (Build 5.3 scale)
+        val half = 7f; val cut = 2f
         val tp = Path()
         tp.moveTo(cx-half+cut, cy-half); tp.lineTo(cx+half-cut, cy-half)
         tp.lineTo(cx+half, cy-half+cut); tp.lineTo(cx+half, cy+half-cut)
@@ -799,70 +819,70 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         tp.lineTo(cx-half, cy+half-cut); tp.lineTo(cx-half, cy-half+cut)
         tp.close()
         canvas.drawPath(tp, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(255,51,46,36); style=Paint.Style.FILL })
-        canvas.drawPath(tp, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(255,128,115,89); style=Paint.Style.STROKE; strokeWidth=2f })
+        canvas.drawPath(tp, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(255,128,115,89); style=Paint.Style.STROKE; strokeWidth=1.5f })
         // Armor plate seams
         val seamPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(153,140,128,102); style=Paint.Style.STROKE; strokeWidth=0.75f }
-        canvas.drawLine(cx-8f, cy-3f, cx+8f, cy-3f, seamPaint)
-        canvas.drawLine(cx-8f, cy+3f, cx+8f, cy+3f, seamPaint)
-        drawHealthBar(canvas, cx, cy, half, e.currentHp, e.maxHp, barWidth = 24f, barHeight = 4f)
+        canvas.drawLine(cx-5.5f, cy-2f, cx+5.5f, cy-2f, seamPaint)
+        canvas.drawLine(cx-5.5f, cy+2f, cx+5.5f, cy+2f, seamPaint)
+        drawHealthBar(canvas, cx, cy, half, e.currentHp, e.maxHp, barWidth = 22f, barHeight = 3f)
     }
 
     private fun drawShieldEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
-        val r = 9f
-        // Body — dark green circle (DESIGN_SPEC Section 4.3)
+        val r = 6f  // was 9f, ×0.70 (Build 5.3 scale)
+        // Body — dark green circle
         val bodyColor = if (e.shieldBroken) Color.argb(255,153,51,0) else Color.argb(255,10,61,31)
         canvas.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = bodyColor; style = Paint.Style.FILL })
         val strokeColor = if (e.shieldBroken) Color.parseColor("#CC3300") else Color.parseColor("#33D966")
-        canvas.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=strokeColor; style=Paint.Style.STROKE; strokeWidth=1.5f })
+        canvas.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=strokeColor; style=Paint.Style.STROKE; strokeWidth=1.0f })
 
-        // Shield aura hexagon (only if shield active)
+        // Shield aura hexagon (only if shield active) — radius 10 (was 14, ×0.70)
         if (!e.shieldBroken && e.shieldHp > 0f) {
             val hexPath = Path()
             for (i in 0 until 6) {
                 val a = (i * 60f) * (PI/180f).toFloat()
-                val x = cx + cos(a) * 14f; val y = cy + sin(a) * 14f
+                val x = cx + cos(a) * 10f; val y = cy + sin(a) * 10f
                 if (i == 0) hexPath.moveTo(x, y) else hexPath.lineTo(x, y)
             }
             hexPath.close()
             canvas.drawPath(hexPath, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(38,51,230,102); style=Paint.Style.FILL })
             canvas.drawPath(hexPath, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(127,51,230,102); style=Paint.Style.STROKE; strokeWidth=1f })
         }
-        drawHealthBar(canvas, cx, cy, if (!e.shieldBroken && e.shieldHp > 0f) 14f else r, e.currentHp, e.maxHp, barWidth = 22f, barHeight = 4f)
+        drawHealthBar(canvas, cx, cy, if (!e.shieldBroken && e.shieldHp > 0f) 10f else r, e.currentHp, e.maxHp, barWidth = 22f, barHeight = 3f)
     }
 
     private fun drawSwarmEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
-        // Small irregular hexagon bug body 8×10 (DESIGN_SPEC Section 4.4)
+        // Small irregular hexagon bug body ~6×7 (×0.70 of 8×10, Build 5.3 scale)
         val hexPath = Path()
         for (i in 0 until 6) {
             val a = (i * 60f - 90f) * (PI/180f).toFloat()
-            val x = cx + cos(a) * 4f; val y = cy + sin(a) * 5f
+            val x = cx + cos(a) * 3f; val y = cy + sin(a) * 3.5f
             if (i == 0) hexPath.moveTo(x, y) else hexPath.lineTo(x, y)
         }
         hexPath.close()
         canvas.drawPath(hexPath, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(255,64,56,0); style=Paint.Style.FILL })
-        canvas.drawPath(hexPath, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.parseColor("#FFE11A"); style=Paint.Style.STROKE; strokeWidth=1f })
+        canvas.drawPath(hexPath, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.parseColor("#FFE11A"); style=Paint.Style.STROKE; strokeWidth=0.75f })
         // Antennae
         val antPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(178,255,225,26); style=Paint.Style.STROKE; strokeWidth=0.75f }
-        canvas.drawLine(cx, cy-5f, cx-3f, cy-9f, antPaint)
-        canvas.drawLine(cx, cy-5f, cx+3f, cy-9f, antPaint)
-        drawHealthBar(canvas, cx, cy, 5f, e.currentHp, e.maxHp, barWidth = 14f, barHeight = 3f)
+        canvas.drawLine(cx, cy-3.5f, cx-2f, cy-6.5f, antPaint)
+        canvas.drawLine(cx, cy-3.5f, cx+2f, cy-6.5f, antPaint)
+        drawHealthBar(canvas, cx, cy, 3.5f, e.currentHp, e.maxHp, barWidth = 14f, barHeight = 3f)
     }
 
     private fun drawGhostEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
-        // Soft circle radius 10, semi-transparent purple (DESIGN_SPEC Section 4.5)
-        val r = 10f
+        // Soft circle radius 6 (×0.70 of ~9pt, Build 5.3 scale), semi-transparent purple
+        val r = 6f
         canvas.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color=Color.argb(166,140,89,204); style=Paint.Style.FILL
         })
         canvas.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color=Color.argb(204,191,140,255); style=Paint.Style.STROKE; strokeWidth=1f
+            color=Color.argb(204,191,140,255); style=Paint.Style.STROKE; strokeWidth=0.75f
         })
         // Wispy trail
         val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(127,140,89,204); style=Paint.Style.FILL }
-        canvas.drawOval(RectF(cx-5f, cy+r, cx+5f, cy+r+6f), trailPaint)
+        canvas.drawOval(RectF(cx-3.5f, cy+r, cx+3.5f, cy+r+4f), trailPaint)
         val trailPaint2 = Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(76,140,89,204); style=Paint.Style.FILL }
-        canvas.drawOval(RectF(cx-4f, cy+r+6f, cx+4f, cy+r+10f), trailPaint2)
-        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 22f, barHeight = 4f)
+        canvas.drawOval(RectF(cx-2.5f, cy+r+4f, cx+2.5f, cy+r+7f), trailPaint2)
+        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 22f, barHeight = 3f)
     }
 
     private fun drawBossEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
@@ -878,137 +898,137 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
         when (variant) {
             0 -> {
-                // Rift Guardian — large circle, radius 18, segmented ring (DESIGN_SPEC 4.8.1)
-                canvas.drawCircle(cx, cy, 18f, Paint(aa).apply { color=Color.argb(255,56,10,89); style=Paint.Style.FILL })
-                canvas.drawCircle(cx, cy, 18f, Paint(aa).apply { color=Color.parseColor("#B333FF"); style=Paint.Style.STROKE; strokeWidth=2.5f })
+                // Rift Guardian — large circle radius 13 (×0.70 of 18, Build 5.3), segmented ring
+                canvas.drawCircle(cx, cy, 13f, Paint(aa).apply { color=Color.argb(255,56,10,89); style=Paint.Style.FILL })
+                canvas.drawCircle(cx, cy, 13f, Paint(aa).apply { color=Color.parseColor("#B333FF"); style=Paint.Style.STROKE; strokeWidth=2.0f })
                 // Outer segmented ring — 8 arc segments with gaps
-                val segPaint = Paint(aa).apply { color=Color.argb(153,178,51,255); style=Paint.Style.STROKE; strokeWidth=2f }
+                val segPaint = Paint(aa).apply { color=Color.argb(153,178,51,255); style=Paint.Style.STROKE; strokeWidth=1.5f }
                 val rot = (System.currentTimeMillis() % 6000L) / 6000f * 360f
                 for (i in 0 until 8) {
-                    canvas.drawArc(RectF(cx-22f,cy-22f,cx+22f,cy+22f),
+                    canvas.drawArc(RectF(cx-16f,cy-16f,cx+16f,cy+16f),
                         rot + i*45f, 38f, false, segPaint)
                 }
                 // Center eye
-                canvas.drawCircle(cx, cy, 5f, Paint(aa).apply { color=Color.parseColor("#E64DFF"); style=Paint.Style.FILL })
+                canvas.drawCircle(cx, cy, 3.5f, Paint(aa).apply { color=Color.parseColor("#E64DFF"); style=Paint.Style.FILL })
                 // Shell indicator if active
                 if (e.bossShellActive) {
-                    canvas.drawCircle(cx, cy, 20f, Paint(aa).apply { color=Color.argb(128,255,255,255); style=Paint.Style.STROKE; strokeWidth=3f })
+                    canvas.drawCircle(cx, cy, 15f, Paint(aa).apply { color=Color.argb(128,255,255,255); style=Paint.Style.STROKE; strokeWidth=2.5f })
                 }
             }
             1 -> {
-                // Iron Colossus — heavy square 30×30 (DESIGN_SPEC 4.8.2)
-                val half = 15f
+                // Iron Colossus — heavy square 21×21 (×0.70 of 30×30, Build 5.3)
+                val half = 10.5f
                 canvas.drawRect(cx-half, cy-half, cx+half, cy+half,
                     Paint(aa).apply { color=Color.argb(255,46,46,51); style=Paint.Style.FILL })
                 canvas.drawRect(cx-half, cy-half, cx+half, cy+half,
-                    Paint(aa).apply { color=Color.parseColor("#8C8C99"); style=Paint.Style.STROKE; strokeWidth=3f })
+                    Paint(aa).apply { color=Color.parseColor("#8C8C99"); style=Paint.Style.STROKE; strokeWidth=2.5f })
                 // Armor shell overlay
                 val shellStroke = if (e.bossShellActive) Color.argb(255,255,255,255) else Color.argb(102,140,140,153)
-                canvas.drawRect(cx-half-3f, cy-half-3f, cx+half+3f, cy+half+3f,
-                    Paint(aa).apply { color=shellStroke; style=Paint.Style.STROKE; strokeWidth=1.5f })
+                canvas.drawRect(cx-half-2f, cy-half-2f, cx+half+2f, cy+half+2f,
+                    Paint(aa).apply { color=shellStroke; style=Paint.Style.STROKE; strokeWidth=1.0f })
                 // Corner rivets
-                for ((rx,ry) in listOf(Pair(-11f,-11f),Pair(11f,-11f),Pair(-11f,11f),Pair(11f,11f))) {
-                    canvas.drawCircle(cx+rx, cy+ry, 3f, Paint(aa).apply { color=Color.argb(255,140,140,153); style=Paint.Style.FILL })
+                for ((rx,ry) in listOf(Pair(-7.5f,-7.5f),Pair(7.5f,-7.5f),Pair(-7.5f,7.5f),Pair(7.5f,7.5f))) {
+                    canvas.drawCircle(cx+rx, cy+ry, 2.0f, Paint(aa).apply { color=Color.argb(255,140,140,153); style=Paint.Style.FILL })
                 }
                 // Orange reactor core
                 val coreAlpha = (153 + (102 * sin(System.currentTimeMillis() * 0.008f).toFloat()).toInt()).coerceIn(100, 255)
-                canvas.drawRect(cx-5f, cy-5f, cx+5f, cy+5f,
+                canvas.drawRect(cx-3.5f, cy-3.5f, cx+3.5f, cy+3.5f,
                     Paint(aa).apply { color=Color.argb(coreAlpha,255,102,0); style=Paint.Style.FILL })
             }
             2 -> {
-                // Swarm Queen — hexagon radius 18 (DESIGN_SPEC 4.8.3)
+                // Swarm Queen — hexagon radius 13 (×0.70 of 18, Build 5.3)
                 val hexPath = Path()
                 for (i in 0 until 6) {
                     val a = (i * 60f) * (PI/180f).toFloat()
-                    val x = cx + cos(a)*18f; val y = cy + sin(a)*18f
+                    val x = cx + cos(a)*13f; val y = cy + sin(a)*13f
                     if (i==0) hexPath.moveTo(x,y) else hexPath.lineTo(x,y)
                 }
                 hexPath.close()
                 canvas.drawPath(hexPath, Paint(aa).apply { color=Color.argb(255,71,36,0); style=Paint.Style.FILL })
-                canvas.drawPath(hexPath, Paint(aa).apply { color=Color.parseColor("#FFA619"); style=Paint.Style.STROKE; strokeWidth=2f })
+                canvas.drawPath(hexPath, Paint(aa).apply { color=Color.parseColor("#FFA619"); style=Paint.Style.STROKE; strokeWidth=1.5f })
                 // Egg sacs
                 val sacT = System.currentTimeMillis() % 2400L
                 for ((i, angle) in listOf(30f,150f,270f).withIndex()) {
                     val rad = angle * (PI/180f).toFloat()
-                    val sx = cx + cos(rad)*18f; val sy = cy + sin(rad)*18f
+                    val sx = cx + cos(rad)*13f; val sy = cy + sin(rad)*13f
                     val sacScale = 1f + 0.2f * sin((sacT + i*800L) * 0.003f).toFloat()
                     canvas.save(); canvas.scale(sacScale, sacScale, sx, sy)
-                    canvas.drawCircle(sx, sy, 4f, Paint(aa).apply { color=Color.argb(204,204,102,0); style=Paint.Style.FILL })
+                    canvas.drawCircle(sx, sy, 3f, Paint(aa).apply { color=Color.argb(204,204,102,0); style=Paint.Style.FILL })
                     canvas.restore()
                 }
             }
             3 -> {
-                // Phase Runner — elongated octagon 14×24 (DESIGN_SPEC 4.8.4)
+                // Phase Runner — elongated octagon ~10×17 (×0.70 of 14×24, Build 5.3)
                 val phaseAlpha = (127 + (61 * sin(System.currentTimeMillis() * 0.004f).toFloat()).toInt()).coerceIn(80, 242)
                 val ep = Path()
-                val cut = 4f
-                ep.moveTo(cx-7f+cut, cy-12f); ep.lineTo(cx+7f-cut, cy-12f)
-                ep.lineTo(cx+7f, cy-12f+cut); ep.lineTo(cx+7f, cy+12f-cut)
-                ep.lineTo(cx+7f-cut, cy+12f); ep.lineTo(cx-7f+cut, cy+12f)
-                ep.lineTo(cx-7f, cy+12f-cut); ep.lineTo(cx-7f, cy-12f+cut)
+                val cut = 3f
+                ep.moveTo(cx-5f+cut, cy-8.5f); ep.lineTo(cx+5f-cut, cy-8.5f)
+                ep.lineTo(cx+5f, cy-8.5f+cut); ep.lineTo(cx+5f, cy+8.5f-cut)
+                ep.lineTo(cx+5f-cut, cy+8.5f); ep.lineTo(cx-5f+cut, cy+8.5f)
+                ep.lineTo(cx-5f, cy+8.5f-cut); ep.lineTo(cx-5f, cy-8.5f+cut)
                 ep.close()
                 canvas.drawPath(ep, Paint(aa).apply { color=Color.argb(phaseAlpha,0,71,97); style=Paint.Style.FILL })
-                canvas.drawPath(ep, Paint(aa).apply { color=Color.argb(phaseAlpha,0,230,255); style=Paint.Style.STROKE; strokeWidth=2f })
+                canvas.drawPath(ep, Paint(aa).apply { color=Color.argb(phaseAlpha,0,230,255); style=Paint.Style.STROKE; strokeWidth=1.5f })
                 // Phase trail
                 canvas.drawPath(ep, Paint(aa).apply { color=Color.argb(76,0,230,255); style=Paint.Style.FILL })
             }
             4 -> {
-                // Void Titan — large circle radius 22 (DESIGN_SPEC 4.8.5)
-                canvas.drawCircle(cx, cy, 22f, Paint(aa).apply { color=Color.argb(255,15,5,26); style=Paint.Style.FILL })
-                canvas.drawCircle(cx, cy, 22f, Paint(aa).apply { color=Color.parseColor("#591A8C"); style=Paint.Style.STROKE; strokeWidth=3f })
+                // Void Titan — large circle radius 15 (×0.70 of 22, explicit override per spec, Build 5.3)
+                canvas.drawCircle(cx, cy, 15f, Paint(aa).apply { color=Color.argb(255,15,5,26); style=Paint.Style.FILL })
+                canvas.drawCircle(cx, cy, 15f, Paint(aa).apply { color=Color.parseColor("#591A8C"); style=Paint.Style.STROKE; strokeWidth=2.5f })
                 // Concentric void aura rings
                 val ringTime = System.currentTimeMillis()
-                for ((ri, rr) in listOf(26f,30f,34f).withIndex()) {
+                for ((ri, rr) in listOf(18f,21f,24f).withIndex()) {
                     val rotA = (ringTime * (0.001f + ri*0.0005f)) % (2*PI).toFloat()
                     canvas.drawArc(RectF(cx-rr,cy-rr,cx+rr,cy+rr),
                         Math.toDegrees(rotA.toDouble()).toFloat(), 120f, false,
                         Paint(aa).apply { color=Color.argb((76-ri*15).coerceAtLeast(20),89,26,140); style=Paint.Style.STROKE; strokeWidth=1f })
                 }
                 // Singularity core
-                canvas.drawCircle(cx, cy, 6f, Paint(aa).apply { color=Color.BLACK; style=Paint.Style.FILL })
+                canvas.drawCircle(cx, cy, 4.5f, Paint(aa).apply { color=Color.BLACK; style=Paint.Style.FILL })
             }
         }
 
-        // Boss wide health bar — always on top
-        drawHealthBar(canvas, cx, cy, 28f, e.currentHp, e.maxHp, barWidth = 60f, barHeight = 7f)
+        // Boss wide health bar — 40×5 (was 60×7, ×0.70, Build 5.3)
+        drawHealthBar(canvas, cx, cy, 20f, e.currentHp, e.maxHp, barWidth = 40f, barHeight = 5f)
     }
 
     private fun drawSplitterEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
-        // Diamond (rhombus) 18×18, deep amber (DESIGN_SPEC Section 4.6)
-        val r = 9f
+        // Diamond (rhombus) ~13×13 (×0.70 of 18×18, Build 5.3), deep amber
+        val r = 6.5f
         val path = Path().apply {
             moveTo(cx, cy-r); lineTo(cx+r, cy); lineTo(cx, cy+r); lineTo(cx-r, cy); close()
         }
         canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(255,77,36,0); style=Paint.Style.FILL })
-        canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.parseColor("#FF9919"); style=Paint.Style.STROKE; strokeWidth=1.5f })
+        canvas.drawPath(path, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.parseColor("#FF9919"); style=Paint.Style.STROKE; strokeWidth=1.0f })
         // Glowing split seam
         val seamPulse = ((System.currentTimeMillis() % 800L) / 800f)
         val seamAlpha = (153 + (102 * sin(seamPulse * 2 * PI.toFloat())).toInt()).coerceIn(100, 255)
         canvas.drawLine(cx, cy-r, cx, cy+r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color=Color.argb(seamAlpha,255,204,51); style=Paint.Style.STROKE; strokeWidth=1.5f
+            color=Color.argb(seamAlpha,255,204,51); style=Paint.Style.STROKE; strokeWidth=1.0f
         })
-        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 20f, barHeight = 4f)
+        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 20f, barHeight = 3f)
     }
 
     private fun drawJumperEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
-        // Circle radius 9, dark teal (DESIGN_SPEC Section 4.7)
-        val r = 9f
+        // Circle radius 6 (×0.70 of 9, Build 5.3), dark teal
+        val r = 6f
         canvas.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(255,0,89,97); style=Paint.Style.FILL })
-        canvas.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.parseColor("#1ACCCC"); style=Paint.Style.STROKE; strokeWidth=1.5f })
+        canvas.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.parseColor("#1ACCCC"); style=Paint.Style.STROKE; strokeWidth=1.0f })
         // Jump charge ring (faint)
-        canvas.drawCircle(cx, cy, r+4f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(76,26,204,204); style=Paint.Style.STROKE; strokeWidth=1f })
+        canvas.drawCircle(cx, cy, r+3f, Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(76,26,204,204); style=Paint.Style.STROKE; strokeWidth=0.75f })
         // Coil spring legs (zigzag lines below)
-        val springPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(204,26,204,204); style=Paint.Style.STROKE; strokeWidth=1f }
-        canvas.drawLine(cx-3f, cy+r, cx-1f, cy+r+3f, springPaint)
-        canvas.drawLine(cx-1f, cy+r+3f, cx-3f, cy+r+6f, springPaint)
-        canvas.drawLine(cx+1f, cy+r, cx+3f, cy+r+3f, springPaint)
-        canvas.drawLine(cx+3f, cy+r+3f, cx+1f, cy+r+6f, springPaint)
-        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 20f, barHeight = 4f)
+        val springPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color=Color.argb(204,26,204,204); style=Paint.Style.STROKE; strokeWidth=0.75f }
+        canvas.drawLine(cx-2f, cy+r, cx-0.5f, cy+r+2f, springPaint)
+        canvas.drawLine(cx-0.5f, cy+r+2f, cx-2f, cy+r+4f, springPaint)
+        canvas.drawLine(cx+0.5f, cy+r, cx+2f, cy+r+2f, springPaint)
+        canvas.drawLine(cx+2f, cy+r+2f, cx+0.5f, cy+r+4f, springPaint)
+        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 20f, barHeight = 3f)
     }
 
     private fun drawHealerEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
-        val r = 12f
-        val healRadius = r * 6f  // visual aura radius
+        val r = 8.5f  // was 12f, ×0.70 (Build 5.3)
+        val healRadius = r * 5f  // visual aura radius
 
         // Pulsing aura ring — slow pulse every 2.5s cycle
         val pulseT = ((System.currentTimeMillis() % 2500L) / 2500f)
@@ -1029,13 +1049,13 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         // Fill center with lighter green
         canvas.drawCircle(cx, cy, r * 0.55f, enemyHealerPaint)
 
-        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 26f, barHeight = 5f)
+        drawHealthBar(canvas, cx, cy, r, e.currentHp, e.maxHp, barWidth = 22f, barHeight = 3f)
     }
 
     private fun drawPhantomEnemy(canvas: Canvas, cx: Float, cy: Float, e: EnemyInstance) {
-        // 5-pointed star shape — semi-transparent violet
-        val outerR = 12f
-        val innerR = 5f
+        // 5-pointed star shape — semi-transparent violet (×0.70, Build 5.3)
+        val outerR = 8.5f  // was 12f
+        val innerR = 3.5f  // was 5f
         val path = Path()
         for (i in 0 until 10) {
             val angle = (i * 36f - 90f) * (PI / 180f).toFloat()
@@ -1055,7 +1075,7 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             canvas.drawPath(path, enemyPhantomStrokePaint)
         }
 
-        drawHealthBar(canvas, cx, cy, outerR, e.currentHp, e.maxHp, barWidth = 24f, barHeight = 4f)
+        drawHealthBar(canvas, cx, cy, outerR, e.currentHp, e.maxHp, barWidth = 22f, barHeight = 3f)
     }
 
     private fun drawHealthBar(

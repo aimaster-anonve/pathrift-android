@@ -45,16 +45,17 @@ data class EnemySpawnEntry(
 
 class WaveSystem {
 
+    // Build 5.3: Updated enemy counts per DESIGN_SPEC_BUILD5_3 Section 4 (~60% uplift for early waves)
     private val basePatterns: List<WaveDefinition> = listOf(
-        WaveDefinition(1,  listOf(SpawnGroup(EnemyType.RUNNER, 3)), 2500L),
-        WaveDefinition(2,  listOf(SpawnGroup(EnemyType.RUNNER, 4)), 2200L),
-        WaveDefinition(3,  listOf(SpawnGroup(EnemyType.RUNNER, 4), SpawnGroup(EnemyType.TANK, 1)), 2000L),
-        WaveDefinition(4,  listOf(SpawnGroup(EnemyType.RUNNER, 6), SpawnGroup(EnemyType.TANK, 1)), 1800L),
-        WaveDefinition(5,  listOf(SpawnGroup(EnemyType.RUNNER, 5), SpawnGroup(EnemyType.TANK, 2)), 1600L),
-        WaveDefinition(6,  listOf(SpawnGroup(EnemyType.RUNNER, 7), SpawnGroup(EnemyType.TANK, 2)), 1500L),
-        WaveDefinition(7,  listOf(SpawnGroup(EnemyType.RUNNER, 8), SpawnGroup(EnemyType.TANK, 3)), 1400L),
-        WaveDefinition(8,  listOf(SpawnGroup(EnemyType.RUNNER, 5), SpawnGroup(EnemyType.SHIELD, 2)), 1500L),
-        WaveDefinition(9,  listOf(SpawnGroup(EnemyType.RUNNER, 6), SpawnGroup(EnemyType.TANK, 2), SpawnGroup(EnemyType.SHIELD, 1)), 1300L),
+        WaveDefinition(1,  listOf(SpawnGroup(EnemyType.RUNNER, 5)), 2500L),                                                              // was runner×3
+        WaveDefinition(2,  listOf(SpawnGroup(EnemyType.RUNNER, 7)), 2200L),                                                              // was runner×4
+        WaveDefinition(3,  listOf(SpawnGroup(EnemyType.RUNNER, 6), SpawnGroup(EnemyType.TANK, 2)), 2000L),                               // was runner×4, tank×1
+        WaveDefinition(4,  listOf(SpawnGroup(EnemyType.RUNNER, 9), SpawnGroup(EnemyType.TANK, 2)), 1800L),                               // was runner×6, tank×1
+        WaveDefinition(5,  listOf(SpawnGroup(EnemyType.RUNNER, 9), SpawnGroup(EnemyType.TANK, 3)), 1600L),                               // was runner×5, tank×2
+        WaveDefinition(6,  listOf(SpawnGroup(EnemyType.RUNNER, 11), SpawnGroup(EnemyType.TANK, 3)), 1500L),                              // was runner×7, tank×2
+        WaveDefinition(7,  listOf(SpawnGroup(EnemyType.RUNNER, 12), SpawnGroup(EnemyType.TANK, 4)), 1400L),                              // was runner×8, tank×3
+        WaveDefinition(8,  listOf(SpawnGroup(EnemyType.RUNNER, 7), SpawnGroup(EnemyType.SHIELD, 3)), 1500L),                             // was runner×5, shield×2
+        WaveDefinition(9,  listOf(SpawnGroup(EnemyType.RUNNER, 9), SpawnGroup(EnemyType.TANK, 3), SpawnGroup(EnemyType.SHIELD, 2)), 1300L), // was runner×6, tank×2, shield×1
     )
 
     private val cycleSize = 9
@@ -102,9 +103,10 @@ class WaveSystem {
             return WaveDefinition(wave, base.spawnGroups, base.spawnIntervalMs)
         }
 
-        // Scale base spawns by cycle depth
+        // Scale base spawns by cycle depth — Build 5.3: ceil(cycleNumber * 1.3) for more aggressive scaling
+        val cycleBoost = kotlin.math.ceil(cycleNumber * 1.3).toInt()
         val scaledGroups = base.spawnGroups.map { group ->
-            group.copy(count = group.count + cycleNumber)
+            group.copy(count = group.count + cycleBoost)
         }.toMutableList()
 
         // Cycle 2+ (wave 19+): inject swarm packs every 3rd pattern slot

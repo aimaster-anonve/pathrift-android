@@ -1,6 +1,11 @@
 package com.pathrift.anonve.android.core.ui.screens
 
 import android.widget.FrameLayout
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -150,6 +155,7 @@ fun GameScreen(
 
         CombatHUD(
             state = state,
+            nextWaveDefinition = gameViewModel.nextWaveDefinition,
             onNextWave = gameViewModel::startNextWave,
             onPause = { isPaused = true },
             onToggleSpeed = gameViewModel::toggleSpeed,
@@ -327,6 +333,7 @@ private fun GameCanvasView(
 @Composable
 private fun CombatHUD(
     state: GameState,
+    nextWaveDefinition: WaveDefinition,
     onNextWave: () -> Unit,
     onPause: () -> Unit,
     onToggleSpeed: () -> Unit = {},
@@ -455,37 +462,19 @@ private fun CombatHUD(
                 Spacer(Modifier.width(14.dp))
                 HudStatPill(LanguageManager.s("DIAMONDS", "ELMAS"), "♦${state.diamonds}", Color(0xFF00CCFF))
                 Spacer(Modifier.weight(1f))
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = if (state.wave == 0) LanguageManager.s("READY", "HAZIR") else LanguageManager.s("WAVE", "DALGA"),
-                            fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                            color = PathriftTextSecondary, letterSpacing = 2.sp,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        Text(
-                            text = if (state.wave == 0) "--" else "${state.wave}",
-                            fontSize = 24.sp, fontWeight = FontWeight.Black,
-                            color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
-                        )
-                    }
-                    // Build 5.2: Info button — always visible, distinct background, wave 0 included
-                    Spacer(Modifier.width(4.dp))
-                    Box(
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clip(CircleShape)
-                            .background(Color(0f, 0.78f, 1f, 0.18f))
-                            .clickable { onShowNextWaveInfo() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Info,
-                            contentDescription = "Wave info",
-                            tint = Color(0f, 0.78f, 1f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
+                // Build 5.3: Info button removed — replaced by NextWaveBanner above START WAVE button
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = if (state.wave == 0) LanguageManager.s("READY", "HAZIR") else LanguageManager.s("WAVE", "DALGA"),
+                        fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                        color = PathriftTextSecondary, letterSpacing = 2.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = if (state.wave == 0) "--" else "${state.wave}",
+                        fontSize = 24.sp, fontWeight = FontWeight.Black,
+                        color = PathriftNeonBlue, fontFamily = FontFamily.Monospace
+                    )
                 }
                 Spacer(Modifier.weight(1f))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -554,20 +543,36 @@ private fun CombatHUD(
                 }
             }
         } else {
-            // Portrait bottom bar (unchanged)
-            Row(
+            // Portrait bottom bar — Build 5.3: NextWaveBanner above SendWaveButton
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .align(Alignment.BottomStart)
                     .background(Brush.verticalGradient(listOf(Color.Transparent, PathriftBackground.copy(alpha = 0.9f))))
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
-                HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange)
-                Spacer(Modifier.weight(1f))
-                when {
-                    state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
-                    state.phase != GamePhase.GAME_OVER -> SendWaveButton(onClick = onNextWave)
+                // NextWaveBanner — visible only when wave is not active (Build 5.3)
+                AnimatedVisibility(
+                    visible = state.phase != GamePhase.WAVE_ACTIVE && state.phase != GamePhase.GAME_OVER,
+                    enter = slideInVertically(initialOffsetY = { it }),
+                    exit = slideOutVertically(targetOffsetY = { it })
+                ) {
+                    NextWaveBanner(
+                        waveDef = nextWaveDefinition,
+                        onTap = onShowNextWaveInfo
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange)
+                    Spacer(Modifier.weight(1f))
+                    when {
+                        state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
+                        state.phase != GamePhase.GAME_OVER -> SendWaveButton(onClick = onNextWave)
+                    }
                 }
             }
         }
@@ -1099,18 +1104,78 @@ private fun TowerPickCard(
     }
 }
 
-// PATHRIFT-157: Enemy type indicator colors for NextWaveInfoPanel
+// Enemy type indicator colors — DESIGN_SPEC_BUILD5_3 Section 3.5 + PATHRIFT-157
 private val EnemyType.indicatorColor: Color get() = when(this) {
-    EnemyType.RUNNER   -> Color(0.2f, 0.5f, 1.0f)
-    EnemyType.TANK     -> Color(0.5f, 0.5f, 0.5f)
-    EnemyType.BOSS     -> Color(0.8f, 0.2f, 1.0f)
-    EnemyType.SHIELD   -> Color(0.2f, 0.8f, 0.3f)
-    EnemyType.SWARM    -> Color(1.0f, 0.9f, 0.2f)
-    EnemyType.GHOST    -> Color(0.8f, 0.8f, 1.0f)
-    EnemyType.SPLITTER -> Color(1.0f, 0.7f, 0.0f)
+    EnemyType.RUNNER   -> Color(0.20f, 0.65f, 1.00f)   // electric blue
+    EnemyType.TANK     -> Color(0.55f, 0.55f, 0.60f)   // gray
+    EnemyType.BOSS     -> Color(1.00f, 0.18f, 0.08f)   // red
+    EnemyType.SHIELD   -> Color(0.56f, 0.18f, 1.00f)   // purple
+    EnemyType.SWARM    -> Color(1.00f, 0.82f, 0.10f)   // gold
+    EnemyType.GHOST    -> Color(0.85f, 1.00f, 1.00f, 0.70f)  // cyan-white, semi-transparent
+    EnemyType.SPLITTER -> Color(1.00f, 0.70f, 0.0f)
     EnemyType.JUMPER   -> Color(0.0f, 0.8f, 0.6f)
     EnemyType.HEALER   -> Color(0.2f, 1.0f, 0.4f)
     EnemyType.PHANTOM  -> Color(0.7f, 0.3f, 1.0f)
+}
+
+// Build 5.3: NextWaveBanner — auto info strip above START WAVE button (DESIGN_SPEC_BUILD5_3 Section 3)
+@Composable
+fun NextWaveBanner(waveDef: WaveDefinition, onTap: () -> Unit) {
+    Button(
+        onClick = onTap,
+        modifier = Modifier.fillMaxWidth(),
+        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+        border = BorderStroke(1.dp, Color(0f, 0.78f, 1f, 0.25f)),
+        shape = RoundedCornerShape(8.dp),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Text(
+                "NEXT ▸",
+                fontSize = 9.sp,
+                color = Color.Gray,
+                fontFamily = FontFamily.Monospace
+            )
+            // Show up to 4 enemy type chips
+            waveDef.spawnGroups.take(4).forEach { group ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Box(
+                        Modifier
+                            .size(7.dp)
+                            .background(group.type.indicatorColor, CircleShape)
+                    )
+                    Text(
+                        "${group.type.name.take(3)}×${group.count}",
+                        fontSize = 9.sp,
+                        color = Color.White,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+            if (waveDef.spawnGroups.size > 4) {
+                Text(
+                    "+${waveDef.spawnGroups.size - 4}",
+                    fontSize = 9.sp,
+                    color = Color.Gray,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+            Spacer(Modifier.weight(1f))
+            Icon(
+                Icons.Filled.Info,
+                null,
+                tint = Color(0f, 0.78f, 1f, 0.7f),
+                modifier = Modifier.size(11.dp)
+            )
+        }
+    }
 }
 
 // PATHRIFT-157: Next Wave Info Panel

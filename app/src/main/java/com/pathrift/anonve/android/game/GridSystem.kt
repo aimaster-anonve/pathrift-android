@@ -52,8 +52,8 @@ data class TowerSlot(
 class GridSystem {
 
     companion object {
-        const val COLS = 12
-        const val ROWS = 20
+        const val COLS = 16   // was 12 (Build 5.3 scale reduction)
+        const val ROWS = 26   // was 20 (Build 5.3 scale reduction)
         const val TILE_SIZE_DP = 64
     }
 
