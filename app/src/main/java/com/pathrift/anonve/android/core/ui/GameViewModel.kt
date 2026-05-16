@@ -81,7 +81,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
 
     /** Set by GameCanvasView once the renderer surface is created; used for projectile injection. */
     var renderer: GameRenderer? = null
-    val nextWaveDefinition get() = game.waveSystem.waveDefinition(game.currentWave + 1)
+    // When wave is active show CURRENT wave def (matches progress bar); between waves show NEXT
+    val nextWaveDefinition get() = if (_state.value.phase == com.pathrift.anonve.android.game.GamePhase.WAVE_ACTIVE)
+        game.waveSystem.waveDefinition(game.currentWave)
+    else
+        game.waveSystem.waveDefinition(game.currentWave + 1)
 
     init {
         // If a save exists, restore it (PLAY clears the save first; CONTINUE keeps it)

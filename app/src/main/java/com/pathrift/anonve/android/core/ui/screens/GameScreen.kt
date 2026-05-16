@@ -197,6 +197,7 @@ fun GameScreen(
         if (gameViewModel.showNextWaveInfo) {
             NextWaveInfoPanel(
                 waveDef = gameViewModel.nextWaveDefinition,
+                isCurrentWave = state.phase == GamePhase.WAVE_ACTIVE,
                 onDismiss = { gameViewModel.showNextWaveInfo = false }
             )
         }
@@ -968,8 +969,8 @@ private fun TowerInfoBottomPanel(
                 )
                 Spacer(Modifier.width(12.dp))
 
-                // Identity — wrapContent (max 100dp) to prevent overflow on small screens
-                Column(modifier = Modifier.wrapContentWidth().widthIn(max = 100.dp)) {
+                // Identity — fixed 88dp (fits "ARTILLERY" at 12sp bold + level badge)
+                Column(modifier = Modifier.width(88.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             info.type.displayName.uppercase(),
@@ -1050,16 +1051,20 @@ private fun TowerInfoBottomPanel(
                 val sellPressed by sellInteraction.collectIsPressedAsState()
                 val sellScale by animateFloatAsState(if (sellPressed) 0.94f else 1f, spring(stiffness = 700f), label = "sellScale")
                 Box(
-                    modifier = Modifier.width(48.dp).height(38.dp)
+                    modifier = Modifier.width(56.dp).height(38.dp)
                         .graphicsLayer { scaleX = sellScale; scaleY = sellScale }
                         .background(PathriftDanger.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
                         .border(1.dp, PathriftDanger.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
                         .clickable(interactionSource = sellInteraction, indication = null, onClick = onSell),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("SELL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PathriftDanger)
-                        Text("+${info.sellValue}g", fontSize = 8.sp, color = PathriftDanger.copy(0.8f))
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.padding(horizontal = 3.dp)
+                    ) {
+                        Text("SELL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PathriftDanger, maxLines = 1)
+                        Text("+${info.sellValue}g", fontSize = 8.sp, color = PathriftDanger.copy(0.8f),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 // Dismiss button with scale animation
@@ -1608,6 +1613,7 @@ fun NextWaveBanner(waveDef: WaveDefinition, onTap: () -> Unit) {
 @Composable
 fun NextWaveInfoPanel(
     waveDef: WaveDefinition,
+    isCurrentWave: Boolean = false,
     onDismiss: () -> Unit
 ) {
     val isBoss = waveDef.spawnGroups.any { it.type == EnemyType.BOSS }
@@ -1633,7 +1639,7 @@ fun NextWaveInfoPanel(
             Box(modifier = Modifier.fillMaxWidth()) {
                 // GAP-092: Title "NEXT WAVE" instead of "WAVE X"
                 Text(
-                    text = "NEXT WAVE",
+                    text = if (isCurrentWave) "THIS WAVE" else "NEXT WAVE",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Black,
                     color = Color(0xFF00C8FF),

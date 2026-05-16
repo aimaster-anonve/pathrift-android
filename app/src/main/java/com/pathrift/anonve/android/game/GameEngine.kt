@@ -422,11 +422,14 @@ class GameEngine(
                     val dy = pos.y - inst.position.y
                     val distOk = sqrt(dx * dx + dy * dy) <= rangePixels
                     if (!distOk) return@filter false
-                    // Layer filter based on targeting mode
+                    // Layer filter — BRIDGE_ONLY falls back to ALL_LAYERS when no bridges exist
                     when (tower.type.targetingMode) {
-                        TargetingMode.ALL_LAYERS   -> true
-                        TargetingMode.GROUND_ONLY  -> e.pathLayer == PathLayer.GROUND
-                        TargetingMode.BRIDGE_ONLY  -> e.pathLayer == PathLayer.BRIDGE
+                        TargetingMode.ALL_LAYERS  -> true
+                        TargetingMode.GROUND_ONLY -> e.pathLayer == PathLayer.GROUND
+                        TargetingMode.BRIDGE_ONLY -> {
+                            if (PathSystem.bridgeSegmentCount == 0) true  // no bridges → target all
+                            else e.pathLayer == PathLayer.BRIDGE
+                        }
                     }
                 }
 
