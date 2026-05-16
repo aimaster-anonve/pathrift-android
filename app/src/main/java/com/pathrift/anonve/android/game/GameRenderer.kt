@@ -57,14 +57,13 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     // ---- Paints ----
     private val backgroundPaint = Paint().apply { color = Color.parseColor("#0A0A0F") }
 
-    // Grid tiles (checkerboard)
-    private val gridPaint1 = Paint().apply { color = Color.parseColor("#11111A"); style = Paint.Style.FILL }
-    private val gridPaint2 = Paint().apply { color = Color.parseColor("#16161F"); style = Paint.Style.FILL }
+    // Grid tiles (checkerboard) — iOS parity: gridColor1=(0.07,0.07,0.10)=#121219, gridColor2=(0.09,0.09,0.13)=#171721
+    private val gridPaint1 = Paint().apply { color = Color.argb(255, 18, 18, 25); style = Paint.Style.FILL }
+    private val gridPaint2 = Paint().apply { color = Color.argb(255, 23, 23, 33); style = Paint.Style.FILL }
     private val gridBorderPaint = Paint().apply {
-        color = Color.parseColor("#262633")
+        color = Color.argb(77, 38, 38, 51)   // iOS: #262633 @ alpha 0.30 (77/255)
         style = Paint.Style.STROKE
         strokeWidth = 0.5f
-        alpha = 76
     }
 
     // Path
@@ -492,67 +491,61 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         return path
     }
 
-    // Tower slot backgrounds — octagon shape (Build 5.3: 0.70× scale-down per DESIGN_SPEC_BUILD5_3 Section 1)
+    // Tower slot backgrounds — iOS parity: 32×32pt rounded square, cornerRadius 5, cross 13×2 + 2×13, 4 corner dots at 15pt offset (45°/135°/225°/315°)
     private fun drawTowerSlots(canvas: Canvas) {
-        val slotRadius = dp(16f)       // was 24f → 32dp visual size (×0.70), now density-scaled
-        val innerRingRadius = dp(5.6f) // was 8f → (×0.70), now density-scaled
-        val dotRadius = dp(1.5f)       // was 2f → (×0.70), now density-scaled
-        val pulseT = ((System.currentTimeMillis() % 2400L) / 2400f)
-        val pulseAlpha = (102 + (40 * sin(pulseT * 2 * PI.toFloat())).toInt()).coerceIn(62, 166)
+        val slotSize = dp(32f)          // iOS: 32pt square
+        val cornerR = dp(5f)            // iOS: cornerRadius 5
+        val halfSize = slotSize / 2f
+        val crossW = dp(13f); val crossH = dp(2f)
+        val dotR = dp(1.5f)
+        val dotOffset = dp(15f)         // iOS: 15pt from center
 
-        val fillPaint = Paint().apply {
-            color = Color.argb(255, 13, 23, 36)   // (0.05, 0.09, 0.14) = very dark navy
-            style = Paint.Style.FILL
-            isAntiAlias = true
-        }
-        val strokePaint = Paint().apply {
-            color = Color.argb(pulseAlpha, 0, 200, 255)  // accent.cyan with pulsing alpha
-            style = Paint.Style.STROKE
-            strokeWidth = dp(1.0f)   // was 1.5f → (×0.70), density-scaled
-            isAntiAlias = true
-        }
-        val innerRingPaint = Paint().apply {
-            color = Color.argb(51, 0, 200, 255)   // cyan @ 20%
-            style = Paint.Style.STROKE
-            strokeWidth = dp(0.75f)
-            isAntiAlias = true
-        }
-        val dotPaint = Paint().apply {
-            color = Color.argb(204, 0, 200, 255)  // cyan @ 80%
-            style = Paint.Style.FILL
-            isAntiAlias = true
-        }
-        val selectedFillPaint = Paint().apply {
-            color = Color.argb(255, 0, 46, 71)   // (0.00, 0.18, 0.28) deep cyan-tinted
-            style = Paint.Style.FILL
-            isAntiAlias = true
-        }
-        val selectedStrokePaint = Paint().apply {
-            color = Color.argb(255, 0, 200, 255) // full cyan
-            style = Paint.Style.STROKE
-            strokeWidth = dp(2.0f)   // was 2.5f → proportionally reduced, density-scaled
-            isAntiAlias = true
-        }
+        val pulseT = ((System.currentTimeMillis() % 2400L) / 2400f).toFloat()
+        // pulse alpha 0.40 → 0.65 (sin wave), matching iOS: alpha 0.40 → 0.65, 1.2s cycle
+        val pulseAlpha = (0.40f + 0.25f * sin(pulseT * 2 * PI.toFloat())).toFloat().coerceIn(0.40f, 0.65f)
 
         for ((idx, pos) in slotPositions.withIndex()) {
             if (slotOccupied[idx] == true) continue
             val cx = pos.x; val cy = pos.y
             val isSelected = selectedSlotId == idx
+            val aa = Paint.ANTI_ALIAS_FLAG
 
-            val octPath = buildOctagonPath(cx, cy, slotRadius)
+            // Background fill — iOS: (0.05, 0.09, 0.14) = argb(255,13,23,36) normal; (0,0.18,0.28)=argb(255,0,46,71) selected
+            val fillColor = if (isSelected) Color.argb(255, 0, 46, 71) else Color.argb(255, 13, 23, 36)
+            val fillPaint = Paint(aa).apply { color = fillColor; style = Paint.Style.FILL }
+            val rect = RectF(cx - halfSize, cy - halfSize, cx + halfSize, cy + halfSize)
+            canvas.drawRoundRect(rect, cornerR, cornerR, fillPaint)
 
-            canvas.drawPath(octPath, if (isSelected) selectedFillPaint else fillPaint)
-            canvas.drawPath(octPath, if (isSelected) selectedStrokePaint else strokePaint)
+            // Border stroke — iOS: (0.0, 0.78, 1.0, 0.55) pulsing; selected: full cyan, 2dp
+            val strokeAlpha = if (isSelected) 1.0f else pulseAlpha
+            val strokeWidth = if (isSelected) dp(2f) else dp(1f)
+            val strokePaint = Paint(aa).apply {
+                color = Color.argb((strokeAlpha * 255).toInt().coerceIn(0, 255), 0, 200, 255)
+                style = Paint.Style.STROKE
+                this.strokeWidth = strokeWidth
+            }
+            canvas.drawRoundRect(rect, cornerR, cornerR, strokePaint)
 
-            // Inner ring
-            canvas.drawCircle(cx, cy, innerRingRadius, innerRingPaint)
+            // Inner cross — iOS: H-line 13×2, V-line 2×13, color (0.0,0.78,1.0,0.20) = alpha 51
+            val crossPaint = Paint(aa).apply {
+                color = Color.argb(51, 0, 200, 255)  // alpha 0.20
+                style = Paint.Style.FILL
+            }
+            // H line
+            canvas.drawRect(cx - crossW / 2, cy - crossH / 2, cx + crossW / 2, cy + crossH / 2, crossPaint)
+            // V line
+            canvas.drawRect(cx - crossH / 2, cy - crossW / 2, cx + crossH / 2, cy + crossW / 2, crossPaint)
 
-            // Cardinal corner accent dots (N/S/E/W at 0°, 90°, 180°, 270°)
-            for (angle in listOf(0f, 90f, 180f, 270f)) {
-                val rad = (angle - 90f) * (PI / 180f).toFloat()  // N = -Y on Canvas
-                val dx = cos(rad) * slotRadius
-                val dy = sin(rad) * slotRadius
-                canvas.drawCircle(cx + dx, cy + dy, dotRadius, dotPaint)
+            // 4 corner dots at 45°/135°/225°/315° — iOS: radius 1.5pt, color (0.0,0.78,1.0,0.80) = alpha 204
+            val dotPaint = Paint(aa).apply {
+                color = Color.argb(204, 0, 200, 255)  // alpha 0.80
+                style = Paint.Style.FILL
+            }
+            for (angleDeg in listOf(45f, 135f, 225f, 315f)) {
+                val rad = (angleDeg * PI.toFloat() / 180f)
+                val dx2 = cos(rad) * dotOffset
+                val dy2 = sin(rad) * dotOffset
+                canvas.drawCircle(cx + dx2, cy + dy2, dotR, dotPaint)
             }
         }
     }
@@ -606,41 +599,45 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
         when (type) {
             TowerType.BOLT -> {
-                // Hexagon body, radius 10dp (was 14, ×0.70), flat-top
+                // Hexagon body, flat-top — iOS: radius=11pt, strokeWidth=1.5
                 val hexPath = Path()
                 for (i in 0 until 6) {
                     val a = (i * 60f) * (PI / 180f).toFloat()
-                    val x = cx + cos(a) * dp(10f); val y = cy + sin(a) * dp(10f)
+                    val x = cx + cos(a) * dp(11f); val y = cy + sin(a) * dp(11f)
                     if (i == 0) hexPath.moveTo(x, y) else hexPath.lineTo(x, y)
                 }
                 hexPath.close()
                 canvas.drawPath(hexPath, Paint(aa).apply { color = Color.argb(255,0,31,56); style=Paint.Style.FILL })
-                canvas.drawPath(hexPath, Paint(aa).apply { color=Color.parseColor("#00C8FF"); style=Paint.Style.STROKE; strokeWidth=dp(1.0f) })
-                // Barrel up — 3dp wide (was 5dp), 7.5dp long (was 11dp)
-                canvas.drawRoundRect(RectF(cx-dp(1.5f), cy-dp(15.5f), cx+dp(1.5f), cy-dp(8f)), dp(1.5f), dp(1.5f),
+                canvas.drawPath(hexPath, Paint(aa).apply { color=Color.parseColor("#00C8FF"); style=Paint.Style.STROKE; strokeWidth=dp(1.5f) })
+                // Barrel up — iOS: 3×8pt at y=13 (pointing up)
+                canvas.drawRoundRect(RectF(cx-dp(1.5f), cy-dp(17f), cx+dp(1.5f), cy-dp(9f)), dp(1.5f), dp(1.5f),
                     Paint(aa).apply { color=Color.parseColor("#00C8FF"); style=Paint.Style.FILL })
-                // Circuit trace lines
+                // Circuit trace lines — iOS: 3 diagonals at π/6, π/2, 5π/6 (30°, 90°, 150°)
                 val tracePaint = Paint(aa).apply { color=Color.argb(153,0,200,255); style=Paint.Style.STROKE; strokeWidth=dp(0.75f) }
                 for (angle in listOf(30f, 90f, 150f)) {
                     val rad = angle * (PI/180f).toFloat()
-                    canvas.drawLine(cx, cy, cx + cos(rad)*dp(8.5f), cy + sin(rad)*dp(8.5f), tracePaint)
+                    canvas.drawLine(cx, cy, cx + cos(rad)*dp(9f), cy + sin(rad)*dp(9f), tracePaint)
                 }
             }
             TowerType.BLAST -> {
-                // Circle body, radius 10dp (was 14, ×0.70)
-                canvas.drawCircle(cx, cy, dp(10f), Paint(aa).apply { color=Color.argb(255,51,20,0); style=Paint.Style.FILL })
-                canvas.drawCircle(cx, cy, dp(10f), Paint(aa).apply { color=Color.parseColor("#FF7300"); style=Paint.Style.STROKE; strokeWidth=dp(1.5f) })
-                // Wide barrel — 3dp wide (was 6dp), 7.5dp long (was 11dp)
-                canvas.drawRect(cx-dp(1.5f), cy-dp(15.5f), cx+dp(1.5f), cy-dp(8f),
+                // Circle body — iOS: radius=11pt, strokeWidth=1.5, fill=(0.20,0.08,0.00), stroke=(1.00,0.45,0.00)
+                canvas.drawCircle(cx, cy, dp(11f), Paint(aa).apply { color=Color.argb(255,51,20,0); style=Paint.Style.FILL })
+                canvas.drawCircle(cx, cy, dp(11f), Paint(aa).apply { color=Color.parseColor("#FF7300"); style=Paint.Style.STROKE; strokeWidth=dp(1.5f) })
+                // Barrel — iOS: 3×8pt at y=13 (pointing up)
+                canvas.drawRoundRect(RectF(cx-dp(1.5f), cy-dp(17f), cx+dp(1.5f), cy-dp(9f)), dp(1f), dp(1f),
                     Paint(aa).apply { color=Color.parseColor("#FF7300"); style=Paint.Style.FILL })
-                // Exhaust pipes at 120° intervals from top
+                // Flared tip — iOS: 7×2pt at y=17
+                canvas.drawRect(cx-dp(3.5f), cy-dp(19.5f), cx+dp(3.5f), cy-dp(18.5f),
+                    Paint(aa).apply { color=Color.argb(204,255,115,0); style=Paint.Style.FILL })
+                // 3 exhaust pipe stubs at 120° intervals — iOS: 3 angles (7π/6, 11π/6, π/6)
+                val exhaustAngles = listOf(210f, 330f, 30f)   // π*7/6, π*11/6, π/6 in degrees
                 val exhaustPaint = Paint(aa).apply { color=Color.argb(255,38,15,0); style=Paint.Style.FILL }
-                val exhaustStroke = Paint(aa).apply { color=Color.parseColor("#FF7300"); style=Paint.Style.STROKE; strokeWidth=dp(1f) }
-                for (angle in listOf(120f, 240f)) {
-                    val rad = (angle - 90f) * (PI/180f).toFloat()
-                    val ex = cx + cos(rad)*dp(10f); val ey = cy + sin(rad)*dp(10f)
-                    canvas.drawRect(ex-dp(1.5f), ey-dp(2.5f), ex+dp(1.5f), ey+dp(2.5f), exhaustPaint)
-                    canvas.drawRect(ex-dp(1.5f), ey-dp(2.5f), ex+dp(1.5f), ey+dp(2.5f), exhaustStroke)
+                val exhaustStroke = Paint(aa).apply { color=Color.parseColor("#FF7300"); style=Paint.Style.STROKE; strokeWidth=dp(0.5f) }
+                for (angle in exhaustAngles) {
+                    val rad = angle * (PI/180f).toFloat()
+                    val ex = cx + cos(rad)*dp(11f); val ey = cy + sin(rad)*dp(11f)
+                    canvas.drawRoundRect(RectF(ex-dp(2f), ey-dp(3f), ex+dp(2f), ey+dp(3f)), dp(1f), dp(1f), exhaustPaint)
+                    canvas.drawRoundRect(RectF(ex-dp(2f), ey-dp(3f), ex+dp(2f), ey+dp(3f)), dp(1f), dp(1f), exhaustStroke)
                 }
             }
             TowerType.FROST -> {
@@ -663,29 +660,32 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 }
             }
             TowerType.PIERCE -> {
-                // Elongated octagon ~17×20dp (×0.70 of 24×28)
+                // Elongated octagon — iOS: w=5.5, h=9, cut=3.5, fill=(0.04,0.14,0.02), stroke=(0.40,1.00,0.10)
                 val cut = dp(3.5f)
+                val w = dp(5.5f); val h = dp(9f)
                 val ep = Path()
-                ep.moveTo(cx-dp(8.5f)+cut, cy-dp(10f)); ep.lineTo(cx+dp(8.5f)-cut, cy-dp(10f))
-                ep.lineTo(cx+dp(8.5f), cy-dp(10f)+cut); ep.lineTo(cx+dp(8.5f), cy+dp(10f)-cut)
-                ep.lineTo(cx+dp(8.5f)-cut, cy+dp(10f)); ep.lineTo(cx-dp(8.5f)+cut, cy+dp(10f))
-                ep.lineTo(cx-dp(8.5f), cy+dp(10f)-cut); ep.lineTo(cx-dp(8.5f), cy-dp(10f)+cut)
+                ep.moveTo(cx-w+cut, cy-h); ep.lineTo(cx+w-cut, cy-h)
+                ep.lineTo(cx+w, cy-h+cut); ep.lineTo(cx+w, cy+h-cut)
+                ep.lineTo(cx+w-cut, cy+h); ep.lineTo(cx-w+cut, cy+h)
+                ep.lineTo(cx-w, cy+h-cut); ep.lineTo(cx-w, cy-h+cut)
                 ep.close()
                 canvas.drawPath(ep, Paint(aa).apply { color=Color.argb(255,10,36,5); style=Paint.Style.FILL })
                 canvas.drawPath(ep, Paint(aa).apply { color=Color.parseColor("#66FF1A"); style=Paint.Style.STROKE; strokeWidth=dp(1.0f) })
-                // Long barrel — 3dp wide (was 4dp), 9.5dp long (was 14dp)
-                canvas.drawRect(cx-dp(1.5f), cy-dp(18f), cx+dp(1.5f), cy-dp(8.5f), Paint(aa).apply { color=Color.parseColor("#66FF1A"); style=Paint.Style.FILL })
-                // Reticle sight lines
+                // Barrel — iOS: 3×10pt at y=13 (pointing up)
+                canvas.drawRoundRect(RectF(cx-dp(1.5f), cy-dp(19f), cx+dp(1.5f), cy-dp(9f)), dp(1f), dp(1f),
+                    Paint(aa).apply { color=Color.parseColor("#66FF1A"); style=Paint.Style.FILL })
+                // Reticle sight lines — iOS: 2 rects at y=±1.5
                 val reticlePaint = Paint(aa).apply { color=Color.argb(127,102,255,26); style=Paint.Style.STROKE; strokeWidth=dp(0.75f) }
-                canvas.drawLine(cx-dp(7f), cy-dp(2f), cx+dp(7f), cy-dp(2f), reticlePaint)
-                canvas.drawLine(cx-dp(7f), cy+dp(2f), cx+dp(7f), cy+dp(2f), reticlePaint)
+                canvas.drawLine(cx-dp(4f), cy-dp(1.5f), cx+dp(4f), cy-dp(1.5f), reticlePaint)
+                canvas.drawLine(cx-dp(4f), cy+dp(1.5f), cx+dp(4f), cy+dp(1.5f), reticlePaint)
             }
             TowerType.CORE -> {
-                // Square 18×18dp (was 26×26, ×0.70)
+                // Square 18×18 — iOS: fill=(0.18,0.05,0.00), stroke=(1.00,0.35,0.05), strokeWidth=1.5
                 canvas.drawRect(cx-dp(9f), cy-dp(9f), cx+dp(9f), cy+dp(9f), Paint(aa).apply { color=Color.argb(255,46,13,0); style=Paint.Style.FILL })
                 canvas.drawRect(cx-dp(9f), cy-dp(9f), cx+dp(9f), cy+dp(9f), Paint(aa).apply { color=Color.parseColor("#FF590D"); style=Paint.Style.STROKE; strokeWidth=dp(1.5f) })
-                // Barrel — 3dp wide (was 4.5dp), 5.5dp long (was 8dp)
-                canvas.drawRect(cx-dp(1.5f), cy-dp(14.5f), cx+dp(1.5f), cy-dp(9f), Paint(aa).apply { color=Color.parseColor("#FF590D"); style=Paint.Style.FILL })
+                // Barrel — iOS: 5×7pt at y=11 (pointing up), cornerRadius=1
+                canvas.drawRoundRect(RectF(cx-dp(2.5f), cy-dp(16f), cx+dp(2.5f), cy-dp(9f)), dp(1f), dp(1f),
+                    Paint(aa).apply { color=Color.parseColor("#FF590D"); style=Paint.Style.FILL })
                 // Corner rivets
                 val rivetFill = Paint(aa).apply { color=Color.argb(255,230,71,10); style=Paint.Style.FILL }
                 val rivetStroke = Paint(aa).apply { color=Color.parseColor("#FF590D"); style=Paint.Style.STROKE; strokeWidth=dp(1f) }
@@ -792,10 +792,11 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 artPath.close()
                 canvas.drawPath(artPath, Paint(aa).apply { color=Color.argb(255,36,26,3); style=Paint.Style.FILL })
                 canvas.drawPath(artPath, Paint(aa).apply { color=Color.parseColor("#BF941F"); style=Paint.Style.STROKE; strokeWidth=dp(1.5f) })
-                // Wide barrel — 3dp wide (was 4dp→×0.75 ~3dp), 9dp long (was 13dp)
-                canvas.drawRect(cx-dp(1.5f), cy-dp(15.5f), cx+dp(1.5f), cy-dp(6.5f), Paint(aa).apply { color=Color.parseColor("#BF941F"); style=Paint.Style.FILL })
-                // End plate
-                canvas.drawRect(cx-dp(1.5f), cy-dp(15.5f), cx+dp(1.5f), cy-dp(13.5f), Paint(aa).apply { color=Color.parseColor("#BF941F"); style=Paint.Style.FILL })
+                // Barrel — iOS: 5×9pt at y=(hh+4), end plate 7×2pt at y=(hh+8)
+                canvas.drawRoundRect(RectF(cx-dp(2.5f), cy-dp(16f), cx+dp(2.5f), cy-dp(7f)), dp(1f), dp(1f),
+                    Paint(aa).apply { color=Color.parseColor("#BF941F"); style=Paint.Style.FILL })
+                // End plate — iOS: 7×2pt at y=hh+8
+                canvas.drawRect(cx-dp(3.5f), cy-dp(16.5f), cx+dp(3.5f), cy-dp(15f), Paint(aa).apply { color=Color.parseColor("#BF941F"); style=Paint.Style.FILL })
                 // Armor bands
                 val bandPaint = Paint(aa).apply { color=Color.argb(102,191,148,31); style=Paint.Style.FILL }
                 canvas.drawRect(cx-dp(8.5f), cy-dp(1.5f), cx+dp(8.5f), cy, bandPaint)

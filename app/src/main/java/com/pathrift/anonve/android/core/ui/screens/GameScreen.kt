@@ -541,7 +541,7 @@ private fun CombatHUD(
                             )
                             Text(
                                 text = if (state.wave == 0) "--" else "${state.wave}",
-                                fontSize = 22.sp,
+                                fontSize = 24.sp,   // iOS: 24pt .black .rounded
                                 fontWeight = FontWeight.Black,
                                 color = Color(0f, 0.78f, 1f),
                                 fontFamily = FontFamily.Monospace
