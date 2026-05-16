@@ -309,7 +309,6 @@ object PathSystem {
             }
 
             if (!hasCoverage) {
-                // Add guaranteed slot offset 80px perpendicular from segment midpoint
                 val dir = if (midIndex + 1 < segment.size) {
                     val next = segment[midIndex + 1]
                     PointF(next.x - segMid.x, next.y - segMid.y)
@@ -321,11 +320,17 @@ object PathSystem {
                 }
                 val len = sqrt((dir.x * dir.x + dir.y * dir.y).toDouble()).toFloat()
                 val safeDen = if (len > 0f) len else 1f
-                // Perpendicular offset must be density-aware: slot_radius + path_half + margin
-                val perpOffset = (16f + 8.5f + 10f) * screenDensity
-                val perp = PointF(-dir.y / safeDen * perpOffset, dir.x / safeDen * perpOffset)
-                // Insert at front so take(maxSlots) never drops guaranteed slots
-                result.add(0, PointF(segMid.x + perp.x, segMid.y + perp.y))
+                val pixelClearance = (16f + 8.5f + 4f) * screenDensity
+                // Try BOTH perpendicular sides — pick the one that clears ALL path segments
+                val perpOffset = (16f + 8.5f + 12f) * screenDensity
+                val perpPlus  = PointF(segMid.x - dir.y / safeDen * perpOffset, segMid.y + dir.x / safeDen * perpOffset)
+                val perpMinus = PointF(segMid.x + dir.y / safeDen * perpOffset, segMid.y - dir.x / safeDen * perpOffset)
+                val candidate = when {
+                    isSlotClearOfPath(perpPlus,  waypoints, pixelClearance) -> perpPlus
+                    isSlotClearOfPath(perpMinus, waypoints, pixelClearance) -> perpMinus
+                    else -> perpPlus  // fallback: use +side even if still close (better than on-path)
+                }
+                result.add(0, candidate)
             }
         }
 
