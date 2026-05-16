@@ -1,6 +1,8 @@
 package com.pathrift.anonve.android.game
 
+import android.graphics.PointF
 import com.pathrift.anonve.android.game.enemies.EnemyType
+import com.pathrift.anonve.android.game.towers.TowerType
 
 /**
  * Bridge interface between the game engine and the ViewModel/UI layer.
@@ -22,4 +24,6 @@ interface GameBridge {
     fun onReviveAvailable()
     fun onLifeRestored(lives: Int)
     fun onStateRestored(wave: Int, lives: Int, gold: Int, kills: Int)
+    /** Called each time a tower fires — drives the projectile visual effect. */
+    fun onProjectileFired(from: PointF, to: PointF, type: TowerType) {}
 }

@@ -150,13 +150,17 @@ class GameEngine(
         pendingSave = save
     }
 
-    /** Must be called once screen dimensions are known (before first wave). */
-    fun initLayout(width: Float, height: Float) {
+    /** Must be called once screen dimensions are known (before first wave).
+     *  topInset / bottomInset are in pixels and include status bar + HUD height and
+     *  nav bar + bottom bar height respectively, as measured from Compose onGloballyPositioned.
+     */
+    fun initLayout(width: Float, height: Float, topInset: Float = 0f, bottomInset: Float = 0f) {
         screenWidth = width
         screenHeight = height
         val density = Resources.getSystem().displayMetrics.density
-        PathSystem.hudTopInset = 48f * density
-        PathSystem.hudBottomInset = 46f * density
+        // Use real insets from Compose when provided; fall back to sensible defaults
+        PathSystem.hudTopInset = if (topInset > 0f) topInset else 48f * density
+        PathSystem.hudBottomInset = if (bottomInset > 0f) bottomInset else 46f * density
         PathSystem.hudHorizontalInset = 8f * density
         val layoutIdx = pendingSave?.layoutIndex ?: -1
         PathSystem.buildLayout(width, height, currentWave = 0, layoutIndex = layoutIdx)
@@ -407,8 +411,8 @@ class GameEngine(
                 // Attack cooldown
                 if (now - inst.lastAttackTime < (1000L / effectiveAttacksPerSecond).toLong()) continue
 
-                // Range in screen pixels (tile-based towers used tile coords; here we use pixel range)
-                val rangePixels = tower.rangeTiles * GridSystem.TILE_SIZE_DP
+                // Range in screen pixels — TILE_SIZE_DP must be scaled by display density
+                val rangePixels = tower.rangeTiles * GridSystem.TILE_SIZE_DP * Resources.getSystem().displayMetrics.density
 
                 val inRange = _enemies.filter { e ->
                     if (!e.isAlive) return@filter false
@@ -516,6 +520,13 @@ class GameEngine(
                 }
 
                 _towers[slotId] = inst.copy(lastAttackTime = now, facingAngle = targetFacingAngle)
+
+                // Fire projectile visual — pick the primary target position for the line/AoE effect
+                val primaryTarget = inRange.maxByOrNull { it.pathProgress }
+                if (primaryTarget != null) {
+                    val targetPos = PathSystem.positionAt(primaryTarget.pathProgress)
+                    bridge.onProjectileFired(inst.position, targetPos, tower.type)
+                }
             }
         }
     }

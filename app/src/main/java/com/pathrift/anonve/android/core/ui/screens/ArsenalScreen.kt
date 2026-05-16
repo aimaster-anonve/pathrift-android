@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -120,50 +123,81 @@ fun ArsenalScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
-    Column(
-        Modifier.fillMaxSize().background(Color(0xFF0A0A10))
+    BoxWithConstraints(
+        modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A10))
     ) {
-        // Header
-        Row(
-            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
-            }
-            Text(
-                "ARSENAL",
-                color = Color.White,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 2.sp,
-                modifier = Modifier.weight(1f).padding(start = 8.dp)
-            )
-            Text(
-                "◆ ${state.diamonds}",
-                color = Color(0xFF00CCFF),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace
-            )
-        }
+        val isLandscape = maxWidth > maxHeight
+        val towerList = TowerType.values().toList()
 
-        LazyColumn(
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(TowerType.values().toList()) { type ->
-                TowerArsenalCard(
-                    type = type,
-                    isUnlocked = state.unlockedTowers.contains(type.name),
-                    dmgLevel = state.dmgLevels[type] ?: 0,
-                    spdLevel = state.spdLevels[type] ?: 0,
-                    dmgCost = state.dmgCosts[type],
-                    spdCost = state.spdCosts[type],
-                    diamonds = state.diamonds,
-                    onUpgradeDmg = { viewModel.upgradeDamage(type) },
-                    onUpgradeSpd = { viewModel.upgradeSpeed(type) }
+        Column(Modifier.fillMaxSize()) {
+            // Header — same for both orientations
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                }
+                Text(
+                    "ARSENAL",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.weight(1f).padding(start = 8.dp)
                 )
+                Text(
+                    "◆ ${state.diamonds}",
+                    color = Color(0xFF00CCFF),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
+
+            if (isLandscape) {
+                // Landscape: 2-column grid
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    gridItems(towerList) { type ->
+                        TowerArsenalCard(
+                            type = type,
+                            isUnlocked = state.unlockedTowers.contains(type.name),
+                            dmgLevel = state.dmgLevels[type] ?: 0,
+                            spdLevel = state.spdLevels[type] ?: 0,
+                            dmgCost = state.dmgCosts[type],
+                            spdCost = state.spdCosts[type],
+                            diamonds = state.diamonds,
+                            onUpgradeDmg = { viewModel.upgradeDamage(type) },
+                            onUpgradeSpd = { viewModel.upgradeSpeed(type) }
+                        )
+                    }
+                }
+            } else {
+                // Portrait: single column
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(towerList) { type ->
+                        TowerArsenalCard(
+                            type = type,
+                            isUnlocked = state.unlockedTowers.contains(type.name),
+                            dmgLevel = state.dmgLevels[type] ?: 0,
+                            spdLevel = state.spdLevels[type] ?: 0,
+                            dmgCost = state.dmgCosts[type],
+                            spdCost = state.spdCosts[type],
+                            diamonds = state.diamonds,
+                            onUpgradeDmg = { viewModel.upgradeDamage(type) },
+                            onUpgradeSpd = { viewModel.upgradeSpeed(type) }
+                        )
+                    }
+                }
             }
         }
     }

@@ -8,9 +8,11 @@ import com.pathrift.anonve.android.core.engine.EconomyConstants
 import com.pathrift.anonve.android.core.storage.ArsenalStore
 import com.pathrift.anonve.android.core.storage.DiamondStore
 import com.pathrift.anonve.android.core.storage.PremiumStore
+import android.graphics.PointF
 import com.pathrift.anonve.android.game.GameBridge
 import com.pathrift.anonve.android.game.GameEngine
 import com.pathrift.anonve.android.game.GamePhase
+import com.pathrift.anonve.android.game.GameRenderer
 import com.pathrift.anonve.android.game.GameState
 import com.pathrift.anonve.android.game.TowerInfo
 import com.pathrift.anonve.android.game.TowerSlotData
@@ -44,7 +46,7 @@ import kotlin.math.pow
 
 sealed class GameEvent {
     data class ShowMessage(val message: String) : GameEvent()
-    data class RunEnded(val wave: Int, val score: Long) : GameEvent()
+    data class RunEnded(val wave: Int, val score: Long, val kills: Int = 0) : GameEvent()
     data object WaveStarted : GameEvent()
     data object WaveCompleted : GameEvent()
     data object RiftShift : GameEvent()
@@ -76,18 +78,29 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
 
     // PATHRIFT-157: Next wave info panel state
     var showNextWaveInfo by mutableStateOf(false)
+
+    /** Set by GameCanvasView once the renderer surface is created; used for projectile injection. */
+    var renderer: GameRenderer? = null
     val nextWaveDefinition get() = game.waveSystem.waveDefinition(game.currentWave + 1)
 
     init {
         // If a save exists, restore it (PLAY clears the save first; CONTINUE keeps it)
         gameSaveStore.load()?.let { save -> game.queueRestore(save) }
         game.start(viewModelScope)
+        // Poll enemy positions at ~60fps so the renderer stays live
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Default) {
+            while (true) {
+                _enemies.value = game.enemies
+                kotlinx.coroutines.delay(16L)
+            }
+        }
     }
 
     // ---- Player actions ----
 
-    fun initLayout(width: Float, height: Float) {
-        game.initLayout(width, height)
+    fun initLayout(width: Float, height: Float, topInset: Float = 0f, bottomInset: Float = 0f) {
+        game.initLayout(width, height, topInset = topInset, bottomInset = bottomInset)
+        _state.update { it.copy(layoutVersion = it.layoutVersion + 1) }
     }
 
     fun startNextWave() {
@@ -248,7 +261,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     override fun onRunEnded(wave: Int, score: Long) {
         _state.update { it.copy(phase = GamePhase.GAME_OVER, isGameOver = true, lives = 0) }
         gameSaveStore.clear()
-        viewModelScope.launch { _events.emit(GameEvent.RunEnded(wave, score)) }
+        viewModelScope.launch { _events.emit(GameEvent.RunEnded(wave, score, kills = game.totalEnemiesKilled)) }
     }
 
     override fun onRiftShift() {
@@ -404,6 +417,20 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
 
     override fun onStateRestored(wave: Int, lives: Int, gold: Int, kills: Int) {
         _state.update { it.copy(wave = wave, lives = lives, gold = gold, enemyKills = kills) }
+    }
+
+    override fun onProjectileFired(from: PointF, to: PointF, type: TowerType) {
+        val proj = GameRenderer.Projectile(
+            id = System.nanoTime(),
+            fromX = from.x,
+            fromY = from.y,
+            toX = to.x,
+            toY = to.y,
+            progress = 0f,
+            type = type
+        )
+        val r = renderer ?: return
+        r.projectiles = r.projectiles + proj
     }
 
     override fun onCleared() {

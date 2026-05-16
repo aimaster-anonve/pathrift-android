@@ -2,7 +2,9 @@ package com.pathrift.anonve.android.core.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,6 +13,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -82,77 +87,99 @@ fun HowToPlayScreen(onBack: () -> Unit) {
         },
         containerColor = PathriftBackground
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(PathriftBackground)
-                .padding(padding)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
-        ) {
-            Spacer(Modifier.height(20.dp))
-
-            RuleSection(
-                title = LanguageManager.s("PLACE TOWERS", "KULELERİ YERLEŞTIR"),
-                icon = Icons.Default.Apps,
-                text = LanguageManager.s(
+        val ruleSections = listOf(
+            Triple(
+                LanguageManager.s("PLACE TOWERS", "KULELERİ YERLEŞTIR"),
+                Icons.Default.Apps,
+                LanguageManager.s(
                     "Tap empty slots to place towers. Each tower has unique strengths.",
                     "Kule yerleştirmek için boş slotlara dokun. Her kulenin benzersiz güçlü yönleri vardır."
                 )
-            )
-            Spacer(Modifier.height(12.dp))
-
-            RuleSection(
-                title = LanguageManager.s("SEND WAVES", "DALGA GÖNDER"),
-                icon = Icons.Default.PlayArrow,
-                text = LanguageManager.s(
+            ),
+            Triple(
+                LanguageManager.s("SEND WAVES", "DALGA GÖNDER"),
+                Icons.Default.PlayArrow,
+                LanguageManager.s(
                     "Press SEND WAVE to start the next enemy wave. Enemies follow the path.",
                     "Sonraki düşman dalgasını başlatmak için DALGA GÖNDER'e bas. Düşmanlar yolu takip eder."
                 )
-            )
-            Spacer(Modifier.height(12.dp))
-
-            RuleSection(
-                title = LanguageManager.s("RIFT SHIFT", "RIFT KAYIŞI"),
-                icon = Icons.Default.Bolt,
-                text = LanguageManager.s(
+            ),
+            Triple(
+                LanguageManager.s("RIFT SHIFT", "RIFT KAYIŞI"),
+                Icons.Default.Bolt,
+                LanguageManager.s(
                     "Every 5 waves the map shifts! Move and reposition your towers.",
                     "Her 5 dalgada bir harita kayar! Kulelerini taşı ve yeniden konumlandır."
                 )
-            )
-            Spacer(Modifier.height(12.dp))
-
-            RuleSection(
-                title = LanguageManager.s("TOWERS", "KULELER"),
-                icon = Icons.Default.TrackChanges,
-                text = LanguageManager.s(
-                    "Bolt: Fast single-target\nBlast: Area damage\nFrost: Slows enemies 40%",
-                    "Şimşek: Hızlı tek hedef\nPatlama: Alan hasarı\nBuz: Düşmanları %40 yavaşlatır"
+            ),
+            Triple(
+                LanguageManager.s("TOWERS", "KULELER"),
+                Icons.Default.TrackChanges,
+                LanguageManager.s(
+                    "Bolt: Fast single-target\nBlast: Area damage\nFrost: Slows enemies 40%\nPierce: Hits all in range, ignores shields\nCore: Armor-piercing single target\nInferno: High DPS fire damage\nTesla: Chain lightning (3 targets)\nNova: Star-burst AoE gold\nSniper: Ultra-long range, high damage\nArtillery: Wide area splash",
+                    "Şimşek: Hızlı tek hedef\nPatlama: Alan hasarı\nBuz: Düşmanları %40 yavaşlatır\nDelici: Tüm hedefe çarpar, kalkanı yoksayar\nÇekirdek: Zırh delici tek hedef\nCehennem: Yüksek DPS ateş\nTesla: Zincir şimşek (3 hedef)\nNova: Yıldız patlama AoE\nKeskin Nişancı: Ultra uzun menzil\nTopçu: Geniş alan sıçrama"
                 )
-            )
-            Spacer(Modifier.height(12.dp))
-
-            RuleSection(
-                title = LanguageManager.s("LIVES", "CANLAR"),
-                icon = Icons.Default.Favorite,
-                text = LanguageManager.s(
+            ),
+            Triple(
+                LanguageManager.s("LIVES", "CANLAR"),
+                Icons.Default.Favorite,
+                LanguageManager.s(
                     "You have 3 lives. Each enemy that reaches the exit costs 1 life.",
                     "3 canın var. Çıkışa ulaşan her düşman 1 can alır."
                 )
-            )
-            Spacer(Modifier.height(12.dp))
-
-            RuleSection(
-                title = LanguageManager.s("SCORE", "PUAN"),
-                icon = Icons.Default.Star,
-                text = LanguageManager.s(
+            ),
+            Triple(
+                LanguageManager.s("SCORE", "PUAN"),
+                Icons.Default.Star,
+                LanguageManager.s(
                     "Score = Wave × 1000 + Kills × 5. Push as far as you can!",
                     "Puan = Dalga × 1000 + Öldürme × 5. Mümkün olduğunca ilerle!"
                 )
             )
+        )
 
-            Spacer(Modifier.height(40.dp))
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(PathriftBackground)
+                .padding(padding)
+        ) {
+            val isLandscape = maxWidth > maxHeight
+            if (isLandscape) {
+                // Landscape: 2-column grid of rule cards
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    contentPadding = PaddingValues(
+                        horizontal = 16.dp,
+                        vertical = 16.dp
+                    ),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(ruleSections) { (title, icon, text) ->
+                        RuleSection(title = title, icon = icon, text = text)
+                    }
+                }
+            } else {
+                // Portrait: single-column vertical scroll
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    Spacer(Modifier.height(20.dp))
+                    ruleSections.forEachIndexed { index, (title, icon, text) ->
+                        RuleSection(title = title, icon = icon, text = text)
+                        if (index < ruleSections.lastIndex) {
+                            Spacer(Modifier.height(12.dp))
+                        }
+                    }
+                    Spacer(Modifier.height(40.dp))
+                }
+            }
         }
     }
 }

@@ -59,4 +59,5 @@ data class GameState(
     val speedMultiplier: Float = 1.0f,
     val showRevivePrompt: Boolean = false,
     val reviveCountdown: Int = 5,
+    val layoutVersion: Int = 0,  // incremented on initLayout → forces slot recomposition
 )

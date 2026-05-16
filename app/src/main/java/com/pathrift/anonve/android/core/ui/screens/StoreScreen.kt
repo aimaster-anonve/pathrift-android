@@ -713,3 +713,4 @@ private fun todayKey(): String {
     val fmt = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
     return fmt.format(Date())
 }
+// towerColor(type) is provided by ArsenalScreen.kt (internal fun, same package)

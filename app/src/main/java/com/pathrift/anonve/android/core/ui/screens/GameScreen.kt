@@ -49,8 +49,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -66,8 +64,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -77,6 +77,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import kotlin.math.sqrt
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.systemBars
 import com.pathrift.anonve.android.core.engine.EconomyConstants
 import com.pathrift.anonve.android.core.ui.ArtilleryTowerColor
 import com.pathrift.anonve.android.core.ui.BlastTowerColor
@@ -116,20 +118,19 @@ import com.pathrift.anonve.android.game.towers.TowerType
 
 @Composable
 fun GameScreen(
-    onRunEnded: (score: Long, wave: Int) -> Unit,
+    onRunEnded: (score: Long, wave: Int, kills: Int) -> Unit,
     navController: NavController? = null,
     gameViewModel: GameViewModel = viewModel()
 ) {
     val state by gameViewModel.state.collectAsState()
-    val snackbarHostState = remember { SnackbarHostState() }
     var isPaused by remember { mutableStateOf(false) }
     var showPremiumDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         gameViewModel.events.collect { event ->
             when (event) {
-                is GameEvent.RunEnded -> onRunEnded(event.score, event.wave)
-                is GameEvent.ShowMessage -> snackbarHostState.showSnackbar(event.message)
+                is GameEvent.RunEnded -> onRunEnded(event.score, event.wave, event.kills)
+                is GameEvent.ShowMessage -> { /* silent — no snackbar per iOS parity */ }
                 is GameEvent.WaveStarted -> {}
                 is GameEvent.WaveCompleted -> {}
                 is GameEvent.RiftShift -> {}
@@ -187,17 +188,17 @@ fun GameScreen(
             )
         }
 
-        SnackbarHost(
-            hostState = snackbarHostState,
-            modifier = Modifier.align(Alignment.BottomCenter)
-        )
+        // Rift Shift animated overlay — iOS parity: pulsing purple full-screen flash + banner
+        if (state.riftShiftActive) {
+            RiftShiftOverlay()
+        }
 
         if (isPaused) {
             PauseOverlay(
                 onResume = { isPaused = false },
                 onQuit = {
                     gameViewModel.clearSaveOnQuit()
-                    onRunEnded(state.score, state.wave)
+                    onRunEnded(state.score, state.wave, state.enemyKills)
                 }
             )
         }
@@ -274,6 +275,14 @@ private fun GameCanvasView(
     val context = LocalContext.current
     val gameSurface = remember { GameRenderer(context) }
     val enemies by gameViewModel.enemies.collectAsState()
+    var sizeInitialized by remember { mutableStateOf(false) }
+    val density = LocalDensity.current
+    val systemBarsInsets = WindowInsets.systemBars
+
+    // Wire renderer to ViewModel so projectile callbacks can inject directly
+    LaunchedEffect(gameSurface) {
+        gameViewModel.renderer = gameSurface
+    }
 
     gameSurface.enemies = enemies
     gameSurface.towerInstances = gameViewModel.game.towers
@@ -283,35 +292,50 @@ private fun GameCanvasView(
     gameSurface.riftShiftActive = state.riftShiftActive
 
     Box(
-        modifier = modifier.pointerInput(Unit) {
-            awaitPointerEventScope {
-                while (true) {
-                    val event = awaitPointerEvent()
-                    val change = event.changes.firstOrNull() ?: continue
-                    if (change.pressed && !change.previousPressed) {
-                        val tapX = change.position.x
-                        val tapY = change.position.y
-                        val slots = gameViewModel.game.grid.slots
-                        val tapRadiusPx = 60f
-                        var closestId: Int? = null
-                        var closestDist = Float.MAX_VALUE
-                        for (slot in slots) {
-                            val dx = slot.position.x - tapX
-                            val dy = slot.position.y - tapY
-                            val dist = sqrt(dx * dx + dy * dy)
-                            if (dist < tapRadiusPx && dist < closestDist) {
-                                closestDist = dist
-                                closestId = slot.id
+        modifier = modifier
+            .onGloballyPositioned { coordinates ->
+                if (!sizeInitialized && coordinates.size.width > 0 && coordinates.size.height > 0) {
+                    val w = coordinates.size.width.toFloat()
+                    val h = coordinates.size.height.toFloat()
+                    val topPx = with(density) {
+                        systemBarsInsets.getTop(density).toFloat() + 90.dp.toPx()
+                    }
+                    val bottomPx = with(density) {
+                        systemBarsInsets.getBottom(density).toFloat() + 80.dp.toPx()
+                    }
+                    gameViewModel.initLayout(w, h, topInset = topPx, bottomInset = bottomPx)
+                    sizeInitialized = true
+                }
+            }
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull() ?: continue
+                        if (change.pressed && !change.previousPressed) {
+                            val tapX = change.position.x
+                            val tapY = change.position.y
+                            val slots = gameViewModel.game.grid.slots
+                            val tapRadiusPx = 48f * density.density  // 48dp → pixels
+                            var closestId: Int? = null
+                            var closestDist = Float.MAX_VALUE
+                            for (slot in slots) {
+                                val dx = slot.position.x - tapX
+                                val dy = slot.position.y - tapY
+                                val dist = sqrt(dx * dx + dy * dy)
+                                if (dist < tapRadiusPx && dist < closestDist) {
+                                    closestDist = dist
+                                    closestId = slot.id
+                                }
                             }
-                        }
-                        if (closestId != null) {
-                            gameViewModel.tapTowerSlot(closestId)
-                            change.consume()
+                            if (closestId != null) {
+                                gameViewModel.tapTowerSlot(closestId)
+                                change.consume()
+                            }
                         }
                     }
                 }
             }
-        }
     ) {
         AndroidView(
             factory = {
@@ -719,6 +743,48 @@ private fun SendWaveButton(onClick: () -> Unit) {
 }
 
 // ==============================
+// Rift Shift Overlay — iOS parity: pulsing purple flash + "RIFT SHIFT!" banner
+// ==============================
+
+@Composable
+private fun RiftShiftOverlay() {
+    val infiniteTransition = rememberInfiniteTransition(label = "riftPulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.18f,
+        targetValue = 0.42f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 200),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "riftAlpha"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFF8B4FFF).copy(alpha = pulseAlpha)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(
+                modifier = Modifier
+                    .background(Color(0xFF8B4FFF).copy(alpha = 0.85f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 24.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = "⚡ RIFT SHIFT ⚡",
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color.White,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 2.sp
+                )
+            }
+        }
+    }
+}
+
+// ==============================
 // Pause Overlay
 // ==============================
 
@@ -763,17 +829,17 @@ private fun TowerInfoBottomPanel(
     Box(
         modifier = Modifier.fillMaxSize()
             .background(Color.Transparent)
-            .clickable(onClick = onDismiss),
+            .clickable(onClick = onDismiss)
+            .navigationBarsPadding(),
         contentAlignment = Alignment.BottomCenter
     ) {
-        // Single-row compact card — 60dp fixed height
+        // Single-row compact card — 60dp fixed height (no nav bar padding inside row)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(60.dp)
                 .background(PathriftBackground.copy(alpha = 0.94f))
-                .clickable(enabled = false) {}
-                .navigationBarsPadding(),
+                .clickable(enabled = false) {},
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Tower color accent bar
@@ -782,7 +848,6 @@ private fun TowerInfoBottomPanel(
                     .width(4.dp).fillMaxHeight()
                     .padding(vertical = 10.dp)
                     .background(towerColor, RoundedCornerShape(2.dp))
-                    .padding(start = 12.dp)
             )
             Spacer(Modifier.width(12.dp))
 
@@ -896,22 +961,59 @@ private fun TowerSelectionPanel(
     viewModel: GameViewModel,
     onDismiss: () -> Unit
 ) {
+    var selectedType by remember { mutableStateOf<TowerType?>(null) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.35f))
-            .clickable(onClick = onDismiss),
+            .clickable(onClick = onDismiss)
+            .navigationBarsPadding(),
         contentAlignment = Alignment.BottomCenter
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 140.dp)
                 .background(PathriftSurface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-                .navigationBarsPadding()
                 .clickable(enabled = false, onClick = {})
+                .padding(bottom = 8.dp)
         ) {
-            Box(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp).size(36.dp, 4.dp).align(Alignment.CenterHorizontally).background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp)))
+            // Drag handle
+            Box(
+                modifier = Modifier
+                    .padding(top = 8.dp, bottom = 4.dp)
+                    .size(36.dp, 4.dp)
+                    .align(Alignment.CenterHorizontally)
+                    .background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
+            )
+
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = LanguageManager.s("PLACE TOWER", "KULE YERLEŞTIR"),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Black,
+                    color = PathriftTextPrimary,
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 1.sp
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("💰", fontSize = 10.sp)
+                        Text("${state.gold}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PathriftGold, fontFamily = FontFamily.Monospace)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("♦", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00CCFF))
+                        Text("${state.diamonds}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00CCFF), fontFamily = FontFamily.Monospace)
+                    }
+                }
+            }
 
             val sortedTowers = remember {
                 TowerType.values().sortedWith(
@@ -920,59 +1022,132 @@ private fun TowerSelectionPanel(
                 )
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth().fillMaxHeight().padding(bottom = 8.dp),
+            // Tower scroll row
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                LazyRow(
-                    modifier = Modifier.weight(1f).padding(start = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(end = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                items(sortedTowers) { type ->
+                    val isUnlocked = viewModel.isTowerUnlocked(type)
+                    val canAffordGold = state.gold >= towerGoldCost(type)
+                    val canAffordDiamonds = state.diamonds >= type.diamondCost || type.diamondCost == 0
+                    CompactTowerPickCard(
+                        type = type,
+                        isSelected = selectedType == type,
+                        isUnlocked = isUnlocked,
+                        canAffordGold = canAffordGold,
+                        canAffordDiamonds = canAffordDiamonds,
+                        diamonds = state.diamonds,
+                        onTap = { selectedType = if (selectedType == type) null else type }
+                    )
+                }
+            }
+
+            // Detail panel — shows when a tower is selected (iOS parity)
+            val sel = selectedType
+            if (sel != null) {
+                val isUnlocked = viewModel.isTowerUnlocked(sel)
+                val canAffordGold = state.gold >= towerGoldCost(sel)
+                val canAffordDiamonds = state.diamonds >= sel.diamondCost || sel.diamondCost == 0
+                val towerColor = towerDisplayColor(sel)
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+                        .padding(12.dp)
                 ) {
-                    items(sortedTowers) { type ->
-                        val isUnlocked = viewModel.isTowerUnlocked(type)
-                        val canAffordGold = state.gold >= towerGoldCost(type)
-                        val canAffordDiamonds = state.diamonds >= type.diamondCost || type.diamondCost == 0
-                        CompactTowerPickCard(
-                            type = type,
-                            isUnlocked = isUnlocked,
-                            canAffordGold = canAffordGold,
-                            canAffordDiamonds = canAffordDiamonds,
-                            diamonds = state.diamonds,
-                            onTap = {
-                                if (isUnlocked) {
-                                    viewModel.placeTower(slotId, type)
-                                    onDismiss()
-                                } else {
-                                    viewModel.unlockTower(type)
-                                }
-                            }
-                        )
+                    Text(
+                        text = sel.displayName.uppercase(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        color = towerColor,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    sel.typeAdvantageHint?.let { hint ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(top = 2.dp)
+                        ) {
+                            Text("⚡", fontSize = 10.sp)
+                            Text(hint, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = PathriftGold, fontFamily = FontFamily.Monospace)
+                        }
                     }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(56.dp)
-                        .background(Color.White.copy(0.08f))
-                )
-
-                Box(
-                    modifier = Modifier
-                        .width(140.dp)
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = LanguageManager.s("TAP TOWER TO BUILD", "KULEYE DOKUN"),
-                        fontSize = 9.sp,
-                        color = PathriftTextSecondary,
-                        fontFamily = FontFamily.Monospace,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
+                // BUILD / UNLOCK button
+                if (!isUnlocked) {
+                    val hasDiamonds = canAffordDiamonds
+                    Button(
+                        onClick = { viewModel.unlockTower(sel) },
+                        enabled = hasDiamonds,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (hasDiamonds) Color(0xFF00CCFF) else PathriftSurface,
+                            disabledContainerColor = PathriftSurface
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = if (hasDiamonds) "UNLOCK ${sel.displayName.uppercase()} — ${sel.diamondCost}♦"
+                                   else "NEED ${sel.diamondCost}♦",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hasDiamonds) PathriftBackground else PathriftTextSecondary,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
+                } else {
+                    Button(
+                        onClick = {
+                            if (canAffordGold) {
+                                viewModel.placeTower(slotId, sel)
+                                onDismiss()
+                            }
+                        },
+                        enabled = canAffordGold,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (canAffordGold) PathriftNeonBlue else PathriftSurface,
+                            disabledContainerColor = PathriftSurface
+                        ),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = if (canAffordGold) "BUILD ${sel.displayName.uppercase()} — ${towerGoldCost(sel)}g"
+                                   else "NOT ENOUGH GOLD",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (canAffordGold) PathriftBackground else PathriftTextSecondary,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    }
                 }
+                Spacer(Modifier.height(4.dp))
+            } else {
+                // No tower selected yet
+                Text(
+                    text = LanguageManager.s("Select a tower type above", "Yukarıdan kule seçin"),
+                    fontSize = 11.sp,
+                    color = PathriftTextSecondary,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
             }
         }
     }
@@ -981,6 +1156,7 @@ private fun TowerSelectionPanel(
 @Composable
 private fun CompactTowerPickCard(
     type: TowerType,
+    isSelected: Boolean,
     isUnlocked: Boolean,
     canAffordGold: Boolean,
     canAffordDiamonds: Boolean,
@@ -995,12 +1171,12 @@ private fun CompactTowerPickCard(
         modifier = Modifier
             .width(72.dp)
             .background(
-                PathriftSurface.copy(alpha = alpha),
+                if (isSelected) towerColor.copy(alpha = 0.12f) else PathriftSurface.copy(alpha = alpha),
                 RoundedCornerShape(10.dp)
             )
             .border(
-                width = 1.dp,
-                color = if (isAffordable) towerColor.copy(alpha = 0.7f) else PathriftTextDisabled,
+                width = if (isSelected) 2.dp else 1.dp,
+                color = if (isSelected) towerColor else if (isAffordable) towerColor.copy(alpha = 0.5f) else PathriftTextDisabled,
                 shape = RoundedCornerShape(10.dp)
             )
             .clickable(onClick = onTap)
@@ -1011,15 +1187,20 @@ private fun CompactTowerPickCard(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(towerColor.copy(alpha = if (isAffordable) 0.1f else 0.05f), CircleShape)
-                    .then(Modifier),
+                    .background(
+                        towerColor.copy(alpha = if (isSelected) 0.2f else if (isAffordable) 0.1f else 0.05f),
+                        CircleShape
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 if (!isUnlocked) {
                     Text("🔒", fontSize = androidx.compose.ui.unit.TextUnit(14f, androidx.compose.ui.unit.TextUnitType.Sp))
                 } else {
-                    TowerShapeIcon(type = type, color = towerColor.copy(alpha = alpha),
-                        modifier = Modifier.size(28.dp))
+                    TowerShapeIcon(
+                        type = type,
+                        color = if (isSelected) towerColor else towerColor.copy(alpha = alpha),
+                        modifier = Modifier.size(28.dp)
+                    )
                 }
             }
             Spacer(Modifier.height(3.dp))
@@ -1027,15 +1208,13 @@ private fun CompactTowerPickCard(
                 text = type.displayName.uppercase().take(6),
                 fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isAffordable) PathriftTextPrimary else PathriftTextSecondary.copy(alpha = alpha),
+                color = if (isSelected) PathriftTextPrimary else if (isAffordable) PathriftTextPrimary else PathriftTextSecondary.copy(alpha = alpha),
                 fontFamily = FontFamily.Monospace
             )
             Spacer(Modifier.height(2.dp))
             if (!isUnlocked) {
-                Text(
-                    text = "🔒",
-                    fontSize = 8.sp
-                )
+                Text(text = "${type.diamondCost}♦", fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                    color = if (canAffordDiamonds) Color(0xFF00CCFF) else PathriftDanger, fontFamily = FontFamily.Monospace)
             } else {
                 val goldCost = towerGoldCost(type)
                 Text(

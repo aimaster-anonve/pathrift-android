@@ -2,14 +2,18 @@ package com.pathrift.anonve.android.core.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -99,78 +103,173 @@ fun SettingsScreen(onBack: () -> Unit) {
         },
         containerColor = PathriftBackground
     ) { padding ->
-        Column(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .background(PathriftBackground)
                 .padding(padding)
-                .padding(horizontal = 20.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            Spacer(Modifier.height(24.dp))
-
-            // Language section
-            SectionHeader(
-                title = LanguageManager.s("LANGUAGE", "DİL"),
-                icon = Icons.Default.Language
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                AppLanguage.values().forEach { language ->
-                    val selected = lang == language
-                    Button(
-                        onClick = { LanguageManager.setLanguage(language) },
-                        modifier = Modifier.weight(1f).height(48.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (selected) PathriftNeonBlue else PathriftSurface,
-                            contentColor = if (selected) PathriftBackground else PathriftTextPrimary
-                        ),
-                        shape = RoundedCornerShape(12.dp)
+            val isLandscape = maxWidth > maxHeight
+            if (isLandscape) {
+                // Landscape: Left panel (Language) + Right panel (Info + About)
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    // Left panel: Language
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp, vertical = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        SectionHeader(
+                            title = LanguageManager.s("LANGUAGE", "DİL"),
+                            icon = Icons.Default.Language
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            AppLanguage.values().forEach { language ->
+                                val selected = lang == language
+                                Button(
+                                    onClick = { LanguageManager.setLanguage(language) },
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (selected) PathriftNeonBlue else PathriftSurface,
+                                        contentColor = if (selected) PathriftBackground else PathriftTextPrimary
+                                    ),
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Text(
+                                        text = "${language.flag} ${language.displayName}",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Divider
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(PathriftSurface)
+                    )
+
+                    // Right panel: Game Info + About
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp, vertical = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                        SectionHeader(
+                            title = LanguageManager.s("GAME INFO", "OYUN BİLGİSİ"),
+                            icon = Icons.Default.Info
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        InfoRow(
+                            label = LanguageManager.s("Version", "Versiyon"),
+                            value = "$version ($buildCode)"
+                        )
+                        Spacer(Modifier.height(24.dp))
+                        SectionHeader(title = "PATHRIFT", icon = Icons.Default.Bolt)
+                        Spacer(Modifier.height(12.dp))
                         Text(
-                            text = "${language.flag} ${language.displayName}",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold
+                            text = "Endless tower defense where the map never stops shifting.\nPlace towers. Survive the Rift. Push further.",
+                            fontSize = 13.sp,
+                            color = PathriftTextSecondary,
+                            lineHeight = 20.sp,
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(PathriftSurface, RoundedCornerShape(12.dp))
+                                .padding(16.dp)
                         )
                     }
                 }
+            } else {
+                // Portrait: vertical scroll
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(0.dp)
+                ) {
+                    Spacer(Modifier.height(24.dp))
+
+                    // Language section
+                    SectionHeader(
+                        title = LanguageManager.s("LANGUAGE", "DİL"),
+                        icon = Icons.Default.Language
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        AppLanguage.values().forEach { language ->
+                            val selected = lang == language
+                            Button(
+                                onClick = { LanguageManager.setLanguage(language) },
+                                modifier = Modifier.weight(1f).height(48.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (selected) PathriftNeonBlue else PathriftSurface,
+                                    contentColor = if (selected) PathriftBackground else PathriftTextPrimary
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = "${language.flag} ${language.displayName}",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(24.dp))
+
+                    // Version / Game Info section
+                    SectionHeader(
+                        title = LanguageManager.s("GAME INFO", "OYUN BİLGİSİ"),
+                        icon = Icons.Default.Info
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    InfoRow(
+                        label = LanguageManager.s("Version", "Versiyon"),
+                        value = "$version ($buildCode)"
+                    )
+
+                    Spacer(Modifier.height(24.dp))
+
+                    // About / PATHRIFT section
+                    SectionHeader(title = "PATHRIFT", icon = Icons.Default.Bolt)
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        text = "Endless tower defense where the map never stops shifting.\nPlace towers. Survive the Rift. Push further.",
+                        fontSize = 13.sp,
+                        color = PathriftTextSecondary,
+                        lineHeight = 20.sp,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(PathriftSurface, RoundedCornerShape(12.dp))
+                            .padding(16.dp)
+                    )
+
+                    Spacer(Modifier.height(40.dp))
+                }
             }
-
-            Spacer(Modifier.height(24.dp))
-
-            // Version / Game Info section
-            SectionHeader(
-                title = LanguageManager.s("GAME INFO", "OYUN BİLGİSİ"),
-                icon = Icons.Default.Info
-            )
-            Spacer(Modifier.height(12.dp))
-            InfoRow(
-                label = LanguageManager.s("Version", "Versiyon"),
-                value = "$version ($buildCode)"
-            )
-
-            Spacer(Modifier.height(24.dp))
-
-            // About / PATHRIFT section
-            SectionHeader(title = "PATHRIFT", icon = Icons.Default.Bolt)
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = "Endless tower defense where the map never stops shifting.\nPlace towers. Survive the Rift. Push further.",
-                fontSize = 13.sp,
-                color = PathriftTextSecondary,
-                lineHeight = 20.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(PathriftSurface, RoundedCornerShape(12.dp))
-                    .padding(16.dp)
-            )
-
-            Spacer(Modifier.height(40.dp))
         }
     }
 }

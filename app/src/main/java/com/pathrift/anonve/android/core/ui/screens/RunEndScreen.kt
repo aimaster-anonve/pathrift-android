@@ -11,17 +11,30 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.EmojiEvents
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,21 +45,35 @@ import com.pathrift.anonve.android.core.ui.PathriftBackground
 import com.pathrift.anonve.android.core.ui.PathriftDanger
 import com.pathrift.anonve.android.core.ui.PathriftGold
 import com.pathrift.anonve.android.core.ui.PathriftNeonBlue
+import com.pathrift.anonve.android.core.ui.PathriftOrange
 import com.pathrift.anonve.android.core.ui.PathriftPurple
 import com.pathrift.anonve.android.core.ui.PathriftSuccess
 import com.pathrift.anonve.android.core.ui.PathriftSurface
 import com.pathrift.anonve.android.core.ui.PathriftSurfaceVariant
 import com.pathrift.anonve.android.core.ui.PathriftTextPrimary
 import com.pathrift.anonve.android.core.ui.PathriftTextSecondary
+import kotlinx.coroutines.delay
 
 @Composable
 fun RunEndScreen(
     score: Long,
     wave: Int,
+    enemyKills: Int = 0,
     onPlayAgain: () -> Unit,
     onMainMenu: () -> Unit
 ) {
     val rank = ScoreEngine.getRank(score)
+
+    // Score count-up animation — iOS parity
+    var displayedScore by remember { mutableStateOf(0L) }
+    LaunchedEffect(score) {
+        val steps = 30
+        val stepValue = if (score > 0) score / steps else 0L
+        for (i in 1..steps) {
+            delay(40L)
+            displayedScore = if (i == steps) score else stepValue * i
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -63,24 +90,26 @@ fun RunEndScreen(
                         .padding(horizontal = 24.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left panel (45%): title + score + rank
+                    // Left panel (45%): title + animated score + rank
                     Column(
                         modifier = Modifier.fillMaxWidth(0.45f),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = stringResource(R.string.run_end_title),
-                            fontSize = 20.sp,
+                            text = "RUN OVER",
+                            fontSize = 24.sp,
                             fontWeight = FontWeight.Black,
                             color = PathriftDanger,
-                            letterSpacing = 2.sp
+                            letterSpacing = 2.sp,
+                            fontFamily = FontFamily.Monospace
                         )
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = "$score",
+                            text = "$displayedScore",
                             fontSize = 36.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = PathriftGold
+                            color = PathriftNeonBlue,
+                            fontFamily = FontFamily.Monospace
                         )
                         Text(
                             text = stringResource(R.string.run_end_score_label),
@@ -92,24 +121,39 @@ fun RunEndScreen(
                         RankBadgeCompact(rank = rank)
                     }
 
-                    // Right panel
+                    // Right panel: stats + actions
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(start = 20.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // Stats card — iOS parity: waves, kills, score
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(PathriftSurface)
                                 .padding(horizontal = 24.dp, vertical = 16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            StatRow(
-                                label = stringResource(R.string.run_end_wave_label),
-                                value = "$wave"
+                            StatIconRow(
+                                icon = Icons.Default.Flag,
+                                label = "WAVES REACHED",
+                                value = "$wave",
+                                color = PathriftNeonBlue
+                            )
+                            StatIconRow(
+                                icon = Icons.Default.Star,
+                                label = "ENEMY KILLS",
+                                value = "$enemyKills",
+                                color = PathriftDanger
+                            )
+                            StatIconRow(
+                                icon = Icons.Default.EmojiEvents,
+                                label = "FINAL SCORE",
+                                value = "$score",
+                                color = PathriftGold
                             )
                         }
 
@@ -147,12 +191,14 @@ fun RunEndScreen(
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier.fillMaxSize().padding(32.dp)
                 ) {
+                    // Header — iOS: "RUN OVER" title
                     Text(
-                        text = stringResource(R.string.run_end_title),
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
+                        text = "RUN OVER",
+                        fontSize = 40.sp,
+                        fontWeight = FontWeight.Black,
                         color = PathriftDanger,
-                        letterSpacing = 3.sp
+                        letterSpacing = 3.sp,
+                        fontFamily = FontFamily.Monospace
                     )
 
                     Spacer(Modifier.height(24.dp))
@@ -161,18 +207,23 @@ fun RunEndScreen(
 
                     Spacer(Modifier.height(24.dp))
 
+                    // Stats card — iOS parity: waves, kills, animated score
                     Column(
                         modifier = Modifier
+                            .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
                             .background(PathriftSurface)
-                            .padding(horizontal = 48.dp, vertical = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .padding(horizontal = 32.dp, vertical = 24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
+                        // Animated score — iOS parity
                         Text(
-                            text = "$score",
-                            fontSize = 40.sp,
+                            text = "$displayedScore",
+                            fontSize = 48.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = PathriftGold
+                            color = PathriftNeonBlue,
+                            fontFamily = FontFamily.Monospace
                         )
                         Text(
                             text = stringResource(R.string.run_end_score_label),
@@ -181,11 +232,25 @@ fun RunEndScreen(
                             letterSpacing = 1.sp
                         )
 
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(8.dp))
 
-                        StatRow(
-                            label = stringResource(R.string.run_end_wave_label),
-                            value = "$wave"
+                        StatIconRow(
+                            icon = Icons.Default.Flag,
+                            label = "WAVES REACHED",
+                            value = "$wave",
+                            color = PathriftNeonBlue
+                        )
+                        StatIconRow(
+                            icon = Icons.Default.Star,
+                            label = "ENEMY KILLS",
+                            value = "$enemyKills",
+                            color = PathriftDanger
+                        )
+                        StatIconRow(
+                            icon = Icons.Default.EmojiEvents,
+                            label = "FINAL SCORE",
+                            value = "$score",
+                            color = PathriftGold
                         )
                     }
 
@@ -194,8 +259,8 @@ fun RunEndScreen(
                     Button(
                         onClick = onPlayAgain,
                         modifier = Modifier
-                            .width(200.dp)
-                            .height(50.dp),
+                            .width(220.dp)
+                            .height(52.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = PathriftNeonBlue)
                     ) {
@@ -212,7 +277,7 @@ fun RunEndScreen(
                     OutlinedButton(
                         onClick = onMainMenu,
                         modifier = Modifier
-                            .width(200.dp)
+                            .width(220.dp)
                             .height(50.dp),
                         shape = RoundedCornerShape(12.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, PathriftSurfaceVariant)
@@ -309,5 +374,32 @@ private fun StatRow(label: String, value: String) {
         Text(text = label, color = PathriftTextSecondary, fontSize = 13.sp)
         Spacer(Modifier.width(24.dp))
         Text(text = value, color = PathriftTextPrimary, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+// iOS parity: icon + label + value stat row
+@Composable
+private fun StatIconRow(icon: ImageVector, label: String, value: String, color: androidx.compose.ui.graphics.Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(16.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = PathriftTextSecondary,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = value,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = PathriftTextPrimary,
+            fontFamily = FontFamily.Monospace
+        )
     }
 }
