@@ -337,7 +337,7 @@ fun TowerArsenalCard(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("🔒", fontSize = 14.sp)
                     Text(
-                        "${type.diamondCost}♦",
+                        "${type.diamondCost}◆",
                         color = Color(0xFF00CCFF),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
@@ -403,7 +403,7 @@ fun upgradeRow(
                 interactionSource = interactionSource
             ) {
                 Text(
-                    text = "+${cost}♦",
+                    text = "+${cost}◆",
                     color = if (diamonds >= cost) color else Color.Gray,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,

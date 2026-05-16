@@ -78,23 +78,18 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         alpha = 178
     }
 
-    // Tower slot
-    private val slotEmptyPaint = Paint().apply {
-        color = Color.parseColor("#0D2640")
-        style = Paint.Style.FILL
-        alpha = 216
-    }
-    private val slotBorderPaint = Paint().apply {
-        color = Color.parseColor("#00C7FF")
-        style = Paint.Style.STROKE
-        strokeWidth = 1.5f
-        alpha = 153
-    }
-    private val slotCrossPaint = Paint().apply {
-        color = Color.parseColor("#00C7FF")
-        style = Paint.Style.FILL
-        alpha = 178
-    }
+    // Tower slot — pre-allocated to avoid GC pressure at 60fps
+    private val slotFillPaint         = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(255, 13, 23, 36);  style = Paint.Style.FILL }
+    private val slotFillSelectedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(255, 0, 46, 71);   style = Paint.Style.FILL }
+    private val slotStrokePaint       = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(140, 0, 200, 255); style = Paint.Style.STROKE }
+    private val slotStrokeSelectedPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(255, 0, 200, 255); style = Paint.Style.STROKE }
+    private val slotCrossNewPaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(51, 0, 200, 255);  style = Paint.Style.FILL }
+    private val slotDotNewPaint       = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(204, 0, 200, 255); style = Paint.Style.FILL }
+    private val slotRect              = RectF()
+    // Legacy slot paints (kept for compatibility)
+    private val slotEmptyPaint = Paint().apply { color = Color.parseColor("#0D2640"); style = Paint.Style.FILL; alpha = 216 }
+    private val slotBorderPaint = Paint().apply { color = Color.parseColor("#00C7FF"); style = Paint.Style.STROKE; strokeWidth = 1.5f; alpha = 153 }
+    private val slotCrossPaint = Paint().apply { color = Color.parseColor("#00C7FF"); style = Paint.Style.FILL; alpha = 178 }
 
     // Tower colors
     private val towerBoltPaint      = Paint().apply { color = Color.parseColor("#00C8FF"); style = Paint.Style.FILL }
@@ -107,6 +102,9 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private val towerNovaPaint      = Paint().apply { color = Color.parseColor("#FFD700"); style = Paint.Style.FILL }
     private val towerSniperPaint    = Paint().apply { color = Color.parseColor("#66FFFF"); style = Paint.Style.FILL }
     private val towerArtilleryPaint = Paint().apply { color = Color.parseColor("#CC8800"); style = Paint.Style.FILL }
+
+    // Pre-allocated reusable paint for tower glow (color set per-tower in drawTowers)
+    private val towerGlowReusePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; alpha = 51 }
 
     // Tower range ring — semi-transparent blue halo
     private val towerRangePaint = Paint().apply {
@@ -493,59 +491,40 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     // Tower slot backgrounds — iOS parity: 32×32pt rounded square, cornerRadius 5, cross 13×2 + 2×13, 4 corner dots at 15pt offset (45°/135°/225°/315°)
     private fun drawTowerSlots(canvas: Canvas) {
-        val slotSize = dp(32f)          // iOS: 32pt square
-        val cornerR = dp(5f)            // iOS: cornerRadius 5
+        val slotSize = dp(32f)
+        val cornerR  = dp(5f)
         val halfSize = slotSize / 2f
-        val crossW = dp(13f); val crossH = dp(2f)
-        val dotR = dp(1.5f)
-        val dotOffset = dp(15f)         // iOS: 15pt from center
+        val crossW   = dp(13f); val crossH = dp(2f)
+        val dotR     = dp(1.5f); val dotOffset = dp(15f)
 
-        val pulseT = ((System.currentTimeMillis() % 2400L) / 2400f).toFloat()
-        // pulse alpha 0.40 → 0.65 (sin wave), matching iOS: alpha 0.40 → 0.65, 1.2s cycle
-        val pulseAlpha = (0.40f + 0.25f * sin(pulseT * 2 * PI.toFloat())).toFloat().coerceIn(0.40f, 0.65f)
+        val pulseT     = ((System.currentTimeMillis() % 2400L) / 2400f).toFloat()
+        val pulseAlpha = (0.40f + 0.25f * sin(pulseT * 2 * PI.toFloat())).coerceIn(0.40f, 0.65f)
 
         for ((idx, pos) in slotPositions.withIndex()) {
             if (slotOccupied[idx] == true) continue
             val cx = pos.x; val cy = pos.y
             val isSelected = selectedSlotId == idx
-            val aa = Paint.ANTI_ALIAS_FLAG
 
-            // Background fill — iOS: (0.05, 0.09, 0.14) = argb(255,13,23,36) normal; (0,0.18,0.28)=argb(255,0,46,71) selected
-            val fillColor = if (isSelected) Color.argb(255, 0, 46, 71) else Color.argb(255, 13, 23, 36)
-            val fillPaint = Paint(aa).apply { color = fillColor; style = Paint.Style.FILL }
-            val rect = RectF(cx - halfSize, cy - halfSize, cx + halfSize, cy + halfSize)
-            canvas.drawRoundRect(rect, cornerR, cornerR, fillPaint)
+            slotRect.set(cx - halfSize, cy - halfSize, cx + halfSize, cy + halfSize)
 
-            // Border stroke — iOS: (0.0, 0.78, 1.0, 0.55) pulsing; selected: full cyan, 2dp
-            val strokeAlpha = if (isSelected) 1.0f else pulseAlpha
-            val strokeWidth = if (isSelected) dp(2f) else dp(1f)
-            val strokePaint = Paint(aa).apply {
-                color = Color.argb((strokeAlpha * 255).toInt().coerceIn(0, 255), 0, 200, 255)
-                style = Paint.Style.STROKE
-                this.strokeWidth = strokeWidth
-            }
-            canvas.drawRoundRect(rect, cornerR, cornerR, strokePaint)
+            // Fill — reuse pre-allocated paint
+            canvas.drawRoundRect(slotRect, cornerR, cornerR,
+                if (isSelected) slotFillSelectedPaint else slotFillPaint)
 
-            // Inner cross — iOS: H-line 13×2, V-line 2×13, color (0.0,0.78,1.0,0.20) = alpha 51
-            val crossPaint = Paint(aa).apply {
-                color = Color.argb(51, 0, 200, 255)  // alpha 0.20
-                style = Paint.Style.FILL
-            }
-            // H line
-            canvas.drawRect(cx - crossW / 2, cy - crossH / 2, cx + crossW / 2, cy + crossH / 2, crossPaint)
-            // V line
-            canvas.drawRect(cx - crossH / 2, cy - crossW / 2, cx + crossH / 2, cy + crossW / 2, crossPaint)
+            // Border — set alpha on pre-allocated paint (no new object)
+            val strokePaint = if (isSelected) slotStrokeSelectedPaint else slotStrokePaint
+            strokePaint.strokeWidth = if (isSelected) dp(2f) else dp(1f)
+            if (!isSelected) slotStrokePaint.alpha = (pulseAlpha * 255).toInt().coerceIn(0, 255)
+            canvas.drawRoundRect(slotRect, cornerR, cornerR, strokePaint)
 
-            // 4 corner dots at 45°/135°/225°/315° — iOS: radius 1.5pt, color (0.0,0.78,1.0,0.80) = alpha 204
-            val dotPaint = Paint(aa).apply {
-                color = Color.argb(204, 0, 200, 255)  // alpha 0.80
-                style = Paint.Style.FILL
-            }
+            // Inner cross — reuse pre-allocated paint
+            canvas.drawRect(cx - crossW/2, cy - crossH/2, cx + crossW/2, cy + crossH/2, slotCrossNewPaint)
+            canvas.drawRect(cx - crossH/2, cy - crossW/2, cx + crossH/2, cy + crossW/2, slotCrossNewPaint)
+
+            // Corner dots — reuse pre-allocated paint
             for (angleDeg in listOf(45f, 135f, 225f, 315f)) {
-                val rad = (angleDeg * PI.toFloat() / 180f)
-                val dx2 = cos(rad) * dotOffset
-                val dy2 = sin(rad) * dotOffset
-                canvas.drawCircle(cx + dx2, cy + dy2, dotR, dotPaint)
+                val rad = angleDeg * PI.toFloat() / 180f
+                canvas.drawCircle(cx + cos(rad) * dotOffset, cy + sin(rad) * dotOffset, dotR, slotDotNewPaint)
             }
         }
     }
@@ -564,12 +543,9 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 canvas.drawCircle(cx, cy, rangePixels, towerRangePaint)
             }
 
-            // Tower body glow — faint colored aura circle beneath the tower (iOS SpriteKit glow parity)
-            val towerGlowColor = towerTypeGlowColor(inst.tower.type)
-            val glowPaint = Paint().apply {
-                color = towerGlowColor; style = Paint.Style.FILL; isAntiAlias = true; alpha = 51  // 20% alpha
-            }
-            canvas.drawCircle(cx, cy, dp(18f), glowPaint)
+            // Tower body glow — reuse pre-allocated paint, just set color each time
+            towerGlowReusePaint.color = towerTypeGlowColor(inst.tower.type)
+            canvas.drawCircle(cx, cy, dp(18f), towerGlowReusePaint)
 
             // Floor shadow ellipse beneath tower
             val shadowPaint = Paint().apply {

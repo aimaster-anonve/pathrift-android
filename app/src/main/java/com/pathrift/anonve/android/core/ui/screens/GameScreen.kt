@@ -39,6 +39,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -450,7 +451,7 @@ private fun CombatHUD(
                         Spacer(Modifier.width(8.dp))
                         // Diamond pill
                         StatPill {
-                            Text("♦", color = Color(0xFF00CCFF), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF00CCFF), modifier = Modifier.size(11.dp))
                             Text("${state.diamonds}", color = Color(0xFF00CCFF), fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                         }
                         Spacer(Modifier.width(8.dp))
@@ -512,10 +513,10 @@ private fun CombatHUD(
                 ) {
                     HudStatPill(LanguageManager.s("GOLD", "ALTIN"), "${state.gold}", PathriftGold, icon = Icons.Default.MonetizationOn)
                     Spacer(Modifier.width(14.dp))
-                    // GAP-022: Diamond pill — ♦ symbol separate from value (FIX 12: #66CCFF softer cyan, iOS parity)
+                    // Diamond pill — Icon avoids emoji rendering issue on Android
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("♦", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF66CCFF))
+                            Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF66CCFF), modifier = Modifier.size(13.dp))
                             Text("${state.diamonds}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF66CCFF), fontFamily = FontFamily.Monospace)
                         }
                         Text(LanguageManager.s("DIAMONDS", "ELMAS"), fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = PathriftTextSecondary, letterSpacing = 1.5.sp, fontFamily = FontFamily.Monospace)
@@ -957,22 +958,27 @@ private fun TowerInfoBottomPanel(
                 )
                 Spacer(Modifier.width(12.dp))
 
-                // Identity: name + level — GAP-041: name font 12sp
-                Column(modifier = Modifier.width(90.dp)) {
+                // Identity — 96dp (iOS parity), name clipped to prevent overflow
+                Column(modifier = Modifier.width(96.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(info.type.displayName.uppercase(), fontSize = 12.sp,
-                            fontWeight = FontWeight.Black, color = PathriftTextPrimary)
-                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            info.type.displayName.uppercase(),
+                            fontSize = 12.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        Spacer(Modifier.width(3.dp))
                         Box(modifier = Modifier
                             .background(PathriftNeonBlue.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                            .padding(horizontal = 3.dp, vertical = 1.dp)
                         ) {
-                            Text("Lv.${info.level}", fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                            Text("Lv${info.level}", fontSize = 7.sp, fontWeight = FontWeight.Bold,
                                 color = PathriftNeonBlue, fontFamily = FontFamily.Monospace)
                         }
                     }
                     info.type.typeAdvantageHint?.let { hint ->
-                        Text("⚡ $hint", fontSize = 7.sp, color = PathriftGold, fontFamily = FontFamily.Monospace)
+                        Text("⚡ $hint", fontSize = 7.sp, color = PathriftGold,
+                            fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     val modeLabel = when (info.type.targetingMode) {
                         TargetingMode.ALL_LAYERS  -> "ALL LAYERS"
@@ -980,13 +986,8 @@ private fun TowerInfoBottomPanel(
                         else -> null
                     }
                     modeLabel?.let { label ->
-                        Text(
-                            text = label,
-                            fontSize = 7.sp,
-                            color = Color(0xFF00CCFF).copy(alpha = 0.7f),
-                            fontFamily = FontFamily.Monospace,
-                            letterSpacing = 0.5.sp
-                        )
+                        Text(label, fontSize = 7.sp, color = Color(0xFF00CCFF).copy(alpha = 0.7f),
+                            fontFamily = FontFamily.Monospace, maxLines = 1)
                     }
                 }
 
@@ -1147,7 +1148,7 @@ private fun TowerSelectionPanel(
                         Text("GOLD", fontSize = 8.sp, color = PathriftTextSecondary, fontFamily = FontFamily.Monospace)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("♦", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00CCFF))
+                        Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF00CCFF), modifier = Modifier.size(11.dp))
                         Text("${state.diamonds}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00CCFF), fontFamily = FontFamily.Monospace)
                     }
                 }
@@ -1253,8 +1254,8 @@ private fun TowerSelectionPanel(
                                 tint = if (hasDiamonds) PathriftBackground else PathriftTextSecondary
                             )
                             Text(
-                                text = if (hasDiamonds) "UNLOCK ${sel.displayName.uppercase()} — ${sel.diamondCost}♦"
-                                       else "NEED ${sel.diamondCost}♦",
+                                text = if (hasDiamonds) "UNLOCK ${sel.displayName.uppercase()} — ${sel.diamondCost}◆"
+                                       else "NEED ${sel.diamondCost}◆",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (hasDiamonds) PathriftBackground else PathriftTextSecondary,
@@ -1397,7 +1398,7 @@ private fun CompactTowerPickCard(
             Spacer(Modifier.height(2.dp))
             if (!isUnlocked) {
                 // GAP-033: Cost font 10sp
-                Text(text = "${type.diamondCost}♦", fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                Text(text = "${type.diamondCost}◆", fontSize = 10.sp, fontWeight = FontWeight.Bold,
                     color = if (canAffordDiamonds) Color(0xFF00CCFF) else PathriftTextSecondary, fontFamily = FontFamily.Monospace)
             } else {
                 val goldCost = towerGoldCost(type)
@@ -1472,7 +1473,7 @@ private fun TowerPickCard(
                         .padding(horizontal = 5.dp, vertical = 2.dp)
                 ) {
                     Text(
-                        text = "🔒 ${type.diamondCost}♦",
+                        text = "🔒 ${type.diamondCost}◆",
                         fontSize = 8.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (canAffordDiamonds) Color(0xFF00CCFF) else PathriftDanger,

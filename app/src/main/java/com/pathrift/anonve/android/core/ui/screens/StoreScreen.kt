@@ -373,7 +373,7 @@ private fun StoreTowerGridCard(type: TowerType, isUnlocked: Boolean, modifier: M
                 text = when {
                     type.diamondCost == 0 -> "FREE"
                     isUnlocked -> "OWNED ✓"
-                    else -> "♦ ${type.diamondCost}"
+                    else -> "◆ ${type.diamondCost}"
                 },
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
@@ -487,7 +487,7 @@ private fun TowerDetailSheetContent(
                 shape = RoundedCornerShape(14.dp)
             ) {
                 Text(
-                    text = if (canAfford) "UNLOCK FOR ${type.diamondCost} ♦" else "NEED ${type.diamondCost - diamonds} MORE ♦",
+                    text = if (canAfford) "UNLOCK FOR ${type.diamondCost} ◆" else "NEED ${type.diamondCost - diamonds} MORE ◆",
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (canAfford) PathriftBackground else PathriftTextSecondary
