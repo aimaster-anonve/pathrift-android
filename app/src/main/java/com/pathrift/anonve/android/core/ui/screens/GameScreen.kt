@@ -37,13 +37,16 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.KeyboardDoubleArrowRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
@@ -506,7 +509,7 @@ private fun CombatHUD(
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    HudStatPill(LanguageManager.s("GOLD", "ALTIN"), "${state.gold}", PathriftGold)
+                    HudStatPill(LanguageManager.s("GOLD", "ALTIN"), "${state.gold}", PathriftGold, icon = Icons.Default.MonetizationOn)
                     Spacer(Modifier.width(14.dp))
                     // GAP-022: Diamond pill — ♦ symbol separate from value
                     Column {
@@ -650,7 +653,7 @@ private fun CombatHUD(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange)
+                    HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange, icon = Icons.Default.Bolt)
                     Spacer(Modifier.weight(1f))
                     when {
                         state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
@@ -663,9 +666,14 @@ private fun CombatHUD(
 }
 
 @Composable
-private fun HudStatPill(label: String, value: String, valueColor: Color) {
+private fun HudStatPill(label: String, value: String, valueColor: Color, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
     Column {
-        Text(value, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = valueColor, fontFamily = FontFamily.Monospace)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            if (icon != null) {
+                Icon(icon, contentDescription = null, tint = valueColor, modifier = Modifier.size(14.dp))
+            }
+            Text(value, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = valueColor, fontFamily = FontFamily.Monospace)
+        }
         Text(label, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = PathriftTextSecondary, letterSpacing = 1.5.sp, fontFamily = FontFamily.Monospace)
     }
 }
@@ -741,37 +749,51 @@ private fun WaveProgressIndicator(cleared: Int, total: Int) {
     }
 }
 
-// GAP-016: "START"/"BAŞLA" on wave 0, GAP-017: PlayArrow icon
+// iOS parity: double chevron icon + gradient background, cornerRadius 18
 @Composable
 private fun SendWaveButton(wave: Int, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
-        modifier = Modifier.height(36.dp),
-        shape = RoundedCornerShape(18.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-        elevation = ButtonDefaults.buttonElevation(0.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.97f else 1.0f,
+        animationSpec = spring(stiffness = 700f),
+        label = "sendWaveScale"
+    )
+    Box(
+        modifier = Modifier
+            .height(36.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
     ) {
-        Box(
-            modifier = Modifier
-                .background(
-                    Brush.horizontalGradient(listOf(Color(0xFF00CCFF), Color(0xFF9966FF))),
-                    RoundedCornerShape(18.dp)
-                )
-                .padding(horizontal = 16.dp, vertical = 6.dp)
+        Button(
+            onClick = onClick,
+            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
+            modifier = Modifier.height(36.dp),
+            shape = RoundedCornerShape(18.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+            elevation = ButtonDefaults.buttonElevation(0.dp),
+            interactionSource = interactionSource
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            Box(
+                modifier = Modifier
+                    .background(
+                        Brush.horizontalGradient(listOf(Color(0xFF00CCFF), Color(0xFF9966FF))),
+                        RoundedCornerShape(18.dp)
+                    )
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
-                Text(
-                    if (wave == 0) LanguageManager.s("START", "BAŞLA") else LanguageManager.s("NEXT WAVE", "SONRAKI DALGA"),
-                    color = Color.Black,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 0.5.sp
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(Icons.Default.KeyboardDoubleArrowRight, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                    Text(
+                        if (wave == 0) LanguageManager.s("START", "BAŞLA") else LanguageManager.s("NEXT WAVE", "SONRAKI DALGA"),
+                        color = Color.Black,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.5.sp
+                    )
+                }
             }
         }
     }
@@ -830,17 +852,55 @@ private fun PauseOverlay(onResume: () -> Unit, onQuit: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Column(
-            modifier = Modifier.background(PathriftSurface, RoundedCornerShape(20.dp)).padding(32.dp),
+            modifier = Modifier
+                .padding(horizontal = 40.dp)
+                .background(PathriftSurface, RoundedCornerShape(20.dp))
+                .padding(28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(LanguageManager.s("PAUSED", "DURAKLATILDI"), fontSize = 22.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary, letterSpacing = 3.sp, fontFamily = FontFamily.Monospace)
+            Text(
+                LanguageManager.s("PAUSED", "DURAKLATILDI"),
+                fontSize = 22.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary,
+                letterSpacing = 3.sp, fontFamily = FontFamily.Monospace
+            )
             Spacer(Modifier.height(24.dp))
-            Button(onClick = onResume, modifier = Modifier.fillMaxWidth().height(52.dp), colors = ButtonDefaults.buttonColors(containerColor = PathriftNeonBlue), shape = RoundedCornerShape(12.dp)) {
-                Text(LanguageManager.s("RESUME", "DEVAM ET"), fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            // RESUME — gradient NeonBlue→Purple (iOS parity) + scale press animation
+            val resumeInteraction = remember { MutableInteractionSource() }
+            val resumePressed by resumeInteraction.collectIsPressedAsState()
+            val resumeScale by animateFloatAsState(if (resumePressed) 0.97f else 1f, spring(stiffness = 700f), label = "resumeScale")
+            Button(
+                onClick = onResume,
+                modifier = Modifier.fillMaxWidth().height(52.dp).graphicsLayer { scaleX = resumeScale; scaleY = resumeScale },
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                interactionSource = resumeInteraction
+            ) {
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(listOf(PathriftNeonBlue, PathriftPurple)),
+                            RoundedCornerShape(12.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(LanguageManager.s("RESUME", "DEVAM ET"), fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, color = Color.White)
+                }
             }
             Spacer(Modifier.height(12.dp))
-            OutlinedButton(onClick = onQuit, modifier = Modifier.fillMaxWidth().height(48.dp), shape = RoundedCornerShape(12.dp)) {
-                Text(LanguageManager.s("QUIT RUN", "OYUNU BIRAK"), fontSize = 14.sp, color = PathriftTextSecondary)
+            // QUIT — outlined danger border (iOS parity)
+            val quitInteraction = remember { MutableInteractionSource() }
+            val quitPressed by quitInteraction.collectIsPressedAsState()
+            val quitScale by animateFloatAsState(if (quitPressed) 0.97f else 1f, spring(stiffness = 700f), label = "quitScale")
+            OutlinedButton(
+                onClick = onQuit,
+                modifier = Modifier.fillMaxWidth().height(48.dp).graphicsLayer { scaleX = quitScale; scaleY = quitScale },
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, PathriftDanger.copy(alpha = 0.6f)),
+                interactionSource = quitInteraction,
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftDanger)
+            ) {
+                Text(LanguageManager.s("QUIT RUN", "OYUNU BIRAK"), fontSize = 14.sp, color = PathriftDanger)
             }
         }
     }

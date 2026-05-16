@@ -61,6 +61,9 @@ object PathSystem {
     private var screenWidth: Float = 0f
     private var screenHeight: Float = 0f
 
+    // Screen density — set by GameEngine.initLayout() so isSlotClearOfPath uses pixel-correct clearance
+    var screenDensity: Float = 1f
+
     var waypoints: List<PointF> = emptyList()
         private set
 
@@ -131,8 +134,9 @@ object PathSystem {
             waypointLayers = List(waypoints.size) { PathLayer.GROUND }
 
             val rawSlots = computeSlots(y1, y2, y3, xL, xR, xOff + W, yOff + H, currentWave)
-            // Build 5.3: clearance = 28f (slot half=16 + path half=8.5 + margin=3.5, was 36f)
-            val filteredSlots = rawSlots.filter { isSlotClearOfPath(it, waypoints, clearance = 28f) }
+            // Build 8: density-aware clearance = (slotRadius=16 + pathHalf=8.5 + margin=4) × density
+            val pixelClearance = (16f + 8.5f + 4f) * screenDensity
+            val filteredSlots = rawSlots.filter { isSlotClearOfPath(it, waypoints, clearance = pixelClearance) }
             slotPositions = guaranteePathCoverage(filteredSlots, waypoints, currentWave)
         } else {
             // Crossing/complex layouts (indices 12–17)
@@ -149,8 +153,9 @@ object PathSystem {
             }
 
             val rawSlots = computeSlotsForCrossing(xOff + W, yOff + H, xOff, yOff, currentWave)
-            // Build 5.3: clearance = 28f (slot half=16 + path half=8.5 + margin=3.5, was 36f)
-            val filteredSlots = rawSlots.filter { isSlotClearOfPath(it, waypoints, clearance = 28f) }
+            // Build 8: density-aware clearance = (slotRadius=16 + pathHalf=8.5 + margin=4) × density
+            val pixelClearance = (16f + 8.5f + 4f) * screenDensity
+            val filteredSlots = rawSlots.filter { isSlotClearOfPath(it, waypoints, clearance = pixelClearance) }
             slotPositions = guaranteePathCoverage(filteredSlots, waypoints, currentWave)
         }
     }
@@ -197,7 +202,7 @@ object PathSystem {
         return sqrt((px - cx).pow(2) + (py - cy).pow(2))
     }
 
-    private fun isSlotClearOfPath(slot: PointF, waypoints: List<PointF>, clearance: Float = 28f): Boolean {
+    private fun isSlotClearOfPath(slot: PointF, waypoints: List<PointF>, clearance: Float = 85f): Boolean {
         for (i in 1 until waypoints.size) {
             val dist = distanceFromPointToSegment(
                 slot.x, slot.y,

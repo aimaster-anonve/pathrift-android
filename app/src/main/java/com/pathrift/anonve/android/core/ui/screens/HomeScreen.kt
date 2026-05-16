@@ -230,14 +230,33 @@ private fun LandscapeHomeContent(
                 fontFamily = FontFamily.Monospace,
                 textAlign = TextAlign.Center
             )
-            Text(
-                text = "THE MAP ALWAYS SHIFTS",
-                fontSize = 8.sp,
-                color = PathriftPurple.copy(alpha = 0.8f),
-                letterSpacing = 1.sp,
-                fontFamily = FontFamily.Monospace,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
                 modifier = Modifier.padding(top = 2.dp)
-            )
+            ) {
+                Canvas(modifier = Modifier.width(10.dp).height(2.dp)) {
+                    drawRoundRect(
+                        color = PathriftPurple.copy(alpha = 0.7f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx())
+                    )
+                }
+                Spacer(Modifier.width(4.dp))
+                Text(
+                    text = "THE MAP ALWAYS SHIFTS",
+                    fontSize = 8.sp,
+                    color = PathriftPurple.copy(alpha = 0.8f),
+                    letterSpacing = 1.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Spacer(Modifier.width(4.dp))
+                Canvas(modifier = Modifier.width(10.dp).height(2.dp)) {
+                    drawRoundRect(
+                        color = PathriftPurple.copy(alpha = 0.7f),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx())
+                    )
+                }
+            }
 
             if (bestScore > 0L) {
                 Spacer(Modifier.height(8.dp))
@@ -409,14 +428,34 @@ private fun PortraitHomeContent(
             letterSpacing = 3.sp,
             fontFamily = FontFamily.Monospace
         )
-        Text(
-            text = "THE MAP ALWAYS SHIFTS",
-            fontSize = 10.sp,
-            color = PathriftPurple.copy(alpha = 0.8f),
-            letterSpacing = 1.5.sp,
-            fontFamily = FontFamily.Monospace,
+        // iOS parity: decorative purple line accents flanking the tagline
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
             modifier = Modifier.padding(top = 4.dp)
-        )
+        ) {
+            Canvas(modifier = Modifier.width(20.dp).height(2.dp)) {
+                drawRoundRect(
+                    color = PathriftPurple.copy(alpha = 0.7f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx())
+                )
+            }
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "THE MAP ALWAYS SHIFTS",
+                fontSize = 10.sp,
+                color = PathriftPurple.copy(alpha = 0.8f),
+                letterSpacing = 1.5.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Spacer(Modifier.width(6.dp))
+            Canvas(modifier = Modifier.width(20.dp).height(2.dp)) {
+                drawRoundRect(
+                    color = PathriftPurple.copy(alpha = 0.7f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(1.dp.toPx())
+                )
+            }
+        }
 
         if (bestScore > 0L) {
             // GAP-007: Styled high score badge box
@@ -546,20 +585,22 @@ private fun PortraitHomeContent(
 
         Spacer(Modifier.height(12.dp))
 
+        // iOS parity: Settings + Store + Arsenal in one 3-equal-width row (portrait)
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             OutlinedButton(
                 onClick = onOpenSettings,
                 modifier = Modifier.weight(1f).height(44.dp),
                 border = BorderStroke(1.dp, PathriftTextSecondary.copy(alpha = 0.2f)),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftTextSecondary)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftTextSecondary),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp)
             ) {
-                Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(LanguageManager.s("SETTINGS", "AYARLAR"), fontSize = 13.sp)
+                Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(LanguageManager.s("SETTINGS", "AYARLAR"), fontSize = 11.sp)
             }
 
             OutlinedButton(
@@ -567,26 +608,26 @@ private fun PortraitHomeContent(
                 modifier = Modifier.weight(1f).height(44.dp),
                 border = BorderStroke(1.dp, PathriftNeonBlue.copy(alpha = 0.3f)),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftNeonBlue)
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftNeonBlue),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp)
             ) {
-                Icon(Icons.Default.Diamond, contentDescription = null, modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(LanguageManager.s("STORE", "MAĞAZA"), fontSize = 13.sp)
+                Icon(Icons.Default.Diamond, contentDescription = null, modifier = Modifier.size(13.dp), tint = PathriftNeonBlue)
+                Spacer(Modifier.width(4.dp))
+                Text(LanguageManager.s("STORE", "MAĞAZA"), fontSize = 11.sp)
             }
-        }
 
-        Spacer(Modifier.height(12.dp))
-
-        OutlinedButton(
-            onClick = onOpenArsenal,
-            modifier = Modifier.fillMaxWidth().height(44.dp),
-            border = BorderStroke(1.dp, PathriftOrange.copy(alpha = 0.4f)),
-            shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftOrange)
-        ) {
-            Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(LanguageManager.s("ARSENAL", "CEPHANE"), fontSize = 13.sp)
+            OutlinedButton(
+                onClick = onOpenArsenal,
+                modifier = Modifier.weight(1f).height(44.dp),
+                border = BorderStroke(1.dp, PathriftOrange.copy(alpha = 0.4f)),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftOrange),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+            ) {
+                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(13.dp))
+                Spacer(Modifier.width(4.dp))
+                Text(LanguageManager.s("ARSENAL", "CEPHANE"), fontSize = 11.sp)
+            }
         }
 
         Spacer(Modifier.height(12.dp))

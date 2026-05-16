@@ -193,11 +193,12 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private val hpYellowPaint = Paint().apply { color = Color.parseColor("#FFD60A"); style = Paint.Style.FILL }
     private val hpRedPaint = Paint().apply { color = Color.parseColor("#FF2D55"); style = Paint.Style.FILL }
 
-    // Rift Shift overlay
+    // Rift Shift overlay — alpha kept minimal (8) since Compose RiftShiftOverlay handles the main visual
+    // Keeping a very subtle renderer flash avoids double-darkening while preserving edge blending
     private val riftFlashPaint = Paint().apply {
         color = Color.parseColor("#8C4FFF")
         style = Paint.Style.FILL
-        alpha = 38
+        alpha = 8
     }
 
     private val indicatorTextPaint = Paint().apply {
@@ -570,6 +571,13 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 canvas.drawCircle(cx, cy, rangePixels, towerRangePaint)
             }
 
+            // Tower body glow — faint colored aura circle beneath the tower (iOS SpriteKit glow parity)
+            val towerGlowColor = towerTypeGlowColor(inst.tower.type)
+            val glowPaint = Paint().apply {
+                color = towerGlowColor; style = Paint.Style.FILL; isAntiAlias = true; alpha = 51  // 20% alpha
+            }
+            canvas.drawCircle(cx, cy, dp(18f), glowPaint)
+
             // Floor shadow ellipse beneath tower
             val shadowPaint = Paint().apply {
                 color = Color.argb(89, 0, 0, 0); style = Paint.Style.FILL; isAntiAlias = true
@@ -817,6 +825,34 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         canvas.drawText(level.toString(), cx, cy + dp(4f), tp)
     }
 
+    /** Returns the ARGB glow color for a tower type — used for the body glow circle. */
+    private fun towerTypeGlowColor(type: TowerType): Int = when (type) {
+        TowerType.BOLT      -> Color.parseColor("#00C8FF")
+        TowerType.BLAST     -> Color.parseColor("#FF6B00")
+        TowerType.FROST     -> Color.parseColor("#8B4FFF")
+        TowerType.PIERCE    -> Color.parseColor("#CCFF00")
+        TowerType.CORE      -> Color.parseColor("#FF4400")
+        TowerType.INFERNO   -> Color.parseColor("#FF2200")
+        TowerType.TESLA     -> Color.parseColor("#00AAFF")
+        TowerType.NOVA      -> Color.parseColor("#FFD700")
+        TowerType.SNIPER    -> Color.parseColor("#66FFFF")
+        TowerType.ARTILLERY -> Color.parseColor("#CC8800")
+    }
+
+    /** Returns the ARGB aura color for an enemy type — drawn as a faint glow before the body. */
+    private fun enemyTypeAuraColor(type: EnemyType): Int = when (type) {
+        EnemyType.RUNNER   -> Color.parseColor("#3399FF")
+        EnemyType.TANK     -> Color.parseColor("#808090")
+        EnemyType.BOSS     -> Color.parseColor("#FF2D55")
+        EnemyType.SHIELD   -> Color.parseColor("#33D966")
+        EnemyType.SWARM    -> Color.parseColor("#FFE11A")
+        EnemyType.GHOST    -> Color.parseColor("#BF8BFF")
+        EnemyType.SPLITTER -> Color.parseColor("#FF9919")
+        EnemyType.JUMPER   -> Color.parseColor("#1ACCCC")
+        EnemyType.HEALER   -> Color.parseColor("#2ECC71")
+        EnemyType.PHANTOM  -> Color.parseColor("#8B00FF")
+    }
+
     // All enemy types with distinct visuals; bridge enemies drawn 1.15× larger
     private fun drawEnemies(canvas: Canvas) {
         for (enemy in enemies) {
@@ -830,6 +866,15 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                 canvas.save()
                 canvas.scale(scale, scale, px, py)
             }
+
+            // Enemy aura glow — faint colored halo before drawing body (iOS parity ~10% alpha)
+            val enemyAuraPaint = Paint().apply {
+                color = enemyTypeAuraColor(enemy.type)
+                style = Paint.Style.FILL
+                isAntiAlias = true
+                alpha = 28  // ~11% alpha
+            }
+            canvas.drawCircle(px, py, dp(10f), enemyAuraPaint)
 
             when (enemy.type) {
                 EnemyType.RUNNER   -> drawRunnerEnemy(canvas, px, py, enemy)

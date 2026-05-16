@@ -162,6 +162,7 @@ class GameEngine(
         PathSystem.hudTopInset = if (topInset > 0f) topInset else 48f * density
         PathSystem.hudBottomInset = if (bottomInset > 0f) bottomInset else 46f * density
         PathSystem.hudHorizontalInset = 8f * density
+        PathSystem.screenDensity = density  // Build 8: density-aware path clearance (PATHRIFT-160 fix)
         val layoutIdx = pendingSave?.layoutIndex ?: -1
         PathSystem.buildLayout(width, height, currentWave = 0, layoutIndex = layoutIdx)
         grid.updateSlots(PathSystem.slotPositions)
@@ -673,7 +674,7 @@ class GameEngine(
         // Snapshot surviving towers before layout change
         val towerSnapshot = _towers.values.toList()
 
-        // Build new path + slots
+        // Build new path + slots — density already set in initLayout
         PathSystem.buildLayout(screenWidth, screenHeight, currentWave, newIndex)
         val newSlotPositions = PathSystem.slotPositions
         grid.updateSlots(newSlotPositions)
