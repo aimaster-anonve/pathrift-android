@@ -506,7 +506,7 @@ private fun CombatHUD(
                         .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    HudStatPill(LanguageManager.s("GOLD", "ALTIN"), "${state.gold}", PathriftNeonBlue)
+                    HudStatPill(LanguageManager.s("GOLD", "ALTIN"), "${state.gold}", PathriftGold)
                     Spacer(Modifier.width(14.dp))
                     // GAP-022: Diamond pill — ♦ symbol separate from value
                     Column {
@@ -872,12 +872,19 @@ private fun TowerInfoBottomPanel(
         Column(modifier = Modifier.fillMaxWidth().clickable(enabled = false) {}) {
             // GAP-038: Top accent line
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(towerColor.copy(alpha = 0.4f)))
-            // Single-row compact card — GAP-045: 58dp fixed height
+            // Single-row compact card — GAP-045: 58dp fixed height, GAP-037: frosted glass gradient overlay
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(58.dp)
-                    .background(PathriftBackground.copy(alpha = 0.94f)),
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                PathriftBackground.copy(alpha = 0.82f),
+                                PathriftBackground.copy(alpha = 0.96f)
+                            )
+                        )
+                    ),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Tower color accent bar — GAP-042: vertical padding 8dp
@@ -1267,11 +1274,11 @@ private fun CompactTowerPickCard(
     val isAffordable = isUnlocked && canAffordGold
     val alpha = if (isAffordable) 1f else 0.45f
 
-    // GAP-035: Scale press animation
+    // GAP-035: Scale press animation 0.97f (iOS parity)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.95f else 1.0f,
+        targetValue = if (isPressed) 0.97f else 1.0f,
         animationSpec = spring(stiffness = 700f),
         label = "cardScale"
     )

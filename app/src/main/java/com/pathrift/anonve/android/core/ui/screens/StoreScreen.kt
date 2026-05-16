@@ -29,11 +29,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.Diamond
+import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Shield
@@ -575,9 +577,9 @@ private fun PremiumCard(isPremium: Boolean, onActivate: () -> Unit) {
 
         if (!isPremium) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                PremiumBenefitRow(icon = Icons.Default.Bolt, text = "×2 Speed in-game")
+                PremiumBenefitRow(icon = Icons.Default.FastForward, text = "×2 Speed in-game")
                 PremiumBenefitRow(icon = Icons.Default.Favorite, text = "1 Revive per run")
-                PremiumBenefitRow(icon = Icons.Default.Star, text = "More perks coming")
+                PremiumBenefitRow(icon = Icons.Default.AutoAwesome, text = "More perks coming")
             }
             // Gradient button — iOS parity: NeonBlue → Purple gradient
             Box(
@@ -593,7 +595,7 @@ private fun PremiumCard(isPremium: Boolean, onActivate: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Icon(imageVector = Icons.Default.Bolt, contentDescription = null, tint = PathriftBackground, modifier = Modifier.size(16.dp))
+                    Icon(imageVector = Icons.Default.FastForward, contentDescription = null, tint = PathriftBackground, modifier = Modifier.size(16.dp))
                     Text(
                         text = "GET PREMIUM (FREE – Test Mode)",
                         fontSize = 14.sp,
@@ -605,7 +607,7 @@ private fun PremiumCard(isPremium: Boolean, onActivate: () -> Unit) {
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                PremiumBenefitRow(icon = Icons.Default.Bolt, text = "×2 Speed active")
+                PremiumBenefitRow(icon = Icons.Default.FastForward, text = "×2 Speed active")
                 PremiumBenefitRow(icon = Icons.Default.Favorite, text = "1 Revive per run active")
             }
         }
