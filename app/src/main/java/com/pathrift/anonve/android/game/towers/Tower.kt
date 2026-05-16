@@ -82,6 +82,32 @@ enum class TowerType {
     }
 
     val isPremium: Boolean get() = diamondCost > 0
+
+    val baseDamage: Int get() = when (this) {
+        BOLT -> 20; BLAST -> 15; FROST -> 5; PIERCE -> 25; CORE -> 45
+        INFERNO -> 18; TESLA -> 35; NOVA -> 90; SNIPER -> 35; ARTILLERY -> 55
+    }
+    val baseRangeTiles: Float get() = when (this) {
+        BOLT -> 2.4f; BLAST -> 2.0f; FROST -> 2.4f; PIERCE -> 2.4f; CORE -> 2.0f
+        INFERNO -> 2.0f; TESLA -> 2.5f; NOVA -> 2.7f; SNIPER -> 3.2f; ARTILLERY -> 2.5f
+    }
+    val baseAttacksPerSecond: Float get() = when (this) {
+        BOLT -> 1.2f; BLAST -> 0.5f; FROST -> 0.8f; PIERCE -> 1.0f; CORE -> 0.7f
+        INFERNO -> 1.5f; TESLA -> 0.9f; NOVA -> 0.35f; SNIPER -> 0.5f; ARTILLERY -> 0.4f
+    }
+
+    val description: String get() = when (this) {
+        TowerType.BOLT      -> "Fast electrical strikes. Excellent against light enemies."
+        TowerType.BLAST     -> "Wide AoE explosion. Shreds swarm waves."
+        TowerType.FROST     -> "Slows enemies significantly. Great support tower."
+        TowerType.PIERCE    -> "Piercing rounds. Devastates shielded units."
+        TowerType.CORE      -> "Focused energy beam. Melts armored tanks."
+        TowerType.INFERNO   -> "Burning flames. Combusts ghost-type enemies."
+        TowerType.TESLA     -> "Chain lightning. Zaps entire swarms."
+        TowerType.NOVA      -> "Singularity burst. Extra damage to boss enemies."
+        TowerType.SNIPER    -> "Targets all layers. Long range single target."
+        TowerType.ARTILLERY -> "Bridge enemies only. AoE blast. +50% vs Boss."
+    }
 }
 
 /**

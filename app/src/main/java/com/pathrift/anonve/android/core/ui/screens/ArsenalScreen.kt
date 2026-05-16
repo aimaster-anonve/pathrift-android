@@ -238,13 +238,20 @@ fun TowerArsenalCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // GAP-060: solid fill circle with white center dot — iOS parity
                 Box(
                     Modifier
                         .size(32.dp)
                         .clip(CircleShape)
-                        .background(towerColor.copy(0.2f))
-                        .border(1.5.dp, towerColor, CircleShape)
-                )
+                        .background(towerColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        Modifier
+                            .size(10.dp)
+                            .background(Color.White.copy(alpha = 0.9f), CircleShape)
+                    )
+                }
                 Column {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),

@@ -1,6 +1,9 @@
 package com.pathrift.anonve.android.core.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -15,9 +18,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Flag
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -32,6 +35,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -59,13 +64,17 @@ fun RunEndScreen(
     score: Long,
     wave: Int,
     enemyKills: Int = 0,
+    isVictory: Boolean = false,
+    previousBestScore: Long = 0L,
     onPlayAgain: () -> Unit,
     onMainMenu: () -> Unit
 ) {
     val rank = ScoreEngine.getRank(score)
+    val isNewHighScore = score > previousBestScore && score > 0L
 
     // Score count-up animation — iOS parity
     var displayedScore by remember { mutableStateOf(0L) }
+    var scoreAnimDone by remember { mutableStateOf(false) }
     LaunchedEffect(score) {
         val steps = 30
         val stepValue = if (score > 0) score / steps else 0L
@@ -73,7 +82,18 @@ fun RunEndScreen(
             delay(40L)
             displayedScore = if (i == steps) score else stepValue * i
         }
+        scoreAnimDone = true
     }
+
+    // Digit flip scale animation — iOS parity
+    val scoreScale by animateFloatAsState(
+        targetValue = if (scoreAnimDone) 1.0f else 0.95f,
+        animationSpec = spring(stiffness = 400f),
+        label = "scoreScale"
+    )
+
+    val titleText = if (isVictory) "VICTORY" else "RUN OVER"
+    val titleColor = if (isVictory) PathriftSuccess else PathriftDanger
 
     Box(
         modifier = Modifier
@@ -96,20 +116,24 @@ fun RunEndScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "RUN OVER",
+                            text = titleText,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Black,
-                            color = PathriftDanger,
+                            color = titleColor,
                             letterSpacing = 2.sp,
                             fontFamily = FontFamily.Monospace
                         )
+                        if (isNewHighScore) {
+                            NewHighScoreBadge()
+                        }
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = "$displayedScore",
+                            text = "%,d".format(displayedScore),
                             fontSize = 36.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            fontWeight = FontWeight.Black,
                             color = PathriftNeonBlue,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.scale(scoreScale)
                         )
                         Text(
                             text = stringResource(R.string.run_end_score_label),
@@ -144,7 +168,7 @@ fun RunEndScreen(
                                 color = PathriftNeonBlue
                             )
                             StatIconRow(
-                                icon = Icons.Default.Star,
+                                icon = Icons.Default.Close,
                                 label = "ENEMY KILLS",
                                 value = "$enemyKills",
                                 color = PathriftDanger
@@ -152,7 +176,7 @@ fun RunEndScreen(
                             StatIconRow(
                                 icon = Icons.Default.EmojiEvents,
                                 label = "FINAL SCORE",
-                                value = "$score",
+                                value = "%,d".format(score),
                                 color = PathriftGold
                             )
                         }
@@ -191,15 +215,21 @@ fun RunEndScreen(
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier.fillMaxSize().padding(32.dp)
                 ) {
-                    // Header — iOS: "RUN OVER" title
+                    // Header — GAP-046: VICTORY vs RUN OVER
                     Text(
-                        text = "RUN OVER",
+                        text = titleText,
                         fontSize = 40.sp,
                         fontWeight = FontWeight.Black,
-                        color = PathriftDanger,
+                        color = titleColor,
                         letterSpacing = 3.sp,
                         fontFamily = FontFamily.Monospace
                     )
+
+                    // GAP-050: NEW HIGH SCORE badge
+                    if (isNewHighScore) {
+                        Spacer(Modifier.height(8.dp))
+                        NewHighScoreBadge()
+                    }
 
                     Spacer(Modifier.height(24.dp))
 
@@ -217,13 +247,14 @@ fun RunEndScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Animated score — iOS parity
+                        // Animated score — GAP-048: 56sp Black + scale animation
                         Text(
-                            text = "$displayedScore",
-                            fontSize = 48.sp,
-                            fontWeight = FontWeight.ExtraBold,
+                            text = "%,d".format(displayedScore),
+                            fontSize = 56.sp,
+                            fontWeight = FontWeight.Black,
                             color = PathriftNeonBlue,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.scale(scoreScale)
                         )
                         Text(
                             text = stringResource(R.string.run_end_score_label),
@@ -240,8 +271,9 @@ fun RunEndScreen(
                             value = "$wave",
                             color = PathriftNeonBlue
                         )
+                        // GAP-052: Close icon instead of Star for enemy kills
                         StatIconRow(
-                            icon = Icons.Default.Star,
+                            icon = Icons.Default.Close,
                             label = "ENEMY KILLS",
                             value = "$enemyKills",
                             color = PathriftDanger
@@ -249,7 +281,7 @@ fun RunEndScreen(
                         StatIconRow(
                             icon = Icons.Default.EmojiEvents,
                             label = "FINAL SCORE",
-                            value = "$score",
+                            value = "%,d".format(score),
                             color = PathriftGold
                         )
                     }
@@ -291,6 +323,27 @@ fun RunEndScreen(
                 }
             }
         }
+    }
+}
+
+// GAP-050: NEW HIGH SCORE badge
+@Composable
+private fun NewHighScoreBadge() {
+    Box(
+        modifier = Modifier
+            .background(PathriftGold.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+            .border(1.dp, PathriftGold.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "★ NEW HIGH SCORE ★",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = PathriftGold,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 1.5.sp
+        )
     }
 }
 

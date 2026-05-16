@@ -40,7 +40,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
-import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -110,6 +109,7 @@ import com.pathrift.anonve.android.game.GameState
 import com.pathrift.anonve.android.game.TowerInfo
 import com.pathrift.anonve.android.game.WaveDefinition
 import com.pathrift.anonve.android.game.enemies.EnemyType
+import com.pathrift.anonve.android.game.towers.TargetingMode
 import com.pathrift.anonve.android.game.towers.TowerType
 
 // ==============================
@@ -536,21 +536,16 @@ private fun CombatHUD(
                     }
                     Spacer(Modifier.weight(1f))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Compact lives stat — Build 5.3.2
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Icon(
-                                imageVector = if (state.lives > 0) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                                contentDescription = null,
-                                tint = if (state.lives > 0) PathriftDanger else Color.Gray,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = "${state.lives}",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                color = if (state.lives > 0) PathriftDanger else Color.Gray
-                            )
+                        // Compact lives stat — GAP-014: 3 individual hearts (iOS parity)
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                            for (i in 0 until EconomyConstants.STARTING_LIVES) {
+                                Icon(
+                                    imageVector = if (i < state.lives) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    contentDescription = null,
+                                    tint = if (i < state.lives) PathriftDanger else PathriftTextSecondary.copy(alpha = 0.3f),
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
                         }
                         Spacer(Modifier.width(8.dp))
                         // Speed toggle button
@@ -865,8 +860,22 @@ private fun TowerInfoBottomPanel(
                             color = PathriftNeonBlue, fontFamily = FontFamily.Monospace)
                     }
                 }
-                info.type.typeAdvantageHint?.let {
-                    Text("⚡ advantage", fontSize = 7.sp, color = PathriftGold, fontFamily = FontFamily.Monospace)
+                info.type.typeAdvantageHint?.let { hint ->
+                    Text("⚡ $hint", fontSize = 7.sp, color = PathriftGold, fontFamily = FontFamily.Monospace)
+                }
+                val modeLabel = when (info.type.targetingMode) {
+                    TargetingMode.ALL_LAYERS  -> "ALL LAYERS"
+                    TargetingMode.BRIDGE_ONLY -> "BRIDGE ONLY"
+                    else -> null
+                }
+                modeLabel?.let { label ->
+                    Text(
+                        text = label,
+                        fontSize = 7.sp,
+                        color = Color(0xFF00CCFF).copy(alpha = 0.7f),
+                        fontFamily = FontFamily.Monospace,
+                        letterSpacing = 0.5.sp
+                    )
                 }
             }
 
@@ -881,7 +890,7 @@ private fun TowerInfoBottomPanel(
             ) {
                 MiniStatItem("DMG", String.format("%.0f", info.damage), PathriftOrange, Modifier.weight(1f))
                 Box(Modifier.size(1.dp, 22.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
-                MiniStatItem("RNG", "${info.range.toInt()}t", PathriftNeonBlue, Modifier.weight(1f))
+                MiniStatItem("RNG", String.format("%.0ft", info.range / 64f * 3f), PathriftNeonBlue, Modifier.weight(1f))
                 Box(Modifier.size(1.dp, 22.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
                 MiniStatItem("SPD", String.format("%.1f/s", info.attackSpeed), PathriftPurple, Modifier.weight(1f))
             }
@@ -1068,6 +1077,13 @@ private fun TowerSelectionPanel(
                         fontWeight = FontWeight.Black,
                         color = towerColor,
                         fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = sel.description,
+                        fontSize = 11.sp,
+                        color = PathriftTextSecondary,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.padding(top = 3.dp)
                     )
                     sel.typeAdvantageHint?.let { hint ->
                         Row(

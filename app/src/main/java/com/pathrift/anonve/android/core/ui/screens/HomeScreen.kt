@@ -2,12 +2,18 @@ package com.pathrift.anonve.android.core.ui.screens
 
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,6 +47,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
@@ -73,6 +80,7 @@ import com.pathrift.anonve.android.core.ui.PathriftSurface
 import com.pathrift.anonve.android.core.ui.PathriftTextPrimary
 import com.pathrift.anonve.android.core.ui.PathriftTextSecondary
 import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import com.pathrift.anonve.android.app.PathriftApp
 import kotlinx.coroutines.flow.flowOf
@@ -357,10 +365,10 @@ private fun PortraitHomeContent(
     ) {
         Spacer(Modifier.weight(1f))
 
-        // Title area
+        // Title area — GAP-001: 56sp
         Text(
             text = "PATHRIFT",
-            fontSize = 52.sp,
+            fontSize = 56.sp,
             fontWeight = FontWeight.Black,
             color = PathriftNeonBlue,
             modifier = Modifier.graphicsLayer {
@@ -385,24 +393,30 @@ private fun PortraitHomeContent(
         )
 
         if (bestScore > 0L) {
-            Row(
-                modifier = Modifier.padding(top = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            // GAP-007: Styled high score badge box
+            Box(
+                modifier = Modifier
+                    .padding(top = 8.dp)
+                    .background(PathriftNeonBlue.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+                    .border(1.dp, PathriftGold.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
-                Icon(
-                    imageVector = Icons.Default.EmojiEvents,
-                    contentDescription = "trophy",
-                    tint = PathriftGold,
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = "${LanguageManager.s("BEST", "EN İYİ")}: $bestScore",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = PathriftGold,
-                    fontFamily = FontFamily.Monospace
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.EmojiEvents,
+                        contentDescription = "trophy",
+                        tint = PathriftGold,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "${LanguageManager.s("BEST", "EN İYİ")}: $bestScore",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PathriftGold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
             }
         }
 
@@ -421,20 +435,49 @@ private fun PortraitHomeContent(
             Spacer(Modifier.height(8.dp))
         }
 
+        // GAP-004: gradient PLAY button + GAP-012: scale press animation
+        val playInteractionSource = remember { MutableInteractionSource() }
+        val playIsPressed by playInteractionSource.collectIsPressedAsState()
+        val playScale by animateFloatAsState(
+            targetValue = if (playIsPressed) 0.97f else 1.0f,
+            animationSpec = spring(stiffness = 700f),
+            label = "playBtnScale"
+        )
         Button(
             onClick = onStartGame,
-            modifier = Modifier.fillMaxWidth().height(58.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = PathriftNeonBlue),
-            shape = RoundedCornerShape(16.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(58.dp)
+                .scale(playScale),
+            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+            shape = RoundedCornerShape(16.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+            interactionSource = playInteractionSource
         ) {
-            Icon(Icons.Default.PlayArrow, contentDescription = "play", modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = LanguageManager.s("PLAY", "OYNA"),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 2.sp
-            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(listOf(PathriftNeonBlue, PathriftPurple)),
+                        RoundedCornerShape(16.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = "play", modifier = Modifier.size(18.dp), tint = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = LanguageManager.s("PLAY", "OYNA"),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 2.sp,
+                        color = Color.White
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(12.dp))
