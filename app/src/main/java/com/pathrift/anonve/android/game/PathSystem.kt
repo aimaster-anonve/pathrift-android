@@ -42,7 +42,7 @@ object PathSystem {
     // Total layout count: 18 Z-based + 6 crossing = 24
     val layoutCount: Int get() = layoutParams.size + 6
 
-    var currentLayoutIndex: Int = 0
+    @Volatile var currentLayoutIndex: Int = 0
         private set
 
     // HUD insets in pixels — set by GameEngine.initLayout() using screen density
@@ -64,13 +64,13 @@ object PathSystem {
     // Screen density — set by GameEngine.initLayout() so isSlotClearOfPath uses pixel-correct clearance
     var screenDensity: Float = 1f
 
-    var waypoints: List<PointF> = emptyList()
+    @Volatile var waypoints: List<PointF> = emptyList()
         private set
 
-    var slotPositions: List<PointF> = emptyList()
+    @Volatile var slotPositions: List<PointF> = emptyList()
         private set
 
-    var waypointLayers: List<PathLayer> = emptyList()
+    @Volatile var waypointLayers: List<PathLayer> = emptyList()
         private set
 
     val bridgeSegmentCount: Int get() = waypointLayers.count { it == PathLayer.BRIDGE }

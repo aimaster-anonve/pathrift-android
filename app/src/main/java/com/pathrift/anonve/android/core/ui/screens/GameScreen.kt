@@ -544,7 +544,7 @@ private fun CombatHUD(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(0.dp)) {
                             Text(
-                                text = if (state.wave == 0) "READY" else "WAVE",
+                                text = if (state.wave == 0) "NEXT" else "W${state.wave + 1}",
                                 fontSize = 8.sp,
                                 fontFamily = FontFamily.Monospace,
                                 letterSpacing = 2.sp,
