@@ -317,17 +317,30 @@ private fun LandscapeHomeContent(
             Button(
                 onClick = onPlay,
                 modifier = Modifier.fillMaxWidth().height(44.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PathriftNeonBlue),
-                shape = RoundedCornerShape(14.dp)
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                shape = RoundedCornerShape(14.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = LanguageManager.s("PLAY", "OYNA"),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Black,
-                    letterSpacing = 1.5.sp
-                )
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(listOf(PathriftNeonBlue, PathriftPurple)),
+                            RoundedCornerShape(14.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = LanguageManager.s("PLAY", "OYNA"),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.5.sp,
+                            color = Color.White
+                        )
+                    }
+                }
             }
 
             OutlinedButton(
@@ -335,7 +348,10 @@ private fun LandscapeHomeContent(
                 modifier = Modifier.fillMaxWidth().height(40.dp),
                 border = BorderStroke(1.dp, PathriftTextSecondary.copy(alpha = 0.3f)),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftTextSecondary)
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = PathriftSurface,
+                    contentColor = PathriftTextSecondary
+                )
             ) {
                 Icon(Icons.Default.HelpOutline, contentDescription = null, modifier = Modifier.size(13.dp))
                 Spacer(Modifier.width(6.dp))
@@ -348,7 +364,10 @@ private fun LandscapeHomeContent(
                     modifier = Modifier.weight(1f).height(40.dp),
                     border = BorderStroke(1.dp, PathriftTextSecondary.copy(alpha = 0.2f)),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftTextSecondary)
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = PathriftSurface,
+                        contentColor = PathriftTextSecondary
+                    )
                 ) {
                     Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(13.dp))
                     Spacer(Modifier.width(5.dp))
@@ -359,7 +378,10 @@ private fun LandscapeHomeContent(
                     modifier = Modifier.weight(1f).height(40.dp),
                     border = BorderStroke(1.dp, PathriftNeonBlue.copy(alpha = 0.3f)),
                     shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftNeonBlue)
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = PathriftNeonBlue.copy(alpha = 0.12f),
+                        contentColor = PathriftNeonBlue
+                    )
                 ) {
                     Icon(Icons.Default.Diamond, contentDescription = null, modifier = Modifier.size(13.dp))
                     Spacer(Modifier.width(5.dp))
@@ -372,7 +394,10 @@ private fun LandscapeHomeContent(
                 modifier = Modifier.fillMaxWidth().height(40.dp),
                 border = BorderStroke(1.dp, PathriftOrange.copy(alpha = 0.4f)),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftOrange)
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = PathriftOrange.copy(alpha = 0.12f),
+                    contentColor = PathriftOrange
+                )
             ) {
                 Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(13.dp))
                 Spacer(Modifier.width(5.dp))
@@ -576,7 +601,10 @@ private fun PortraitHomeContent(
             modifier = Modifier.fillMaxWidth().height(48.dp),
             border = BorderStroke(1.dp, PathriftTextSecondary.copy(alpha = 0.3f)),
             shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftTextSecondary)
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = PathriftSurface,
+                contentColor = PathriftTextSecondary
+            )
         ) {
             Icon(Icons.Default.HelpOutline, contentDescription = null, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(8.dp))
@@ -599,7 +627,10 @@ private fun PortraitHomeContent(
                 modifier = Modifier.weight(1f).height(44.dp),
                 border = BorderStroke(1.dp, PathriftTextSecondary.copy(alpha = 0.2f)),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftTextSecondary),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = PathriftSurface,
+                    contentColor = PathriftTextSecondary
+                ),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp)
             ) {
                 Icon(Icons.Default.Settings, contentDescription = null, modifier = Modifier.size(13.dp))
@@ -612,7 +643,10 @@ private fun PortraitHomeContent(
                 modifier = Modifier.weight(1f).height(44.dp),
                 border = BorderStroke(1.dp, PathriftNeonBlue.copy(alpha = 0.3f)),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftNeonBlue),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = PathriftNeonBlue.copy(alpha = 0.12f),
+                    contentColor = PathriftNeonBlue
+                ),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp)
             ) {
                 Icon(Icons.Default.Diamond, contentDescription = null, modifier = Modifier.size(13.dp), tint = PathriftNeonBlue)
@@ -625,7 +659,10 @@ private fun PortraitHomeContent(
                 modifier = Modifier.weight(1f).height(44.dp),
                 border = BorderStroke(1.dp, PathriftOrange.copy(alpha = 0.4f)),
                 shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftOrange),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    containerColor = PathriftOrange.copy(alpha = 0.12f),
+                    contentColor = PathriftOrange
+                ),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp)
             ) {
                 Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(13.dp))
