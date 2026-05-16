@@ -1,6 +1,11 @@
 package com.pathrift.anonve.android.core.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,7 +31,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -37,6 +41,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -86,13 +91,12 @@ fun SettingsScreen(onBack: () -> Unit) {
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronLeft,
-                            contentDescription = "back",
-                            tint = PathriftNeonBlue,
-                            modifier = Modifier.size(28.dp)
-                        )
+                    Row(
+                        modifier = Modifier.clickable(onClick = onBack).padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.ChevronLeft, null, tint = PathriftNeonBlue, modifier = Modifier.size(22.dp))
+                        Text(LanguageManager.s("MAIN MENU", "ANA MENÜ"), fontSize = 13.sp, fontWeight = FontWeight.Medium, color = PathriftNeonBlue)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -135,9 +139,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                         ) {
                             AppLanguage.values().forEach { language ->
                                 val selected = lang == language
+                                val interactionSource = remember { MutableInteractionSource() }
+                                val isPressed by interactionSource.collectIsPressedAsState()
+                                val scale by animateFloatAsState(if (isPressed) 0.97f else 1.0f, spring(stiffness = 700f), label = "langBtnScale")
                                 Button(
                                     onClick = { LanguageManager.setLanguage(language) },
-                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    modifier = Modifier.weight(1f).height(44.dp).graphicsLayer { scaleX = scale; scaleY = scale },
+                                    interactionSource = interactionSource,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = if (selected) PathriftNeonBlue else PathriftSurface,
                                         contentColor = if (selected) PathriftBackground else PathriftTextPrimary
@@ -146,7 +154,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 ) {
                                     Text(
                                         text = "${language.flag} ${language.displayName}",
-                                        fontSize = 14.sp,
+                                        fontSize = 13.sp,
                                         fontWeight = FontWeight.SemiBold
                                     )
                                 }
@@ -205,7 +213,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(16.dp))
 
                     // Language section
                     SectionHeader(
@@ -219,9 +227,13 @@ fun SettingsScreen(onBack: () -> Unit) {
                     ) {
                         AppLanguage.values().forEach { language ->
                             val selected = lang == language
+                            val interactionSource = remember { MutableInteractionSource() }
+                            val isPressed by interactionSource.collectIsPressedAsState()
+                            val scale by animateFloatAsState(if (isPressed) 0.97f else 1.0f, spring(stiffness = 700f), label = "langBtnScale")
                             Button(
                                 onClick = { LanguageManager.setLanguage(language) },
-                                modifier = Modifier.weight(1f).height(48.dp),
+                                modifier = Modifier.weight(1f).height(44.dp).graphicsLayer { scaleX = scale; scaleY = scale },
+                                interactionSource = interactionSource,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = if (selected) PathriftNeonBlue else PathriftSurface,
                                     contentColor = if (selected) PathriftBackground else PathriftTextPrimary
@@ -230,14 +242,14 @@ fun SettingsScreen(onBack: () -> Unit) {
                             ) {
                                 Text(
                                     text = "${language.flag} ${language.displayName}",
-                                    fontSize = 14.sp,
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
                         }
                     }
 
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(16.dp))
 
                     // Version / Game Info section
                     SectionHeader(
@@ -250,7 +262,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         value = "$version ($buildCode)"
                     )
 
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(16.dp))
 
                     // About / PATHRIFT section
                     SectionHeader(title = "PATHRIFT", icon = Icons.Default.Bolt)

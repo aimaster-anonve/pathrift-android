@@ -1,6 +1,7 @@
 package com.pathrift.anonve.android.core.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -30,7 +31,6 @@ import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -63,7 +63,7 @@ fun HowToPlayScreen(onBack: () -> Unit) {
                 title = {
                     Text(
                         text = LanguageManager.s("HOW TO PLAY", "NASIL OYNANIR"),
-                        fontSize = 16.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = PathriftTextPrimary,
                         letterSpacing = 2.sp,
@@ -71,13 +71,12 @@ fun HowToPlayScreen(onBack: () -> Unit) {
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.Default.ChevronLeft,
-                            contentDescription = "back",
-                            tint = PathriftNeonBlue,
-                            modifier = Modifier.size(28.dp)
-                        )
+                    Row(
+                        modifier = Modifier.clickable(onClick = onBack).padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.ChevronLeft, null, tint = PathriftNeonBlue, modifier = Modifier.size(22.dp))
+                        Text("HOME", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = PathriftNeonBlue)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -175,11 +174,11 @@ fun HowToPlayScreen(onBack: () -> Unit) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 20.dp)
+                        .padding(horizontal = 16.dp)
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(0.dp)
                 ) {
-                    Spacer(Modifier.height(20.dp))
+                    Spacer(Modifier.height(12.dp))
                     ruleSections.forEachIndexed { index, (title, icon, text) ->
                         RuleSection(title = title, icon = icon, text = text)
                         if (index < ruleSections.lastIndex) {

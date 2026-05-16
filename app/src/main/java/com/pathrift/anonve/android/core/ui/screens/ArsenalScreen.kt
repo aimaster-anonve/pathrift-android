@@ -1,9 +1,14 @@
 package com.pathrift.anonve.android.core.ui.screens
 
 import android.app.Application
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -27,23 +32,24 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -61,6 +67,9 @@ import com.pathrift.anonve.android.core.ui.CoreTowerColor
 import com.pathrift.anonve.android.core.ui.FrostTowerColor
 import com.pathrift.anonve.android.core.ui.InfernoTowerColor
 import com.pathrift.anonve.android.core.ui.NovaTowerColor
+import com.pathrift.anonve.android.core.ui.PathriftBackground
+import com.pathrift.anonve.android.core.ui.PathriftNeonBlue
+import com.pathrift.anonve.android.core.ui.PathriftSurface
 import com.pathrift.anonve.android.core.ui.PierceTowerColor
 import com.pathrift.anonve.android.core.ui.SniperTowerColor
 import com.pathrift.anonve.android.core.ui.TeslaTowerColor
@@ -123,8 +132,9 @@ fun ArsenalScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+    // GAP-058: semantic background color
     BoxWithConstraints(
-        modifier = Modifier.fillMaxSize().background(Color(0xFF0A0A10))
+        modifier = Modifier.fillMaxSize().background(PathriftBackground)
     ) {
         val isLandscape = maxWidth > maxHeight
         val towerList = TowerType.values().toList()
@@ -135,8 +145,25 @@ fun ArsenalScreen(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = Color.White)
+                // GAP-057: HOME text back button — iOS parity
+                Row(
+                    modifier = Modifier
+                        .clickable(onClick = onBack)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = null,
+                        tint = PathriftNeonBlue,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Text(
+                        "HOME",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = PathriftNeonBlue
+                    )
                 }
                 Text(
                     "ARSENAL",
@@ -148,7 +175,7 @@ fun ArsenalScreen(
                 )
                 Text(
                     "◆ ${state.diamonds}",
-                    color = Color(0xFF00CCFF),
+                    color = PathriftNeonBlue,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace
@@ -219,9 +246,10 @@ fun TowerArsenalCard(
 ) {
     val towerColor = towerColor(type)
 
+    // GAP-059: semantic card color
     Card(
         modifier = Modifier.fillMaxWidth().alpha(if (isUnlocked) 1f else 0.6f),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF16162A)),
+        colors = CardDefaults.cardColors(containerColor = PathriftSurface),
         shape = RoundedCornerShape(14.dp),
         border = BorderStroke(
             1.dp,
@@ -272,8 +300,9 @@ fun TowerArsenalCard(
                                 .padding(horizontal = 4.dp, vertical = 1.dp)
                         )
                     }
+                    // GAP-061: fallback to type.description — iOS parity
                     Text(
-                        type.typeAdvantageHint ?: type.displayName,
+                        type.typeAdvantageHint ?: type.description,
                         color = Color.Gray,
                         fontSize = 10.sp,
                         maxLines = 1,
@@ -348,11 +377,12 @@ fun upgradeRow(
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.sp
             )
+            // GAP-062: bar width 14dp — iOS parity
             Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                 repeat(3) { i ->
                     Box(
                         Modifier
-                            .size(width = 16.dp, height = 5.dp)
+                            .size(width = 14.dp, height = 5.dp)
                             .clip(RoundedCornerShape(2.dp))
                             .background(if (i < level) color else Color.Gray.copy(alpha = 0.2f))
                     )
@@ -360,11 +390,23 @@ fun upgradeRow(
             }
         }
         if (cost != null) {
+            // GAP-064: scale press animation — iOS parity
+            val interactionSource = remember { MutableInteractionSource() }
+            val isPressed by interactionSource.collectIsPressedAsState()
+            val scale by animateFloatAsState(
+                targetValue = if (isPressed) 0.97f else 1.0f,
+                animationSpec = spring(stiffness = 700f),
+                label = "upgradeScale"
+            )
             TextButton(
                 onClick = onUpgrade,
                 enabled = diamonds >= cost,
                 contentPadding = PaddingValues(horizontal = 5.dp, vertical = 2.dp),
-                modifier = Modifier.wrapContentWidth().height(28.dp)
+                modifier = Modifier
+                    .wrapContentWidth()
+                    .height(28.dp)
+                    .graphicsLayer { scaleX = scale; scaleY = scale },
+                interactionSource = interactionSource
             ) {
                 Text(
                     text = "+${cost}♦",

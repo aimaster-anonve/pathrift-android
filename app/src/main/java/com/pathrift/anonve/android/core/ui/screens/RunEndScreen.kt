@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -35,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -45,7 +47,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.pathrift.anonve.android.R
-import com.pathrift.anonve.android.core.engine.ScoreEngine
 import com.pathrift.anonve.android.core.ui.PathriftBackground
 import com.pathrift.anonve.android.core.ui.PathriftDanger
 import com.pathrift.anonve.android.core.ui.PathriftGold
@@ -69,7 +70,6 @@ fun RunEndScreen(
     onPlayAgain: () -> Unit,
     onMainMenu: () -> Unit
 ) {
-    val rank = ScoreEngine.getRank(score)
     val isNewHighScore = score > previousBestScore && score > 0L
 
     // Score count-up animation — iOS parity
@@ -110,18 +110,25 @@ fun RunEndScreen(
                         .padding(horizontal = 24.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left panel (45%): title + animated score + rank
+                    // Left panel (45%): title + animated score
                     Column(
                         modifier = Modifier.fillMaxWidth(0.45f),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        // GAP-047: title glow shadow
                         Text(
                             text = titleText,
                             fontSize = 24.sp,
                             fontWeight = FontWeight.Black,
                             color = titleColor,
                             letterSpacing = 2.sp,
-                            fontFamily = FontFamily.Monospace
+                            fontFamily = FontFamily.Monospace,
+                            modifier = Modifier.drawBehind {
+                                drawCircle(
+                                    color = titleColor.copy(alpha = 0.3f),
+                                    radius = size.minDimension * 1.5f
+                                )
+                            }
                         )
                         if (isNewHighScore) {
                             NewHighScoreBadge()
@@ -141,8 +148,6 @@ fun RunEndScreen(
                             color = PathriftTextSecondary,
                             letterSpacing = 1.sp
                         )
-                        Spacer(Modifier.height(16.dp))
-                        RankBadgeCompact(rank = rank)
                     }
 
                     // Right panel: stats + actions
@@ -181,6 +186,7 @@ fun RunEndScreen(
                             )
                         }
 
+                        // GAP-054: full width buttons
                         Button(
                             onClick = onPlayAgain,
                             modifier = Modifier.fillMaxWidth().height(44.dp),
@@ -195,12 +201,20 @@ fun RunEndScreen(
                             )
                         }
 
+                        // GAP-054 + GAP-055: full width + Home icon
                         OutlinedButton(
                             onClick = onMainMenu,
                             modifier = Modifier.fillMaxWidth().height(40.dp),
                             shape = RoundedCornerShape(12.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, PathriftSurfaceVariant)
                         ) {
+                            Icon(
+                                imageVector = Icons.Default.Home,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = PathriftTextSecondary
+                            )
+                            Spacer(Modifier.width(6.dp))
                             Text(
                                 text = stringResource(R.string.run_end_main_menu),
                                 fontSize = 13.sp,
@@ -215,14 +229,20 @@ fun RunEndScreen(
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier.fillMaxSize().padding(32.dp)
                 ) {
-                    // Header — GAP-046: VICTORY vs RUN OVER
+                    // Header — GAP-046: VICTORY vs RUN OVER, GAP-047: glow shadow
                     Text(
                         text = titleText,
                         fontSize = 40.sp,
                         fontWeight = FontWeight.Black,
                         color = titleColor,
                         letterSpacing = 3.sp,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier.drawBehind {
+                            drawCircle(
+                                color = titleColor.copy(alpha = 0.3f),
+                                radius = size.minDimension * 1.5f
+                            )
+                        }
                     )
 
                     // GAP-050: NEW HIGH SCORE badge
@@ -232,10 +252,7 @@ fun RunEndScreen(
                     }
 
                     Spacer(Modifier.height(24.dp))
-
-                    RankBadge(rank = rank)
-
-                    Spacer(Modifier.height(24.dp))
+                    // GAP-051: RankBadge removed — no iOS equivalent
 
                     // Stats card — iOS parity: waves, kills, animated score
                     Column(
@@ -288,10 +305,11 @@ fun RunEndScreen(
 
                     Spacer(Modifier.height(40.dp))
 
+                    // GAP-054: full width
                     Button(
                         onClick = onPlayAgain,
                         modifier = Modifier
-                            .width(220.dp)
+                            .fillMaxWidth()
                             .height(52.dp),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = PathriftNeonBlue)
@@ -306,14 +324,22 @@ fun RunEndScreen(
 
                     Spacer(Modifier.height(12.dp))
 
+                    // GAP-054 + GAP-055: full width + Home icon
                     OutlinedButton(
                         onClick = onMainMenu,
                         modifier = Modifier
-                            .width(220.dp)
+                            .fillMaxWidth()
                             .height(50.dp),
                         shape = RoundedCornerShape(12.dp),
                         border = androidx.compose.foundation.BorderStroke(1.dp, PathriftSurfaceVariant)
                     ) {
+                        Icon(
+                            imageVector = Icons.Default.Home,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = PathriftTextSecondary
+                        )
+                        Spacer(Modifier.width(6.dp))
                         Text(
                             text = stringResource(R.string.run_end_main_menu),
                             fontSize = 14.sp,
@@ -347,75 +373,7 @@ private fun NewHighScoreBadge() {
     }
 }
 
-@Composable
-private fun RankBadge(rank: String) {
-    val rankColor = when (rank) {
-        "S" -> PathriftGold
-        "A" -> PathriftSuccess
-        "B" -> PathriftNeonBlue
-        "C" -> PathriftPurple
-        else -> PathriftTextSecondary
-    }
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(rankColor.copy(alpha = 0.15f))
-            .padding(horizontal = 32.dp, vertical = 16.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "RANK",
-                fontSize = 10.sp,
-                color = PathriftTextSecondary,
-                letterSpacing = 2.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = rank,
-                fontSize = 64.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = rankColor
-            )
-        }
-    }
-}
-
-@Composable
-private fun RankBadgeCompact(rank: String) {
-    val rankColor = when (rank) {
-        "S" -> PathriftGold
-        "A" -> PathriftSuccess
-        "B" -> PathriftNeonBlue
-        "C" -> PathriftPurple
-        else -> PathriftTextSecondary
-    }
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(rankColor.copy(alpha = 0.15f))
-            .padding(horizontal = 24.dp, vertical = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "RANK",
-                fontSize = 9.sp,
-                color = PathriftTextSecondary,
-                letterSpacing = 2.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = rank,
-                fontSize = 48.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = rankColor
-            )
-        }
-    }
-}
+// GAP-051: RankBadge and RankBadgeCompact removed — no iOS equivalent
 
 @Composable
 private fun StatRow(label: String, value: String) {
@@ -447,9 +405,10 @@ private fun StatIconRow(icon: ImageVector, label: String, value: String, color: 
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.weight(1f)
         )
+        // GAP-053: 18sp iOS parity
         Text(
             text = value,
-            fontSize = 16.sp,
+            fontSize = 18.sp,
             fontWeight = FontWeight.Bold,
             color = PathriftTextPrimary,
             fontFamily = FontFamily.Monospace

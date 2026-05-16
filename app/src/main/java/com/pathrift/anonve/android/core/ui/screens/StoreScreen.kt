@@ -1,8 +1,12 @@
 package com.pathrift.anonve.android.core.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -58,6 +62,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -308,15 +313,19 @@ private fun TowersGrid(unlockedTowers: Set<String>, onTap: (TowerType) -> Unit) 
 private fun StoreTowerGridCard(type: TowerType, isUnlocked: Boolean, modifier: Modifier, onTap: () -> Unit) {
     val color = towerColor(type)
     val isPrem = type.isPremium
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed) 0.97f else 1.0f, spring(stiffness = 700f), label = "storeCardScale")
     Column(
         modifier = modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .background(PathriftSurface, RoundedCornerShape(12.dp))
             .border(
                 width = if (isUnlocked) 1.5.dp else 1.dp,
                 color = if (isUnlocked) color.copy(alpha = 0.3f) else PathriftTextSecondary.copy(alpha = 0.12f),
                 shape = RoundedCornerShape(12.dp)
             )
-            .clickable(onClick = onTap)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onTap)
             .padding(10.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -641,7 +650,7 @@ private fun DiamondBalanceCard(diamonds: Int) {
                 )
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(imageVector = Icons.Default.Diamond, contentDescription = null, tint = PathriftNeonBlue, modifier = Modifier.size(26.dp))
-                    Text("$diamonds", fontSize = 34.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary, fontFamily = FontFamily.Monospace)
+                    Text("$diamonds", fontSize = 34.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary)
                 }
             }
             Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = PathriftTextSecondary.copy(alpha = 0.3f), modifier = Modifier.size(30.dp))
@@ -659,15 +668,19 @@ private fun DiamondBalanceCard(diamonds: Int) {
 
 @Composable
 private fun DailyBonusCard(claimed: Boolean, onClaim: () -> Unit) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (isPressed && !claimed) 0.97f else 1.0f, spring(stiffness = 700f), label = "dailyBonusScale")
     Box(
         modifier = Modifier.fillMaxWidth()
+            .graphicsLayer { scaleX = scale; scaleY = scale }
             .background(PathriftSurface, RoundedCornerShape(14.dp))
             .border(
                 1.dp,
                 if (claimed) Color.Transparent else PathriftGold.copy(alpha = 0.3f),
                 RoundedCornerShape(14.dp)
             )
-            .clickable(enabled = !claimed, onClick = onClaim)
+            .clickable(interactionSource = interactionSource, indication = null, enabled = !claimed, onClick = onClaim)
             .padding(16.dp)
     ) {
         Row(

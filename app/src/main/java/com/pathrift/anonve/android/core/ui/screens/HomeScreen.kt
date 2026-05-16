@@ -33,9 +33,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.HelpOutline
-import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -80,7 +81,9 @@ import com.pathrift.anonve.android.core.ui.PathriftSurface
 import com.pathrift.anonve.android.core.ui.PathriftTextPrimary
 import com.pathrift.anonve.android.core.ui.PathriftTextSecondary
 import androidx.compose.runtime.remember
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.platform.LocalContext
 import com.pathrift.anonve.android.app.PathriftApp
 import kotlinx.coroutines.flow.flowOf
@@ -102,21 +105,32 @@ fun HomeScreen(
     val savedWave = remember { gameSaveStore.savedWave }
 
     val infiniteTransition = rememberInfiniteTransition(label = "titlePulse")
+    // GAP-003: Start from 1.0 (iOS), not 0.97
     val titleScale by infiniteTransition.animateFloat(
-        initialValue = 0.97f,
+        initialValue = 1.0f,
         targetValue = 1.03f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200),
+            animation = tween(1400),
             repeatMode = RepeatMode.Reverse
         ),
         label = "titleScale"
     )
+    // GAP-002: Animated glow alpha 0.3→0.8
+    val titleGlow by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.8f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1400),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "titleGlow"
+    )
 
     Box(modifier = Modifier.fillMaxSize().background(PathriftBackground)) {
-        // Animated grid background
+        // Animated grid background — GAP-013: opacity 0.035f (iOS parity)
         Canvas(modifier = Modifier.fillMaxSize()) {
             val spacing = 44.dp.toPx()
-            val lineColor = Color(0x0AFFFFFF)
+            val lineColor = Color.White.copy(alpha = 0.035f)
             var x = 0f
             while (x <= size.width) {
                 drawLine(lineColor, Offset(x, 0f), Offset(x, size.height), strokeWidth = 0.5f)
@@ -134,6 +148,7 @@ fun HomeScreen(
             if (isLandscape) {
                 LandscapeHomeContent(
                     titleScale = titleScale,
+                    titleGlow = titleGlow,
                     bestScore = bestScore,
                     onPlay = { gameSaveStore.clear(); onStartGame() },
                     onContinue = onStartGame,
@@ -147,6 +162,7 @@ fun HomeScreen(
             } else {
                 PortraitHomeContent(
                     titleScale = titleScale,
+                    titleGlow = titleGlow,
                     bestScore = bestScore,
                     onStartGame = { gameSaveStore.clear(); onStartGame() },
                     onContinue = onStartGame,
@@ -165,6 +181,7 @@ fun HomeScreen(
 @Composable
 private fun LandscapeHomeContent(
     titleScale: Float,
+    titleGlow: Float,
     bestScore: Long,
     onPlay: () -> Unit,
     onContinue: () -> Unit = {},
@@ -197,10 +214,14 @@ private fun LandscapeHomeContent(
                 fontWeight = FontWeight.Black,
                 color = PathriftNeonBlue,
                 letterSpacing = 2.sp,
-                modifier = Modifier.graphicsLayer {
-                    scaleX = titleScale
-                    scaleY = titleScale
-                }
+                modifier = Modifier
+                    .graphicsLayer { scaleX = titleScale; scaleY = titleScale }
+                    .drawBehind {
+                        drawCircle(
+                            color = PathriftNeonBlue.copy(alpha = titleGlow * 0.25f),
+                            radius = size.minDimension * 1.4f
+                        )
+                    }
             )
             Text(
                 text = LanguageManager.s("ENDLESS TOWER DEFENSE", "SONSUZ KULE SAVUNMASI"),
@@ -330,7 +351,7 @@ private fun LandscapeHomeContent(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftOrange)
             ) {
-                Icon(Icons.Default.MilitaryTech, contentDescription = null, modifier = Modifier.size(13.dp))
+                Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(13.dp))
                 Spacer(Modifier.width(5.dp))
                 Text(LanguageManager.s("ARSENAL", "CEPHANE"), fontSize = 12.sp)
             }
@@ -345,6 +366,7 @@ private fun LandscapeHomeContent(
 @Composable
 private fun PortraitHomeContent(
     titleScale: Float,
+    titleGlow: Float,
     bestScore: Long,
     onStartGame: () -> Unit,
     onContinue: () -> Unit = {},
@@ -365,16 +387,20 @@ private fun PortraitHomeContent(
     ) {
         Spacer(Modifier.weight(1f))
 
-        // Title area — GAP-001: 56sp
+        // GAP-001: 56sp, GAP-002: animated glow, GAP-003: scale 1.0→1.03
         Text(
             text = "PATHRIFT",
             fontSize = 56.sp,
             fontWeight = FontWeight.Black,
             color = PathriftNeonBlue,
-            modifier = Modifier.graphicsLayer {
-                scaleX = titleScale
-                scaleY = titleScale
-            }
+            modifier = Modifier
+                .graphicsLayer { scaleX = titleScale; scaleY = titleScale }
+                .drawBehind {
+                    drawCircle(
+                        color = PathriftNeonBlue.copy(alpha = titleGlow * 0.25f),
+                        radius = size.minDimension * 1.4f
+                    )
+                }
         )
         Text(
             text = LanguageManager.s("ENDLESS TOWER DEFENSE", "SONSUZ KULE SAVUNMASI"),
@@ -422,20 +448,35 @@ private fun PortraitHomeContent(
 
         Spacer(Modifier.height(52.dp))
 
+        // GAP-010: height 58dp + orange→gold gradient; GAP-011: Refresh icon
         if (hasSave) {
             Button(
                 onClick = onContinue,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = PathriftOrange),
-                shape = RoundedCornerShape(16.dp)
+                modifier = Modifier.fillMaxWidth().height(58.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                shape = RoundedCornerShape(16.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
             ) {
-                Text("↩  CONTINUE — WAVE $savedWave",
-                    fontSize = 15.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(listOf(PathriftOrange, PathriftGold)),
+                            RoundedCornerShape(16.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Refresh, null, modifier = Modifier.size(18.dp), tint = Color.White)
+                        Spacer(Modifier.width(8.dp))
+                        Text("CONTINUE — WAVE $savedWave",
+                            fontSize = 15.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, color = Color.White)
+                    }
+                }
             }
             Spacer(Modifier.height(8.dp))
         }
 
-        // GAP-004: gradient PLAY button + GAP-012: scale press animation
+        // GAP-004: gradient PLAY button + GAP-005: shadow + GAP-012: scale press animation
         val playInteractionSource = remember { MutableInteractionSource() }
         val playIsPressed by playInteractionSource.collectIsPressedAsState()
         val playScale by animateFloatAsState(
@@ -443,39 +484,44 @@ private fun PortraitHomeContent(
             animationSpec = spring(stiffness = 700f),
             label = "playBtnScale"
         )
-        Button(
-            onClick = onStartGame,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(58.dp)
-                .scale(playScale),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-            shape = RoundedCornerShape(16.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-            interactionSource = playInteractionSource
+                .scale(playScale)
+                .shadow(elevation = 12.dp, shape = RoundedCornerShape(16.dp), spotColor = PathriftNeonBlue.copy(alpha = 0.5f))
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(listOf(PathriftNeonBlue, PathriftPurple)),
-                        RoundedCornerShape(16.dp)
-                    ),
-                contentAlignment = Alignment.Center
+            Button(
+                onClick = onStartGame,
+                modifier = Modifier.fillMaxSize(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                shape = RoundedCornerShape(16.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                interactionSource = playInteractionSource
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(listOf(PathriftNeonBlue, PathriftPurple)),
+                            RoundedCornerShape(16.dp)
+                        ),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "play", modifier = Modifier.size(18.dp), tint = Color.White)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = LanguageManager.s("PLAY", "OYNA"),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 2.sp,
-                        color = Color.White
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "play", modifier = Modifier.size(18.dp), tint = Color.White)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = LanguageManager.s("PLAY", "OYNA"),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 2.sp,
+                            color = Color.White
+                        )
+                    }
                 }
             }
         }
@@ -538,7 +584,7 @@ private fun PortraitHomeContent(
             shape = RoundedCornerShape(12.dp),
             colors = ButtonDefaults.outlinedButtonColors(contentColor = PathriftOrange)
         ) {
-            Icon(Icons.Default.MilitaryTech, contentDescription = null, modifier = Modifier.size(14.dp))
+            Icon(Icons.Default.Shield, contentDescription = null, modifier = Modifier.size(14.dp))
             Spacer(Modifier.width(6.dp))
             Text(LanguageManager.s("ARSENAL", "CEPHANE"), fontSize = 13.sp)
         }
@@ -585,13 +631,19 @@ private fun TowerLegend() {
         horizontalArrangement = Arrangement.SpaceEvenly
     ) {
         TowerType.values().forEach { type ->
+            val c = towerLegendColor(type)
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Box(Modifier.size(10.dp).background(towerLegendColor(type), CircleShape))
+                // GAP-009: circle with shadow/glow
+                Box(
+                    Modifier.size(10.dp)
+                        .shadow(elevation = 4.dp, shape = CircleShape, spotColor = c.copy(alpha = 0.6f))
+                        .background(c, CircleShape)
+                )
                 Text(
-                    text = type.displayName.take(4).uppercase(),
+                    text = type.displayName.uppercase(),
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Medium,
                     color = PathriftTextSecondary,
@@ -618,7 +670,7 @@ private fun TowerLegendCompact(modifier: Modifier = Modifier) {
             ) {
                 Box(Modifier.size(7.dp).background(towerLegendColor(type), CircleShape))
                 Text(
-                    text = type.displayName.take(4).uppercase(),
+                    text = type.displayName.uppercase(),
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Medium,
                     color = PathriftTextSecondary,

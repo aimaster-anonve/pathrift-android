@@ -4,12 +4,16 @@ import android.content.res.Configuration
 import android.widget.FrameLayout
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,10 +37,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Speed
@@ -60,8 +67,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
@@ -477,8 +486,9 @@ private fun CombatHUD(
                                 )
                             }
                         }
+                        // GAP-021: Landscape pause icon 24dp
                         IconButton(onClick = onPause, modifier = Modifier.size(28.dp)) {
-                            Icon(Icons.Default.Pause, contentDescription = null, tint = PathriftTextSecondary, modifier = Modifier.size(16.dp))
+                            Icon(Icons.Default.Pause, contentDescription = null, tint = PathriftTextSecondary, modifier = Modifier.size(24.dp))
                         }
                     }
                 }
@@ -498,7 +508,14 @@ private fun CombatHUD(
                 ) {
                     HudStatPill(LanguageManager.s("GOLD", "ALTIN"), "${state.gold}", PathriftNeonBlue)
                     Spacer(Modifier.width(14.dp))
-                    HudStatPill(LanguageManager.s("DIAMONDS", "ELMAS"), "♦${state.diamonds}", Color(0xFF00CCFF))
+                    // GAP-022: Diamond pill — ♦ symbol separate from value
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("♦", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00CCFF))
+                            Text("${state.diamonds}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00CCFF), fontFamily = FontFamily.Monospace)
+                        }
+                        Text(LanguageManager.s("DIAMONDS", "ELMAS"), fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = PathriftTextSecondary, letterSpacing = 1.5.sp, fontFamily = FontFamily.Monospace)
+                    }
                     Spacer(Modifier.weight(1f))
                     // Wave card IS the info button (Build 5.3.4)
                     Box(
@@ -548,31 +565,52 @@ private fun CombatHUD(
                             }
                         }
                         Spacer(Modifier.width(8.dp))
-                        // Speed toggle button
-                        TextButton(
-                            onClick = onToggleSpeed,
+                        // GAP-020: Speed button iOS pill style
+                        Row(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color.Black.copy(alpha = 0.4f))
+                                .background(
+                                    if (state.speedMultiplier == 2f) Color(0xFF00CCFF).copy(alpha = 0.2f) else Color.White.copy(alpha = 0.07f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .border(
+                                    1.dp,
+                                    if (state.speedMultiplier == 2f) Color(0xFF00CCFF).copy(alpha = 0.5f) else Color.White.copy(alpha = 0.1f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .clickable { onToggleSpeed() }
+                                .padding(horizontal = 8.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Icon(
+                                Icons.Default.Speed, null,
+                                modifier = Modifier.size(10.dp),
+                                tint = if (state.speedMultiplier == 2f) Color(0xFF00CCFF) else Color.Gray
+                            )
+                            Spacer(Modifier.width(3.dp))
                             Text(
-                                text = if (state.speedMultiplier == 1.0f) "x1" else "x2",
-                                color = if (state.speedMultiplier == 2.0f) Color(0xFF00CCFF) else Color.Gray,
+                                if (state.speedMultiplier == 1f) "×1" else "×2",
+                                color = if (state.speedMultiplier == 2f) Color(0xFF00CCFF) else Color.Gray,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
+                                fontSize = 12.sp
                             )
                         }
                         Spacer(Modifier.width(6.dp))
-                        IconButton(onClick = onPause, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Pause, "pause", tint = PathriftTextSecondary.copy(alpha = 0.8f), modifier = Modifier.size(22.dp))
+                        // GAP-021: Pause button 30dp container, icon 24dp
+                        IconButton(onClick = onPause, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.Pause, "pause", tint = PathriftTextSecondary.copy(alpha = 0.8f), modifier = Modifier.size(24.dp))
                         }
                     }
                 }
             } // end portrait else
+            // GAP-019/GAP-096: Event banner with cornerRadius, border, and shadow
             state.waveCompleteMessage?.let { msg ->
                 Box(
-                    modifier = Modifier.fillMaxWidth()
-                        .background(PathriftNeonBlue.copy(alpha = 0.15f))
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 4.dp)
+                        .shadow(elevation = 8.dp, shape = RoundedCornerShape(8.dp))
+                        .background(PathriftNeonBlue.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                        .border(1.dp, PathriftNeonBlue.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 16.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -596,7 +634,7 @@ private fun CombatHUD(
                 Spacer(Modifier.weight(1f))
                 when {
                     state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
-                    state.phase != GamePhase.GAME_OVER -> SendWaveButton(onClick = onNextWave)
+                    state.phase != GamePhase.GAME_OVER -> SendWaveButton(wave = state.wave, onClick = onNextWave)
                 }
             }
         } else {
@@ -616,7 +654,7 @@ private fun CombatHUD(
                     Spacer(Modifier.weight(1f))
                     when {
                         state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
-                        state.phase != GamePhase.GAME_OVER -> SendWaveButton(onClick = onNextWave)
+                        state.phase != GamePhase.GAME_OVER -> SendWaveButton(wave = state.wave, onClick = onNextWave)
                     }
                 }
             }
@@ -693,17 +731,19 @@ private fun WaveProgressIndicator(cleared: Int, total: Int) {
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace
         )
+        // GAP-018: Wave progress bar width 100dp
         LinearProgressIndicator(
             progress = { if (total > 0) cleared.toFloat() / total else 0f },
-            modifier = Modifier.width(80.dp).height(5.dp).clip(RoundedCornerShape(3.dp)),
+            modifier = Modifier.width(100.dp).height(5.dp).clip(RoundedCornerShape(3.dp)),
             color = Color(0xFF00CCFF),
             trackColor = Color.White.copy(alpha = 0.1f)
         )
     }
 }
 
+// GAP-016: "START"/"BAŞLA" on wave 0, GAP-017: PlayArrow icon
 @Composable
-private fun SendWaveButton(onClick: () -> Unit) {
+private fun SendWaveButton(wave: Int, onClick: () -> Unit) {
     Button(
         onClick = onClick,
         contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
@@ -724,9 +764,9 @@ private fun SendWaveButton(onClick: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Icon(Icons.Default.FastForward, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
                 Text(
-                    LanguageManager.s("NEXT WAVE", "SONRAKI DALGA"),
+                    if (wave == 0) LanguageManager.s("START", "BAŞLA") else LanguageManager.s("NEXT WAVE", "SONRAKI DALGA"),
                     color = Color.Black,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Black,
@@ -828,56 +868,59 @@ private fun TowerInfoBottomPanel(
             .navigationBarsPadding(),
         contentAlignment = Alignment.BottomCenter
     ) {
-        // Single-row compact card — 60dp fixed height (no nav bar padding inside row)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(60.dp)
-                .background(PathriftBackground.copy(alpha = 0.94f))
-                .clickable(enabled = false) {},
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Tower color accent bar
-            Box(
+        // GAP-045: Panel height 58dp
+        Column(modifier = Modifier.fillMaxWidth().clickable(enabled = false) {}) {
+            // GAP-038: Top accent line
+            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(towerColor.copy(alpha = 0.4f)))
+            // Single-row compact card — GAP-045: 58dp fixed height
+            Row(
                 modifier = Modifier
-                    .width(4.dp).fillMaxHeight()
-                    .padding(vertical = 10.dp)
-                    .background(towerColor, RoundedCornerShape(2.dp))
-            )
-            Spacer(Modifier.width(12.dp))
+                    .fillMaxWidth()
+                    .height(58.dp)
+                    .background(PathriftBackground.copy(alpha = 0.94f)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Tower color accent bar — GAP-042: vertical padding 8dp
+                Box(
+                    modifier = Modifier
+                        .width(4.dp).fillMaxHeight()
+                        .padding(vertical = 8.dp)
+                        .background(towerColor, RoundedCornerShape(2.dp))
+                )
+                Spacer(Modifier.width(12.dp))
 
-            // Identity: name + level
-            Column(modifier = Modifier.width(90.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(info.type.displayName.uppercase(), fontSize = 11.sp,
-                        fontWeight = FontWeight.Black, color = PathriftTextPrimary)
-                    Spacer(Modifier.width(4.dp))
-                    Box(modifier = Modifier
-                        .background(PathriftNeonBlue.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                    ) {
-                        Text("Lv.${info.level}", fontSize = 8.sp, fontWeight = FontWeight.Bold,
-                            color = PathriftNeonBlue, fontFamily = FontFamily.Monospace)
+                // Identity: name + level — GAP-041: name font 12sp
+                Column(modifier = Modifier.width(90.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(info.type.displayName.uppercase(), fontSize = 12.sp,
+                            fontWeight = FontWeight.Black, color = PathriftTextPrimary)
+                        Spacer(Modifier.width(4.dp))
+                        Box(modifier = Modifier
+                            .background(PathriftNeonBlue.copy(alpha = 0.15f), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                        ) {
+                            Text("Lv.${info.level}", fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                                color = PathriftNeonBlue, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                    info.type.typeAdvantageHint?.let { hint ->
+                        Text("⚡ $hint", fontSize = 7.sp, color = PathriftGold, fontFamily = FontFamily.Monospace)
+                    }
+                    val modeLabel = when (info.type.targetingMode) {
+                        TargetingMode.ALL_LAYERS  -> "ALL LAYERS"
+                        TargetingMode.BRIDGE_ONLY -> "BRIDGE ONLY"
+                        else -> null
+                    }
+                    modeLabel?.let { label ->
+                        Text(
+                            text = label,
+                            fontSize = 7.sp,
+                            color = Color(0xFF00CCFF).copy(alpha = 0.7f),
+                            fontFamily = FontFamily.Monospace,
+                            letterSpacing = 0.5.sp
+                        )
                     }
                 }
-                info.type.typeAdvantageHint?.let { hint ->
-                    Text("⚡ $hint", fontSize = 7.sp, color = PathriftGold, fontFamily = FontFamily.Monospace)
-                }
-                val modeLabel = when (info.type.targetingMode) {
-                    TargetingMode.ALL_LAYERS  -> "ALL LAYERS"
-                    TargetingMode.BRIDGE_ONLY -> "BRIDGE ONLY"
-                    else -> null
-                }
-                modeLabel?.let { label ->
-                    Text(
-                        text = label,
-                        fontSize = 7.sp,
-                        color = Color(0xFF00CCFF).copy(alpha = 0.7f),
-                        fontFamily = FontFamily.Monospace,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-            }
 
             // Stats block
             Row(
@@ -895,15 +938,20 @@ private fun TowerInfoBottomPanel(
                 MiniStatItem("SPD", String.format("%.1f/s", info.attackSpeed), PathriftPurple, Modifier.weight(1f))
             }
 
-            // Buttons
+            // GAP-044: Buttons with scale press animation
             Row(
                 modifier = Modifier.padding(end = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // UPGRADE button with scale animation
+                val upgradeInteraction = remember { MutableInteractionSource() }
+                val upgradePressed by upgradeInteraction.collectIsPressedAsState()
+                val upgradeScale by animateFloatAsState(if (upgradePressed) 0.95f else 1f, spring(stiffness = 700f), label = "upgradeScale")
                 Button(
                     onClick = onUpgrade, enabled = canAffordUpgrade,
-                    modifier = Modifier.width(72.dp).height(38.dp),
+                    interactionSource = upgradeInteraction,
+                    modifier = Modifier.width(72.dp).height(38.dp).graphicsLayer { scaleX = upgradeScale; scaleY = upgradeScale },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (canAffordUpgrade) PathriftNeonBlue else Color.White.copy(alpha = 0.06f),
                         disabledContainerColor = Color.White.copy(alpha = 0.06f)
@@ -918,11 +966,16 @@ private fun TowerInfoBottomPanel(
                             color = if (canAffordUpgrade) PathriftBackground.copy(0.7f) else PathriftTextSecondary.copy(0.5f))
                     }
                 }
+                // SELL button with scale animation
+                val sellInteraction = remember { MutableInteractionSource() }
+                val sellPressed by sellInteraction.collectIsPressedAsState()
+                val sellScale by animateFloatAsState(if (sellPressed) 0.95f else 1f, spring(stiffness = 700f), label = "sellScale")
                 Box(
                     modifier = Modifier.width(56.dp).height(38.dp)
+                        .graphicsLayer { scaleX = sellScale; scaleY = sellScale }
                         .background(PathriftDanger.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
                         .border(1.dp, PathriftDanger.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
-                        .clickable(onClick = onSell),
+                        .clickable(interactionSource = sellInteraction, indication = null, onClick = onSell),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -930,16 +983,22 @@ private fun TowerInfoBottomPanel(
                         Text("+${info.sellValue}g", fontSize = 8.sp, color = PathriftDanger.copy(0.8f))
                     }
                 }
+                // Dismiss button with scale animation
+                val dismissInteraction = remember { MutableInteractionSource() }
+                val dismissPressed by dismissInteraction.collectIsPressedAsState()
+                val dismissScale by animateFloatAsState(if (dismissPressed) 0.95f else 1f, spring(stiffness = 700f), label = "dismissScale")
                 Box(
                     modifier = Modifier.size(28.dp)
+                        .graphicsLayer { scaleX = dismissScale; scaleY = dismissScale }
                         .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
-                        .clickable(onClick = onDismiss),
+                        .clickable(interactionSource = dismissInteraction, indication = null, onClick = onDismiss),
                     contentAlignment = Alignment.Center
                 ) {
                     Text("✕", fontSize = 11.sp, color = PathriftTextSecondary)
                 }
             }
-        }
+        } // end Row (58dp panel)
+        } // end Column (with accent line)
     }
 }
 
@@ -972,31 +1031,33 @@ private fun TowerSelectionPanel(
 ) {
     var selectedType by remember { mutableStateOf<TowerType?>(null) }
 
+    // GAP-024: Overlay opacity 0.4
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.35f))
+            .background(Color.Black.copy(alpha = 0.4f))
             .clickable(onClick = onDismiss)
             .navigationBarsPadding(),
         contentAlignment = Alignment.BottomCenter
     ) {
+        // GAP-025: Sheet cornerRadius 24
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(PathriftSurface, RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                .background(PathriftSurface, RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                 .clickable(enabled = false, onClick = {})
                 .padding(bottom = 8.dp)
         ) {
-            // Drag handle
+            // GAP-026: Drag handle height 5dp
             Box(
                 modifier = Modifier
                     .padding(top = 8.dp, bottom = 4.dp)
-                    .size(36.dp, 4.dp)
+                    .size(36.dp, 5.dp)
                     .align(Alignment.CenterHorizontally)
                     .background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
             )
 
-            // Header
+            // Header — GAP-027: font 16sp (no monospace to simulate rounded), GAP-028: gold pill
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1006,16 +1067,16 @@ private fun TowerSelectionPanel(
             ) {
                 Text(
                     text = LanguageManager.s("PLACE TOWER", "KULE YERLEŞTIR"),
-                    fontSize = 14.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Black,
                     color = PathriftTextPrimary,
-                    fontFamily = FontFamily.Monospace,
                     letterSpacing = 1.sp
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("💰", fontSize = 10.sp)
+                    // GAP-028: Gold pill — value + "GOLD" label
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("${state.gold}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PathriftGold, fontFamily = FontFamily.Monospace)
+                        Text("GOLD", fontSize = 8.sp, color = PathriftTextSecondary, fontFamily = FontFamily.Monospace)
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text("♦", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00CCFF))
@@ -1097,7 +1158,7 @@ private fun TowerSelectionPanel(
                     }
                 }
 
-                // BUILD / UNLOCK button
+                // GAP-034: BUILD / UNLOCK button with icons
                 if (!isUnlocked) {
                     val hasDiamonds = canAffordDiamonds
                     Button(
@@ -1113,14 +1174,25 @@ private fun TowerSelectionPanel(
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text(
-                            text = if (hasDiamonds) "UNLOCK ${sel.displayName.uppercase()} — ${sel.diamondCost}♦"
-                                   else "NEED ${sel.diamondCost}♦",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (hasDiamonds) PathriftBackground else PathriftTextSecondary,
-                            fontFamily = FontFamily.Monospace
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                if (hasDiamonds) Icons.Default.LockOpen else Icons.Default.Lock,
+                                null,
+                                modifier = Modifier.size(18.dp),
+                                tint = if (hasDiamonds) PathriftBackground else PathriftTextSecondary
+                            )
+                            Text(
+                                text = if (hasDiamonds) "UNLOCK ${sel.displayName.uppercase()} — ${sel.diamondCost}♦"
+                                       else "NEED ${sel.diamondCost}♦",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (hasDiamonds) PathriftBackground else PathriftTextSecondary,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                     }
                 } else {
                     Button(
@@ -1141,14 +1213,25 @@ private fun TowerSelectionPanel(
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text(
-                            text = if (canAffordGold) "BUILD ${sel.displayName.uppercase()} — ${towerGoldCost(sel)}g"
-                                   else "NOT ENOUGH GOLD",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = if (canAffordGold) PathriftBackground else PathriftTextSecondary,
-                            fontFamily = FontFamily.Monospace
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(
+                                if (canAffordGold) Icons.Default.CheckCircle else Icons.Default.Close,
+                                null,
+                                modifier = Modifier.size(18.dp),
+                                tint = if (canAffordGold) PathriftBackground else PathriftTextSecondary
+                            )
+                            Text(
+                                text = if (canAffordGold) "BUILD ${sel.displayName.uppercase()} — ${towerGoldCost(sel)}g"
+                                       else "NOT ENOUGH GOLD",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (canAffordGold) PathriftBackground else PathriftTextSecondary,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.height(4.dp))
@@ -1169,6 +1252,7 @@ private fun TowerSelectionPanel(
     }
 }
 
+// GAP-030/031/032/033/035: CompactTowerPickCard — solid fill, 68dp, full name, 10sp cost, scale press
 @Composable
 private fun CompactTowerPickCard(
     type: TowerType,
@@ -1183,11 +1267,23 @@ private fun CompactTowerPickCard(
     val isAffordable = isUnlocked && canAffordGold
     val alpha = if (isAffordable) 1f else 0.45f
 
+    // GAP-035: Scale press animation
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1.0f,
+        animationSpec = spring(stiffness = 700f),
+        label = "cardScale"
+    )
+
     Box(
         modifier = Modifier
-            .width(72.dp)
+            // GAP-031: Card width 68dp
+            .width(68.dp)
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            // GAP-030: Solid towerColor background when selected
             .background(
-                if (isSelected) towerColor.copy(alpha = 0.12f) else PathriftSurface.copy(alpha = alpha),
+                if (isSelected) towerColor else PathriftSurface.copy(alpha = alpha),
                 RoundedCornerShape(10.dp)
             )
             .border(
@@ -1195,7 +1291,7 @@ private fun CompactTowerPickCard(
                 color = if (isSelected) towerColor else if (isAffordable) towerColor.copy(alpha = 0.5f) else PathriftTextDisabled,
                 shape = RoundedCornerShape(10.dp)
             )
-            .clickable(onClick = onTap)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onTap)
             .padding(vertical = 6.dp, horizontal = 6.dp),
         contentAlignment = Alignment.Center
     ) {
@@ -1214,28 +1310,32 @@ private fun CompactTowerPickCard(
                 } else {
                     TowerShapeIcon(
                         type = type,
-                        color = if (isSelected) towerColor else towerColor.copy(alpha = alpha),
+                        // GAP-030: White icon when selected (on solid color background)
+                        color = if (isSelected) Color.White else towerColor.copy(alpha = alpha),
                         modifier = Modifier.size(28.dp)
                     )
                 }
             }
             Spacer(Modifier.height(3.dp))
+            // GAP-032: Full tower name, no truncation
             Text(
-                text = type.displayName.uppercase().take(6),
+                text = type.displayName.uppercase(),
                 fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isSelected) PathriftTextPrimary else if (isAffordable) PathriftTextPrimary else PathriftTextSecondary.copy(alpha = alpha),
+                color = if (isSelected) Color.White else if (isAffordable) PathriftTextPrimary else PathriftTextSecondary.copy(alpha = alpha),
                 fontFamily = FontFamily.Monospace
             )
             Spacer(Modifier.height(2.dp))
             if (!isUnlocked) {
-                Text(text = "${type.diamondCost}♦", fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                // GAP-033: Cost font 10sp
+                Text(text = "${type.diamondCost}♦", fontSize = 10.sp, fontWeight = FontWeight.Bold,
                     color = if (canAffordDiamonds) Color(0xFF00CCFF) else PathriftDanger, fontFamily = FontFamily.Monospace)
             } else {
                 val goldCost = towerGoldCost(type)
+                // GAP-033: Cost font 10sp
                 Text(
                     text = "${goldCost}g",
-                    fontSize = 8.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = if (canAffordGold) PathriftGold else PathriftDanger,
                     fontFamily = FontFamily.Monospace
@@ -1399,37 +1499,52 @@ fun NextWaveBanner(waveDef: WaveDefinition, onTap: () -> Unit) {
     }
 }
 
-// PATHRIFT-157: Next Wave Info Panel
+// PATHRIFT-157: Next Wave Info Panel — GAP-091/092/093/094/095
 @Composable
 fun NextWaveInfoPanel(
     waveDef: WaveDefinition,
     onDismiss: () -> Unit
 ) {
     val isBoss = waveDef.spawnGroups.any { it.type == EnemyType.BOSS }
+    // GAP-091: Panel position — top-left (full screen backdrop, panel top-left aligned)
     Box(
-        modifier = androidx.compose.ui.Modifier
+        modifier = Modifier
             .fillMaxSize()
             .background(Color.Black.copy(alpha = 0.55f))
             .clickable(onClick = onDismiss),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.TopStart
     ) {
         Column(
-            modifier = androidx.compose.ui.Modifier
-                .background(Color(0xFF12121A), RoundedCornerShape(16.dp))
+            modifier = Modifier
+                .padding(top = 60.dp, start = 16.dp)
+                // GAP-095: cornerRadius 10
+                .background(Color(0xFF12121A), RoundedCornerShape(10.dp))
                 .padding(20.dp)
                 .clickable(enabled = false, onClick = {})
                 .width(220.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(
-                text = "WAVE ${waveDef.waveNumber}",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Black,
-                color = Color(0xFF00C8FF),
-                fontFamily = FontFamily.Monospace,
-                letterSpacing = 2.sp
-            )
-            Spacer(androidx.compose.ui.Modifier.height(4.dp))
+            // GAP-093: ✕ close button aligned end
+            Box(modifier = Modifier.fillMaxWidth()) {
+                // GAP-092: Title "NEXT WAVE" instead of "WAVE X"
+                Text(
+                    text = "NEXT WAVE",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Black,
+                    color = Color(0xFF00C8FF),
+                    fontFamily = FontFamily.Monospace,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.align(Alignment.CenterStart)
+                )
+                TextButton(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.CenterEnd).size(28.dp),
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Text("✕", fontSize = 12.sp, color = Color.White.copy(alpha = 0.6f))
+                }
+            }
+            Spacer(Modifier.height(4.dp))
             if (isBoss) {
                 Text(
                     text = "⚠ BOSS WAVE",
@@ -1439,26 +1554,27 @@ fun NextWaveInfoPanel(
                     fontFamily = FontFamily.Monospace
                 )
             }
-            Spacer(androidx.compose.ui.Modifier.height(10.dp))
+            Spacer(Modifier.height(10.dp))
             for (group in waveDef.spawnGroups) {
                 Row(
-                    modifier = androidx.compose.ui.Modifier
+                    modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(
-                        modifier = androidx.compose.ui.Modifier
+                        modifier = Modifier
                             .size(10.dp)
                             .background(group.type.indicatorColor, CircleShape)
                     )
+                    // GAP-094: Enemy name — lowercase then capitalize first char (iOS parity)
                     Text(
                         text = group.type.name.lowercase().replaceFirstChar { it.uppercase() },
                         fontSize = 11.sp,
                         color = Color.White,
                         fontFamily = FontFamily.Monospace,
-                        modifier = androidx.compose.ui.Modifier.weight(1f)
+                        modifier = Modifier.weight(1f)
                     )
                     Text(
                         text = "×${group.count}",
@@ -1469,13 +1585,6 @@ fun NextWaveInfoPanel(
                     )
                 }
             }
-            Spacer(androidx.compose.ui.Modifier.height(12.dp))
-            Text(
-                text = "tap to close",
-                fontSize = 9.sp,
-                color = Color.Gray,
-                fontFamily = FontFamily.Monospace
-            )
         }
     }
 }
