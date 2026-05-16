@@ -1396,7 +1396,7 @@ private fun CompactTowerPickCard(
             if (!isUnlocked) {
                 // GAP-033: Cost font 10sp
                 Text(text = "${type.diamondCost}♦", fontSize = 10.sp, fontWeight = FontWeight.Bold,
-                    color = if (canAffordDiamonds) Color(0xFF00CCFF) else PathriftDanger, fontFamily = FontFamily.Monospace)
+                    color = if (canAffordDiamonds) Color(0xFF00CCFF) else PathriftTextSecondary, fontFamily = FontFamily.Monospace)
             } else {
                 val goldCost = towerGoldCost(type)
                 // GAP-033: Cost font 10sp
@@ -1404,7 +1404,7 @@ private fun CompactTowerPickCard(
                     text = "${goldCost}g",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (canAffordGold) PathriftGold else PathriftDanger,
+                    color = if (canAffordGold) PathriftGold else PathriftTextSecondary,
                     fontFamily = FontFamily.Monospace
                 )
             }

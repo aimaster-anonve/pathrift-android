@@ -321,7 +321,9 @@ object PathSystem {
                 }
                 val len = sqrt((dir.x * dir.x + dir.y * dir.y).toDouble()).toFloat()
                 val safeDen = if (len > 0f) len else 1f
-                val perp = PointF(-dir.y / safeDen * 80f, dir.x / safeDen * 80f)
+                // Perpendicular offset must be density-aware: slot_radius + path_half + margin
+                val perpOffset = (16f + 8.5f + 10f) * screenDensity
+                val perp = PointF(-dir.y / safeDen * perpOffset, dir.x / safeDen * perpOffset)
                 // Insert at front so take(maxSlots) never drops guaranteed slots
                 result.add(0, PointF(segMid.x + perp.x, segMid.y + perp.y))
             }
