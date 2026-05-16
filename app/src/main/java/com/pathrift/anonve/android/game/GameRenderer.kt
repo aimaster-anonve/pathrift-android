@@ -1147,17 +1147,19 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         val alive = mutableListOf<Projectile>()
         for (p in snapshotProj) {
             val age = now - p.createdAt
-            val lifetimeMs = if (isAoeType(p.type)) 280L else 180L
+            val lifetimeMs = if (isAoeType(p.type)) 350L else 250L
             if (age >= lifetimeMs) continue   // expired — drop
             alive.add(p)
             val t = age.toFloat() / lifetimeMs   // 0→1 over lifetime
+            // Alpha: full opacity until last 30%, then fade out
+            val baseAlpha: Float = if (t < 0.7f) 1.0f else (1.0f - (t - 0.7f) / 0.3f)
 
             when {
                 // AoE types: expanding ring at target position — Blast, Nova, Artillery, Inferno
                 isAoeType(p.type) -> {
                     val maxRadius = dp(28f)
                     val radius = maxRadius * t
-                    val alpha = ((1f - t) * 220).toInt().coerceIn(0, 255)
+                    val alpha = (baseAlpha * 220).toInt().coerceIn(0, 255)
                     val aoeColor = aoeProjectileColor(p.type)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = aoeColor
@@ -1170,18 +1172,18 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                     val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = aoeColor
                         style = Paint.Style.FILL
-                        this.alpha = ((1f - t) * 40).toInt().coerceIn(0, 255)
+                        this.alpha = (baseAlpha * 40).toInt().coerceIn(0, 255)
                     }
                     canvas.drawCircle(p.toX, p.toY, radius * 0.5f, fillPaint)
                 }
 
                 // Frost: short blue line + freeze ring at target
                 p.type == TowerType.FROST -> {
-                    val alpha = ((1f - t) * 220).toInt().coerceIn(0, 255)
+                    val alpha = (baseAlpha * 220).toInt().coerceIn(0, 255)
                     val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = android.graphics.Color.argb(alpha, 143, 79, 255)
                         style = Paint.Style.STROKE
-                        strokeWidth = dp(2f)
+                        strokeWidth = dp(2.5f)
                         strokeCap = Paint.Cap.ROUND
                     }
                     // Draw bullet travelling from → to
@@ -1200,7 +1202,7 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
                 // Tesla: jagged lightning line (multi-segment with jitter)
                 p.type == TowerType.TESLA -> {
-                    val alpha = ((1f - t) * 255).toInt().coerceIn(0, 255)
+                    val alpha = (baseAlpha * 255).toInt().coerceIn(0, 255)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = android.graphics.Color.argb(alpha, 51, 166, 255)
                         style = Paint.Style.STROKE
@@ -1222,11 +1224,11 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
                 // Sniper: long fast beam — one bright line drawn fully
                 p.type == TowerType.SNIPER -> {
-                    val alpha = ((1f - t) * 255).toInt().coerceIn(0, 255)
+                    val alpha = (baseAlpha * 255).toInt().coerceIn(0, 255)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = android.graphics.Color.argb(alpha, 153, 255, 255)
                         style = Paint.Style.STROKE
-                        strokeWidth = dp(1.5f)
+                        strokeWidth = dp(2.5f)
                         strokeCap = Paint.Cap.ROUND
                     }
                     canvas.drawLine(p.fromX, p.fromY, p.toX, p.toY, paint)
@@ -1234,12 +1236,12 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
                 // Default line projectile: bullet travels from → to
                 else -> {
-                    val alpha = ((1f - t) * 220).toInt().coerceIn(0, 255)
+                    val alpha = (baseAlpha * 220).toInt().coerceIn(0, 255)
                     val projColor = lineProjectileColor(p.type)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = projColor
                         style = Paint.Style.STROKE
-                        strokeWidth = dp(2f)
+                        strokeWidth = dp(2.5f)
                         strokeCap = Paint.Cap.ROUND
                         this.alpha = alpha
                     }

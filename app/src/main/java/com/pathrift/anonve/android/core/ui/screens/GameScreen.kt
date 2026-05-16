@@ -28,6 +28,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -37,20 +40,28 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Adjust
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowRight
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MonetizationOn
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.TrackChanges
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material.icons.filled.Whatshot
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -106,7 +117,6 @@ import com.pathrift.anonve.android.core.ui.PierceTowerColor
 import com.pathrift.anonve.android.core.ui.SniperTowerColor
 import com.pathrift.anonve.android.core.ui.TeslaTowerColor
 import com.pathrift.anonve.android.core.ui.GameViewModel
-import com.pathrift.anonve.android.core.ui.TowerShapeIcon
 import com.pathrift.anonve.android.core.ui.LanguageManager
 import com.pathrift.anonve.android.core.ui.PathriftBackground
 import com.pathrift.anonve.android.core.ui.PathriftDanger
@@ -958,13 +968,13 @@ private fun TowerInfoBottomPanel(
                 )
                 Spacer(Modifier.width(12.dp))
 
-                // Identity — 96dp (iOS parity), name clipped to prevent overflow
-                Column(modifier = Modifier.width(96.dp)) {
+                // Identity — wrapContent (max 100dp) to prevent overflow on small screens
+                Column(modifier = Modifier.wrapContentWidth().widthIn(max = 100.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             info.type.displayName.uppercase(),
                             fontSize = 12.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            maxLines = 1, overflow = TextOverflow.Clip,
                             modifier = Modifier.weight(1f, fill = false)
                         )
                         Spacer(Modifier.width(3.dp))
@@ -1007,9 +1017,9 @@ private fun TowerInfoBottomPanel(
                 MiniStatItem("SPD", String.format("%.1f/s", info.attackSpeed), PathriftPurple, Modifier.weight(1f))
             }
 
-            // GAP-044: Buttons with scale press animation
+            // Buttons with scale press animation — compact sizing to prevent overflow
             Row(
-                modifier = Modifier.padding(end = 10.dp),
+                modifier = Modifier.wrapContentSize().padding(end = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -1020,7 +1030,7 @@ private fun TowerInfoBottomPanel(
                 Button(
                     onClick = onUpgrade, enabled = canAffordUpgrade,
                     interactionSource = upgradeInteraction,
-                    modifier = Modifier.width(72.dp).height(38.dp).graphicsLayer { scaleX = upgradeScale; scaleY = upgradeScale },
+                    modifier = Modifier.width(64.dp).height(38.dp).graphicsLayer { scaleX = upgradeScale; scaleY = upgradeScale },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (canAffordUpgrade) PathriftNeonBlue else Color.White.copy(alpha = 0.06f),
                         disabledContainerColor = Color.White.copy(alpha = 0.06f)
@@ -1040,7 +1050,7 @@ private fun TowerInfoBottomPanel(
                 val sellPressed by sellInteraction.collectIsPressedAsState()
                 val sellScale by animateFloatAsState(if (sellPressed) 0.94f else 1f, spring(stiffness = 700f), label = "sellScale")
                 Box(
-                    modifier = Modifier.width(56.dp).height(38.dp)
+                    modifier = Modifier.width(48.dp).height(38.dp)
                         .graphicsLayer { scaleX = sellScale; scaleY = sellScale }
                         .background(PathriftDanger.copy(alpha = 0.1f), RoundedCornerShape(10.dp))
                         .border(1.dp, PathriftDanger.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
@@ -1057,7 +1067,7 @@ private fun TowerInfoBottomPanel(
                 val dismissPressed by dismissInteraction.collectIsPressedAsState()
                 val dismissScale by animateFloatAsState(if (dismissPressed) 0.94f else 1f, spring(stiffness = 700f), label = "dismissScale")
                 Box(
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(24.dp)
                         .graphicsLayer { scaleX = dismissScale; scaleY = dismissScale }
                         .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
                         .clickable(interactionSource = dismissInteraction, indication = null, onClick = onDismiss),
@@ -1126,7 +1136,7 @@ private fun TowerSelectionPanel(
                     .background(PathriftTextSecondary.copy(alpha = 0.4f), RoundedCornerShape(2.dp))
             )
 
-            // Header — GAP-027: font 16sp (no monospace to simulate rounded), GAP-028: gold pill
+            // Header — iOS parity: "PLACE TOWER" 16sp Bold + Gold icon+value + Diamond icon+value
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1137,19 +1147,20 @@ private fun TowerSelectionPanel(
                 Text(
                     text = LanguageManager.s("PLACE TOWER", "KULE YERLEŞTIR"),
                     fontSize = 16.sp,
-                    fontWeight = FontWeight.Black,
+                    fontWeight = FontWeight.Bold,
                     color = PathriftTextPrimary,
                     letterSpacing = 1.sp
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // GAP-028: Gold pill — value + "GOLD" label
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("${state.gold}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = PathriftGold, fontFamily = FontFamily.Monospace)
-                        Text("GOLD", fontSize = 8.sp, color = PathriftTextSecondary, fontFamily = FontFamily.Monospace)
-                    }
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Gold: MonetizationOn icon + value 14sp Bold Monospace
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF00CCFF), modifier = Modifier.size(11.dp))
-                        Text("${state.diamonds}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00CCFF), fontFamily = FontFamily.Monospace)
+                        Icon(Icons.Default.MonetizationOn, contentDescription = null, tint = PathriftGold, modifier = Modifier.size(14.dp))
+                        Text("${state.gold}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = PathriftGold, fontFamily = FontFamily.Monospace)
+                    }
+                    // Diamond: Diamond icon + value 14sp Bold Monospace cyan
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Icon(Icons.Default.Diamond, contentDescription = null, tint = Color(0xFF66CCFF), modifier = Modifier.size(14.dp))
+                        Text("${state.diamonds}", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color(0xFF66CCFF), fontFamily = FontFamily.Monospace)
                     }
                 }
             }
@@ -1321,7 +1332,7 @@ private fun TowerSelectionPanel(
     }
 }
 
-// GAP-030/031/032/033/035: CompactTowerPickCard — solid fill, 68dp, full name, 10sp cost, scale press
+// iOS TowerCardButton parity: transparent unselected, towerColor.copy(0.12f) selected, Material icons in Circle
 @Composable
 private fun CompactTowerPickCard(
     type: TowerType,
@@ -1333,10 +1344,9 @@ private fun CompactTowerPickCard(
     onTap: () -> Unit
 ) {
     val towerColor = towerDisplayColor(type)
-    val isAffordable = isUnlocked && canAffordGold
-    val alpha = if (isAffordable) 1f else 0.45f
+    // Alpha: 0.5 only when unlocked but cannot afford gold (iOS parity)
+    val cardAlpha = if (isUnlocked && !canAffordGold) 0.5f else 1.0f
 
-    // GAP-035: Scale press animation 0.94f (iOS parity — FIX 2)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -1345,69 +1355,94 @@ private fun CompactTowerPickCard(
         label = "cardScale"
     )
 
+    val towerIcon: androidx.compose.ui.graphics.vector.ImageVector = when (type) {
+        TowerType.BOLT      -> Icons.Default.Bolt
+        TowerType.BLAST     -> Icons.Default.Whatshot
+        TowerType.FROST     -> Icons.Default.AcUnit
+        TowerType.PIERCE    -> Icons.Default.KeyboardDoubleArrowRight
+        TowerType.CORE      -> Icons.Default.Shield
+        TowerType.INFERNO   -> Icons.Default.LocalFireDepartment
+        TowerType.TESLA     -> Icons.Default.FlashOn
+        TowerType.NOVA      -> Icons.Default.WbSunny
+        TowerType.SNIPER    -> Icons.Default.TrackChanges
+        TowerType.ARTILLERY -> Icons.Default.Adjust
+    }
+
     Box(
         modifier = Modifier
-            // GAP-031: Card width 68dp
             .width(68.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            // FIX 3: iOS parity — selected uses towerColor.copy(0.12f) background (not solid)
+            .graphicsLayer { scaleX = scale; scaleY = scale; alpha = cardAlpha }
+            // Unselected: transparent (Color.Transparent). Selected: towerColor.copy(0.12f)
             .background(
-                if (isSelected) towerColor.copy(alpha = 0.12f) else PathriftSurface.copy(alpha = alpha),
-                RoundedCornerShape(10.dp)
+                if (isSelected) towerColor.copy(alpha = 0.12f) else Color.Transparent,
+                RoundedCornerShape(12.dp)
             )
+            // Unselected: no border (0.dp transparent). Selected: 1dp towerColor.copy(0.5f)
             .border(
-                width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) towerColor else if (isAffordable) towerColor.copy(alpha = 0.5f) else PathriftTextDisabled,
-                shape = RoundedCornerShape(10.dp)
+                width = if (isSelected) 1.dp else 0.dp,
+                color = if (isSelected) towerColor.copy(alpha = 0.5f) else Color.Transparent,
+                shape = RoundedCornerShape(12.dp)
             )
             .clickable(interactionSource = interactionSource, indication = null, onClick = onTap)
-            .padding(vertical = 6.dp, horizontal = 6.dp),
+            .padding(vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            // Circle icon area — 44dp with shadow when selected
             Box(
                 modifier = Modifier
                     .size(44.dp)
+                    .shadow(
+                        elevation = if (isSelected) 6.dp else 0.dp,
+                        shape = CircleShape,
+                        spotColor = towerColor.copy(alpha = 0.5f)
+                    )
                     .background(
-                        towerColor.copy(alpha = if (isSelected) 0.2f else if (isAffordable) 0.1f else 0.05f),
+                        if (isSelected) towerColor else towerColor.copy(alpha = 0.15f),
                         CircleShape
+                    )
+                    .border(
+                        width = if (isSelected) 2.5.dp else 1.dp,
+                        color = towerColor.copy(alpha = if (isSelected) 0.8f else 0.3f),
+                        shape = CircleShape
                     ),
                 contentAlignment = Alignment.Center
             ) {
                 if (!isUnlocked) {
-                    Text("🔒", fontSize = androidx.compose.ui.unit.TextUnit(14f, androidx.compose.ui.unit.TextUnitType.Sp))
+                    Icon(Icons.Default.Lock, null, Modifier.size(16.dp), tint = Color.White.copy(alpha = 0.7f))
                 } else {
-                    TowerShapeIcon(
-                        type = type,
-                        // FIX 3: iOS parity — icon uses towerColor always (not white), brighter when selected
-                        color = if (isSelected) towerColor else towerColor.copy(alpha = alpha),
-                        modifier = Modifier.size(28.dp)
+                    Icon(
+                        towerIcon, null,
+                        Modifier.size(18.dp),
+                        tint = if (isSelected) Color.White else towerColor
                     )
                 }
             }
-            Spacer(Modifier.height(3.dp))
-            // GAP-032: Full tower name, no truncation
             Text(
                 text = type.displayName.uppercase(),
-                fontSize = 8.sp,
+                fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
-                // FIX 3: iOS parity — towerColor when selected, otherwise original logic
-                color = if (isSelected) towerColor else if (isAffordable) PathriftTextPrimary else PathriftTextSecondary.copy(alpha = alpha),
+                color = if (isSelected) PathriftTextPrimary else PathriftTextSecondary,
                 fontFamily = FontFamily.Monospace
             )
-            Spacer(Modifier.height(2.dp))
             if (!isUnlocked) {
-                // GAP-033: Cost font 10sp
-                Text(text = "${type.diamondCost}◆", fontSize = 10.sp, fontWeight = FontWeight.Bold,
-                    color = if (canAffordDiamonds) Color(0xFF00CCFF) else PathriftTextSecondary, fontFamily = FontFamily.Monospace)
+                Text(
+                    text = "${type.diamondCost}◆",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (canAffordDiamonds) Color(0xFF66CCFF) else PathriftDanger,
+                    fontFamily = FontFamily.Monospace
+                )
             } else {
                 val goldCost = towerGoldCost(type)
-                // GAP-033: Cost font 10sp
                 Text(
                     text = "${goldCost}g",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (canAffordGold) PathriftGold else PathriftTextSecondary,
+                    color = if (canAffordGold) PathriftGold else PathriftDanger,
                     fontFamily = FontFamily.Monospace
                 )
             }
