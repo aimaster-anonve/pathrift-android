@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -116,8 +117,16 @@ fun HowToPlayScreen(onBack: () -> Unit) {
                 LanguageManager.s("TOWERS", "KULELER"),
                 Icons.Default.TrackChanges,
                 LanguageManager.s(
-                    "Bolt: Fast single-target\nBlast: Area damage\nFrost: Slows enemies 40%\nPierce: Hits all in range, ignores shields\nCore: Armor-piercing single target\nInferno: High DPS fire damage\nTesla: Chain lightning (3 targets)\nNova: Star-burst AoE gold\nSniper: Ultra-long range, high damage\nArtillery: Wide area splash",
-                    "Şimşek: Hızlı tek hedef\nPatlama: Alan hasarı\nBuz: Düşmanları %40 yavaşlatır\nDelici: Tüm hedefe çarpar, kalkanı yoksayar\nÇekirdek: Zırh delici tek hedef\nCehennem: Yüksek DPS ateş\nTesla: Zincir şimşek (3 hedef)\nNova: Yıldız patlama AoE\nKeskin Nişancı: Ultra uzun menzil\nTopçu: Geniş alan sıçrama"
+                    "Bolt: Fast single-target\nBlast: Area damage\nFrost: Slows enemies 40%\nSniper: Long range, all layers\nArtillery: Bridge only, AoE",
+                    "Şimşek: Hızlı tek hedef\nPatlama: Alan hasarı\nBuz: Düşmanları %40 yavaşlatır\nKeskin Nişancı: Uzun menzil, tüm katmanlar\nTopçu: Yalnızca köprü, AoE"
+                )
+            ),
+            Triple(
+                LanguageManager.s("BRIDGE LAYERS", "KATMAN SİSTEMİ"),
+                Icons.Default.Layers,
+                LanguageManager.s(
+                    "Some maps have bridge segments. Sniper hits all layers. Artillery targets bridges only.",
+                    "Bazı haritaların köprü bölümleri vardır. Keskin Nişancı tüm katmanları vurur. Topçu yalnızca köprüleri hedef alır."
                 )
             ),
             Triple(
@@ -190,7 +199,7 @@ private fun RuleSection(title: String, icon: ImageVector, text: String) {
         modifier = Modifier
             .fillMaxWidth()
             .background(PathriftSurface, RoundedCornerShape(10.dp))
-            .padding(16.dp),
+            .padding(14.dp),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.Start
     ) {
@@ -198,24 +207,24 @@ private fun RuleSection(title: String, icon: ImageVector, text: String) {
             imageVector = icon,
             contentDescription = null,
             tint = PathriftNeonBlue,
-            modifier = Modifier.size(22.dp).padding(top = 1.dp)
+            modifier = Modifier.size(18.dp).padding(top = 1.dp)
         )
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(14.dp))
         Column {
             Text(
                 text = title,
-                fontSize = 12.sp,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 color = PathriftNeonBlue,
                 letterSpacing = 1.5.sp,
                 fontFamily = FontFamily.Monospace
             )
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(3.dp))
             Text(
                 text = text,
-                fontSize = 14.sp,
+                fontSize = 13.sp,
                 color = PathriftTextSecondary,
-                lineHeight = 20.sp
+                lineHeight = 19.sp
             )
         }
     }
