@@ -128,6 +128,7 @@ import com.pathrift.anonve.android.core.ui.PathriftTextPrimary
 import com.pathrift.anonve.android.core.ui.PathriftTextSecondary
 import com.pathrift.anonve.android.game.GamePhase
 import com.pathrift.anonve.android.game.GameRenderer
+import com.pathrift.anonve.android.game.PathSystem
 import com.pathrift.anonve.android.game.GameState
 import com.pathrift.anonve.android.game.TowerInfo
 import com.pathrift.anonve.android.game.WaveDefinition
@@ -314,6 +315,9 @@ private fun GameCanvasView(
     gameSurface.slotOccupied = gameViewModel.game.grid.slots.associate { it.id to it.state.isOccupied }
     gameSurface.selectedSlotId = state.selectedTowerSlotId
     gameSurface.riftShiftActive = state.riftShiftActive
+    // KEY FIX: propagate path waypoints through Compose state (not thread-direct) so renderer
+    // always sees new path after Rift Shift. layoutVersion forces recomposition on layout change.
+    gameSurface.pathWaypoints = PathSystem.waypoints
 
     Box(
         modifier = modifier

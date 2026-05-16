@@ -273,7 +273,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
             cur.copy(
                 riftShiftActive = true,
                 gold = game.gold,
-                activeTowerSlots = buildTowerSlotMap()
+                activeTowerSlots = buildTowerSlotMap(),
+                // Increment layoutVersion so GameCanvasView recomposes and pushes new PathSystem.waypoints
+                // to gameSurface.pathWaypoints — this is the guaranteed path update mechanism.
+                layoutVersion = cur.layoutVersion + 1
             )
         }
         viewModelScope.launch {

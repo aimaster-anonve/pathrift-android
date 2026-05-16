@@ -39,6 +39,8 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     @Volatile var slotOccupied: Map<Int, Boolean> = emptyMap()
     @Volatile var selectedSlotId: Int? = null
     @Volatile var riftShiftActive: Boolean = false
+    /** Path waypoints — set from Compose on every layout change, guarantees renderer sees new path */
+    @Volatile var pathWaypoints: List<PointF> = emptyList()
 
     // ---- Projectile system — simple fire effect, iOS parity ----
     data class Projectile(
@@ -487,7 +489,8 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     // Render the path as filled corridor with dual-edge glow lines and texture (Build 5.3 path visibility spec)
     private fun drawPath(canvas: Canvas, W: Float, H: Float) {
-        val wps = PathSystem.waypoints
+        // Use renderer's own pathWaypoints field (set from Compose, guaranteed fresh after rift shift)
+        val wps = pathWaypoints.ifEmpty { PathSystem.waypoints }
         if (wps.size < 2) return
         val halfWidth = dp(8.5f)  // 17dp corridor = 8.5dp each side, scaled to pixels
 
