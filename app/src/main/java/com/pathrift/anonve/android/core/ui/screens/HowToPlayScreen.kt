@@ -202,12 +202,15 @@ private fun RuleSection(title: String, icon: ImageVector, text: String) {
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.Start
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = PathriftNeonBlue,
-            modifier = Modifier.size(18.dp).padding(top = 1.dp)
-        )
+        // FIX 8: Fixed width container (28dp) for icon — iOS frame(width: 28) parity
+        Box(modifier = Modifier.size(width = 28.dp, height = 18.dp), contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = PathriftNeonBlue,
+                modifier = Modifier.size(18.dp)
+            )
+        }
         Spacer(Modifier.width(14.dp))
         Column {
             Text(

@@ -209,7 +209,7 @@ fun StoreScreen(onBack: () -> Unit) {
                             .padding(horizontal = 12.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        StoreSectionHeader("PREMIUM", Icons.Default.WorkspacePremium)
+                        StoreSectionHeader("PREMIUM", Icons.Default.Bolt)
                         PremiumCard(isPremium = isPremium, onActivate = {
                             premiumStore.toggle(); isPremium = premiumStore.isPremium
                         })
@@ -246,7 +246,7 @@ fun StoreScreen(onBack: () -> Unit) {
                     Spacer(Modifier.height(24.dp))
 
                     // iOS order: PREMIUM → TOWERS → DIAMONDS → DAILY BONUS
-                    StoreSectionHeader("PREMIUM", Icons.Default.WorkspacePremium)
+                    StoreSectionHeader("PREMIUM", Icons.Default.Bolt)
                     Spacer(Modifier.height(12.dp))
                     PremiumCard(isPremium = isPremium, onActivate = {
                         premiumStore.toggle(); isPremium = premiumStore.isPremium
@@ -317,7 +317,7 @@ private fun StoreTowerGridCard(type: TowerType, isUnlocked: Boolean, modifier: M
     val isPrem = type.isPremium
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed) 0.97f else 1.0f, spring(stiffness = 700f), label = "storeCardScale")
+    val scale by animateFloatAsState(if (isPressed) 0.94f else 1.0f, spring(stiffness = 700f), label = "storeCardScale")
     Column(
         modifier = modifier
             .graphicsLayer { scaleX = scale; scaleY = scale }
@@ -672,7 +672,7 @@ private fun DiamondBalanceCard(diamonds: Int) {
 private fun DailyBonusCard(claimed: Boolean, onClaim: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (isPressed && !claimed) 0.97f else 1.0f, spring(stiffness = 700f), label = "dailyBonusScale")
+    val scale by animateFloatAsState(if (isPressed && !claimed) 0.94f else 1.0f, spring(stiffness = 700f), label = "dailyBonusScale")
     Box(
         modifier = Modifier.fillMaxWidth()
             .graphicsLayer { scaleX = scale; scaleY = scale }

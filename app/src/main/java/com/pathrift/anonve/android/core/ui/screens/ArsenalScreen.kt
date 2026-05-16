@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontFamily
@@ -266,20 +267,13 @@ fun TowerArsenalCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // GAP-060: solid fill circle with white center dot — iOS parity
+                // FIX 6: Tower circle with towerColor shadow (iOS parity), no inner white dot
                 Box(
                     Modifier
                         .size(32.dp)
-                        .clip(CircleShape)
-                        .background(towerColor),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(
-                        Modifier
-                            .size(10.dp)
-                            .background(Color.White.copy(alpha = 0.9f), CircleShape)
-                    )
-                }
+                        .shadow(elevation = 6.dp, shape = CircleShape, spotColor = towerColor.copy(alpha = 0.4f))
+                        .background(towerColor, CircleShape)
+                )
                 Column {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -394,7 +388,7 @@ fun upgradeRow(
             val interactionSource = remember { MutableInteractionSource() }
             val isPressed by interactionSource.collectIsPressedAsState()
             val scale by animateFloatAsState(
-                targetValue = if (isPressed) 0.97f else 1.0f,
+                targetValue = if (isPressed) 0.94f else 1.0f,
                 animationSpec = spring(stiffness = 700f),
                 label = "upgradeScale"
             )

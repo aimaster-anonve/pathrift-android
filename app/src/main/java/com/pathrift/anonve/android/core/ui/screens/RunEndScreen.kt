@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -55,7 +54,6 @@ import com.pathrift.anonve.android.core.ui.PathriftOrange
 import com.pathrift.anonve.android.core.ui.PathriftPurple
 import com.pathrift.anonve.android.core.ui.PathriftSuccess
 import com.pathrift.anonve.android.core.ui.PathriftSurface
-import com.pathrift.anonve.android.core.ui.PathriftSurfaceVariant
 import com.pathrift.anonve.android.core.ui.PathriftTextPrimary
 import com.pathrift.anonve.android.core.ui.PathriftTextSecondary
 import kotlinx.coroutines.delay
@@ -157,12 +155,13 @@ fun RunEndScreen(
                             .padding(start = 20.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // Stats card — iOS parity: waves, kills, score
+                        // Stats card — iOS parity: waves, kills, score (FIX 5: NeonBlue border)
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(PathriftSurface)
+                                .border(1.dp, PathriftNeonBlue.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
                                 .padding(horizontal = 24.dp, vertical = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -201,24 +200,27 @@ fun RunEndScreen(
                             )
                         }
 
-                        // GAP-054 + GAP-055: full width + Home icon
-                        OutlinedButton(
+                        // FIX 4: MAIN MENU — NeonBlue.copy(0.1f) bg + NeonBlue text (iOS secondary style)
+                        Button(
                             onClick = onMainMenu,
                             modifier = Modifier.fillMaxWidth().height(40.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, PathriftSurfaceVariant)
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = PathriftNeonBlue.copy(alpha = 0.1f),
+                                contentColor = PathriftNeonBlue
+                            ),
+                            shape = RoundedCornerShape(12.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Home,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp),
-                                tint = PathriftTextSecondary
+                                tint = PathriftNeonBlue
                             )
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 text = stringResource(R.string.run_end_main_menu),
                                 fontSize = 13.sp,
-                                color = PathriftTextSecondary
+                                color = PathriftNeonBlue
                             )
                         }
                     }
@@ -254,12 +256,13 @@ fun RunEndScreen(
                     Spacer(Modifier.height(24.dp))
                     // GAP-051: RankBadge removed — no iOS equivalent
 
-                    // Stats card — iOS parity: waves, kills, animated score
+                    // Stats card — iOS parity: waves, kills, animated score (FIX 5: NeonBlue border)
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(16.dp))
                             .background(PathriftSurface)
+                            .border(1.dp, PathriftNeonBlue.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
                             .padding(horizontal = 32.dp, vertical = 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -324,26 +327,29 @@ fun RunEndScreen(
 
                     Spacer(Modifier.height(12.dp))
 
-                    // GAP-054 + GAP-055: full width + Home icon
-                    OutlinedButton(
+                    // FIX 4: MAIN MENU — NeonBlue.copy(0.1f) bg + NeonBlue text (iOS secondary style)
+                    Button(
                         onClick = onMainMenu,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, PathriftSurfaceVariant)
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PathriftNeonBlue.copy(alpha = 0.1f),
+                            contentColor = PathriftNeonBlue
+                        ),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Home,
                             contentDescription = null,
                             modifier = Modifier.size(16.dp),
-                            tint = PathriftTextSecondary
+                            tint = PathriftNeonBlue
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
                             text = stringResource(R.string.run_end_main_menu),
                             fontSize = 14.sp,
-                            color = PathriftTextSecondary
+                            color = PathriftNeonBlue
                         )
                     }
                 }

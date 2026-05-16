@@ -141,7 +141,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 val selected = lang == language
                                 val interactionSource = remember { MutableInteractionSource() }
                                 val isPressed by interactionSource.collectIsPressedAsState()
-                                val scale by animateFloatAsState(if (isPressed) 0.97f else 1.0f, spring(stiffness = 700f), label = "langBtnScale")
+                                val scale by animateFloatAsState(if (isPressed) 0.94f else 1.0f, spring(stiffness = 700f), label = "langBtnScale")
                                 Button(
                                     onClick = { LanguageManager.setLanguage(language) },
                                     modifier = Modifier.weight(1f).height(44.dp).graphicsLayer { scaleX = scale; scaleY = scale },
@@ -229,7 +229,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             val selected = lang == language
                             val interactionSource = remember { MutableInteractionSource() }
                             val isPressed by interactionSource.collectIsPressedAsState()
-                            val scale by animateFloatAsState(if (isPressed) 0.97f else 1.0f, spring(stiffness = 700f), label = "langBtnScale")
+                            val scale by animateFloatAsState(if (isPressed) 0.94f else 1.0f, spring(stiffness = 700f), label = "langBtnScale")
                             Button(
                                 onClick = { LanguageManager.setLanguage(language) },
                                 modifier = Modifier.weight(1f).height(44.dp).graphicsLayer { scaleX = scale; scaleY = scale },

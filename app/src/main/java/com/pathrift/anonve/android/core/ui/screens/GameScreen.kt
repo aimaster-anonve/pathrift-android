@@ -386,10 +386,11 @@ private fun CombatHUD(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
+                            // FIX 9: PathriftBackground-based gradient (closer to iOS ultraThinMaterial)
                             Brush.verticalGradient(
                                 listOf(
-                                    Color.Black.copy(alpha = 0.75f),
-                                    Color.Black.copy(alpha = 0.45f)
+                                    PathriftBackground.copy(alpha = 0.85f),
+                                    PathriftBackground.copy(alpha = 0.55f)
                                 )
                             )
                         )
@@ -511,11 +512,11 @@ private fun CombatHUD(
                 ) {
                     HudStatPill(LanguageManager.s("GOLD", "ALTIN"), "${state.gold}", PathriftGold, icon = Icons.Default.MonetizationOn)
                     Spacer(Modifier.width(14.dp))
-                    // GAP-022: Diamond pill — ♦ symbol separate from value
+                    // GAP-022: Diamond pill — ♦ symbol separate from value (FIX 12: #66CCFF softer cyan, iOS parity)
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("♦", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00CCFF))
-                            Text("${state.diamonds}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00CCFF), fontFamily = FontFamily.Monospace)
+                            Text("♦", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFF66CCFF))
+                            Text("${state.diamonds}", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF66CCFF), fontFamily = FontFamily.Monospace)
                         }
                         Text(LanguageManager.s("DIAMONDS", "ELMAS"), fontSize = 8.sp, fontWeight = FontWeight.SemiBold, color = PathriftTextSecondary, letterSpacing = 1.5.sp, fontFamily = FontFamily.Monospace)
                     }
@@ -755,7 +756,7 @@ private fun SendWaveButton(wave: Int, onClick: () -> Unit) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1.0f,
+        targetValue = if (isPressed) 0.94f else 1.0f,
         animationSpec = spring(stiffness = 700f),
         label = "sendWaveScale"
     )
@@ -867,7 +868,7 @@ private fun PauseOverlay(onResume: () -> Unit, onQuit: () -> Unit) {
             // RESUME — gradient NeonBlue→Purple (iOS parity) + scale press animation
             val resumeInteraction = remember { MutableInteractionSource() }
             val resumePressed by resumeInteraction.collectIsPressedAsState()
-            val resumeScale by animateFloatAsState(if (resumePressed) 0.97f else 1f, spring(stiffness = 700f), label = "resumeScale")
+            val resumeScale by animateFloatAsState(if (resumePressed) 0.94f else 1f, spring(stiffness = 700f), label = "resumeScale")
             Button(
                 onClick = onResume,
                 modifier = Modifier.fillMaxWidth().height(52.dp).graphicsLayer { scaleX = resumeScale; scaleY = resumeScale },
@@ -891,7 +892,7 @@ private fun PauseOverlay(onResume: () -> Unit, onQuit: () -> Unit) {
             // QUIT — outlined danger border (iOS parity)
             val quitInteraction = remember { MutableInteractionSource() }
             val quitPressed by quitInteraction.collectIsPressedAsState()
-            val quitScale by animateFloatAsState(if (quitPressed) 0.97f else 1f, spring(stiffness = 700f), label = "quitScale")
+            val quitScale by animateFloatAsState(if (quitPressed) 0.94f else 1f, spring(stiffness = 700f), label = "quitScale")
             OutlinedButton(
                 onClick = onQuit,
                 modifier = Modifier.fillMaxWidth().height(48.dp).graphicsLayer { scaleX = quitScale; scaleY = quitScale },
@@ -1014,7 +1015,7 @@ private fun TowerInfoBottomPanel(
                 // UPGRADE button with scale animation
                 val upgradeInteraction = remember { MutableInteractionSource() }
                 val upgradePressed by upgradeInteraction.collectIsPressedAsState()
-                val upgradeScale by animateFloatAsState(if (upgradePressed) 0.95f else 1f, spring(stiffness = 700f), label = "upgradeScale")
+                val upgradeScale by animateFloatAsState(if (upgradePressed) 0.94f else 1f, spring(stiffness = 700f), label = "upgradeScale")
                 Button(
                     onClick = onUpgrade, enabled = canAffordUpgrade,
                     interactionSource = upgradeInteraction,
@@ -1036,7 +1037,7 @@ private fun TowerInfoBottomPanel(
                 // SELL button with scale animation
                 val sellInteraction = remember { MutableInteractionSource() }
                 val sellPressed by sellInteraction.collectIsPressedAsState()
-                val sellScale by animateFloatAsState(if (sellPressed) 0.95f else 1f, spring(stiffness = 700f), label = "sellScale")
+                val sellScale by animateFloatAsState(if (sellPressed) 0.94f else 1f, spring(stiffness = 700f), label = "sellScale")
                 Box(
                     modifier = Modifier.width(56.dp).height(38.dp)
                         .graphicsLayer { scaleX = sellScale; scaleY = sellScale }
@@ -1053,7 +1054,7 @@ private fun TowerInfoBottomPanel(
                 // Dismiss button with scale animation
                 val dismissInteraction = remember { MutableInteractionSource() }
                 val dismissPressed by dismissInteraction.collectIsPressedAsState()
-                val dismissScale by animateFloatAsState(if (dismissPressed) 0.95f else 1f, spring(stiffness = 700f), label = "dismissScale")
+                val dismissScale by animateFloatAsState(if (dismissPressed) 0.94f else 1f, spring(stiffness = 700f), label = "dismissScale")
                 Box(
                     modifier = Modifier.size(28.dp)
                         .graphicsLayer { scaleX = dismissScale; scaleY = dismissScale }
@@ -1334,11 +1335,11 @@ private fun CompactTowerPickCard(
     val isAffordable = isUnlocked && canAffordGold
     val alpha = if (isAffordable) 1f else 0.45f
 
-    // GAP-035: Scale press animation 0.97f (iOS parity)
+    // GAP-035: Scale press animation 0.94f (iOS parity — FIX 2)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.97f else 1.0f,
+        targetValue = if (isPressed) 0.94f else 1.0f,
         animationSpec = spring(stiffness = 700f),
         label = "cardScale"
     )
@@ -1348,9 +1349,9 @@ private fun CompactTowerPickCard(
             // GAP-031: Card width 68dp
             .width(68.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
-            // GAP-030: Solid towerColor background when selected
+            // FIX 3: iOS parity — selected uses towerColor.copy(0.12f) background (not solid)
             .background(
-                if (isSelected) towerColor else PathriftSurface.copy(alpha = alpha),
+                if (isSelected) towerColor.copy(alpha = 0.12f) else PathriftSurface.copy(alpha = alpha),
                 RoundedCornerShape(10.dp)
             )
             .border(
@@ -1377,8 +1378,8 @@ private fun CompactTowerPickCard(
                 } else {
                     TowerShapeIcon(
                         type = type,
-                        // GAP-030: White icon when selected (on solid color background)
-                        color = if (isSelected) Color.White else towerColor.copy(alpha = alpha),
+                        // FIX 3: iOS parity — icon uses towerColor always (not white), brighter when selected
+                        color = if (isSelected) towerColor else towerColor.copy(alpha = alpha),
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -1389,7 +1390,8 @@ private fun CompactTowerPickCard(
                 text = type.displayName.uppercase(),
                 fontSize = 8.sp,
                 fontWeight = FontWeight.Bold,
-                color = if (isSelected) Color.White else if (isAffordable) PathriftTextPrimary else PathriftTextSecondary.copy(alpha = alpha),
+                // FIX 3: iOS parity — towerColor when selected, otherwise original logic
+                color = if (isSelected) towerColor else if (isAffordable) PathriftTextPrimary else PathriftTextSecondary.copy(alpha = alpha),
                 fontFamily = FontFamily.Monospace
             )
             Spacer(Modifier.height(2.dp))

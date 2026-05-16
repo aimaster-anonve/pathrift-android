@@ -298,11 +298,15 @@ private fun LandscapeHomeContent(
             Spacer(Modifier.weight(1f))
 
             if (hasSave) {
+                val contInteraction = remember { MutableInteractionSource() }
+                val contIsPressed by contInteraction.collectIsPressedAsState()
+                val contScale by animateFloatAsState(if (contIsPressed) 0.94f else 1.0f, spring(stiffness = 700f), label = "contScale")
                 Button(
                     onClick = onContinue,
-                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    modifier = Modifier.fillMaxWidth().height(44.dp).graphicsLayer { scaleX = contScale; scaleY = contScale },
                     colors = ButtonDefaults.buttonColors(containerColor = PathriftOrange),
-                    shape = RoundedCornerShape(14.dp)
+                    shape = RoundedCornerShape(14.dp),
+                    interactionSource = contInteraction
                 ) {
                     Text("↩  CONTINUE — WAVE $savedWave",
                         fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
@@ -458,11 +462,11 @@ private fun PortraitHomeContent(
         }
 
         if (bestScore > 0L) {
-            // GAP-007: Styled high score badge box
+            // GAP-007: Styled high score badge box (FIX 1: Gold background, iOS parity)
             Box(
                 modifier = Modifier
                     .padding(top = 8.dp)
-                    .background(PathriftNeonBlue.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
+                    .background(PathriftGold.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
                     .border(1.dp, PathriftGold.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
                     .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
@@ -519,7 +523,7 @@ private fun PortraitHomeContent(
         val playInteractionSource = remember { MutableInteractionSource() }
         val playIsPressed by playInteractionSource.collectIsPressedAsState()
         val playScale by animateFloatAsState(
-            targetValue = if (playIsPressed) 0.97f else 1.0f,
+            targetValue = if (playIsPressed) 0.94f else 1.0f,
             animationSpec = spring(stiffness = 700f),
             label = "playBtnScale"
         )
