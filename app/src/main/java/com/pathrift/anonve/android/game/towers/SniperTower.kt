@@ -7,7 +7,7 @@ package com.pathrift.anonve.android.game.towers
 class SniperTower : Tower() {
     override val type = TowerType.SNIPER
     override val displayName = "Sniper"
-    override val cost = 220
+    override val cost = 190   // BUILD7: was 220
     override val damagePerHit = 35
     override val attacksPerSecond = 0.5f
     override val rangeTiles = 3.2f

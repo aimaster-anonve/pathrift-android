@@ -52,7 +52,7 @@ enum class TowerType {
         TowerType.TESLA     -> 150
         TowerType.NOVA      -> 300
         TowerType.SNIPER    -> 0
-        TowerType.ARTILLERY -> 0
+        TowerType.ARTILLERY -> 20   // BUILD7: Artillery moved to BASIC (was 0)
     }
 
     val tier: Int get() = when (this) {

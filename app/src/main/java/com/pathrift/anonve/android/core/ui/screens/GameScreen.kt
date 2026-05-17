@@ -2,6 +2,8 @@ package com.pathrift.anonve.android.core.ui.screens
 
 import android.content.res.Configuration
 import android.widget.FrameLayout
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -9,6 +11,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -41,6 +47,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AcUnit
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Adjust
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CheckCircle
@@ -49,14 +57,17 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardDoubleArrowRight
 import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.MonetizationOn
+import androidx.compose.material.icons.filled.OpenWith
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.TrackChanges
@@ -87,6 +98,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -99,9 +111,12 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import kotlin.math.sqrt
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.roundToInt
 import com.pathrift.anonve.android.core.engine.EconomyConstants
 import com.pathrift.anonve.android.core.ui.ArtilleryTowerColor
 import com.pathrift.anonve.android.core.ui.BlastTowerColor
@@ -181,6 +196,16 @@ fun GameScreen(
             onPause = { isPaused = true },
             onToggleSpeed = gameViewModel::toggleSpeed,
             onShowNextWaveInfo = { gameViewModel.showNextWaveInfo = true },
+            onAddTower = {
+                // Trigger tower selection via a dummy empty-slot tap on the first available slot
+                val firstEmpty = gameViewModel.game.grid.slots.firstOrNull { !it.state.isOccupied }
+                if (firstEmpty != null) {
+                    gameViewModel.tapTowerSlot(firstEmpty.id)
+                }
+            },
+            activeTowerCount = gameViewModel.activeTowerCount,
+            maxTowerCount = gameViewModel.maxTowerCount(state.wave),
+            canAddTower = gameViewModel.canAddTower,
             modifier = Modifier.fillMaxSize()
         )
 
@@ -188,8 +213,10 @@ fun GameScreen(
             TowerInfoBottomPanel(
                 info = info,
                 gold = state.gold,
+                isWaveActive = state.phase == GamePhase.WAVE_ACTIVE,
                 onUpgrade = { gameViewModel.upgradeSelectedTower() },
                 onSell = { gameViewModel.sellSelectedTower() },
+                onMove = { gameViewModel.beginMoveMode(info.slotId) },
                 onDismiss = { gameViewModel.clearTowerSelection() }
             )
         }
@@ -318,6 +345,12 @@ private fun GameCanvasView(
     // KEY FIX: propagate path waypoints through Compose state (not thread-direct) so renderer
     // always sees new path after Rift Shift. layoutVersion forces recomposition on layout change.
     gameSurface.pathWaypoints = PathSystem.waypoints
+    // Drag-and-drop: propagate valid slot highlight to renderer (PATHRIFT-B7-004)
+    gameSurface.dragValidSlotId = state.dragValidSlotId
+
+    val isDragging = state.isDraggingTower
+    val dragPosition = state.dragPosition
+    val dragTowerType = state.dragTowerType
 
     Box(
         modifier = modifier
@@ -335,30 +368,43 @@ private fun GameCanvasView(
                     sizeInitialized = true
                 }
             }
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent()
-                        val change = event.changes.firstOrNull() ?: continue
-                        if (change.pressed && !change.previousPressed) {
-                            val tapX = change.position.x
-                            val tapY = change.position.y
-                            val slots = gameViewModel.game.grid.slots
-                            val tapRadiusPx = 48f * density.density  // 48dp → pixels
-                            var closestId: Int? = null
-                            var closestDist = Float.MAX_VALUE
-                            for (slot in slots) {
-                                val dx = slot.position.x - tapX
-                                val dy = slot.position.y - tapY
-                                val dist = sqrt(dx * dx + dy * dy)
-                                if (dist < tapRadiusPx && dist < closestDist) {
-                                    closestDist = dist
-                                    closestId = slot.id
+            .pointerInput(isDragging) {
+                if (isDragging) {
+                    detectDragGestures(
+                        onDrag = { change, _ ->
+                            gameViewModel.updateDragPosition(change.position.x, change.position.y)
+                        },
+                        onDragEnd = {
+                            val pos = state.dragPosition
+                            gameViewModel.dropTower(pos.x, pos.y)
+                        },
+                        onDragCancel = { gameViewModel.cancelDrag() }
+                    )
+                } else {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull() ?: continue
+                            if (change.pressed && !change.previousPressed) {
+                                val tapX = change.position.x
+                                val tapY = change.position.y
+                                val slots = gameViewModel.game.grid.slots
+                                val tapRadiusPx = 48f * density.density  // 48dp → pixels
+                                var closestId: Int? = null
+                                var closestDist = Float.MAX_VALUE
+                                for (slot in slots) {
+                                    val dx = slot.position.x - tapX
+                                    val dy = slot.position.y - tapY
+                                    val dist = sqrt(dx * dx + dy * dy)
+                                    if (dist < tapRadiusPx && dist < closestDist) {
+                                        closestDist = dist
+                                        closestId = slot.id
+                                    }
                                 }
-                            }
-                            if (closestId != null) {
-                                gameViewModel.tapTowerSlot(closestId)
-                                change.consume()
+                                if (closestId != null) {
+                                    gameViewModel.tapTowerSlot(closestId)
+                                    change.consume()
+                                }
                             }
                         }
                     }
@@ -371,6 +417,36 @@ private fun GameCanvasView(
             },
             modifier = Modifier.fillMaxSize()
         )
+
+        // Drag ghost overlay (PATHRIFT-B7-004)
+        if (isDragging && dragTowerType != null) {
+            val ghostColor = towerDisplayColor(dragTowerType)
+            val ghostOffsetX = with(density) { (dragPosition.x - 22.dp.toPx()).toDp() }
+            val ghostOffsetY = with(density) { (dragPosition.y - 22.dp.toPx()).toDp() }
+            Box(
+                modifier = Modifier
+                    .padding(start = ghostOffsetX, top = ghostOffsetY)
+                    .size(44.dp)
+                    .alpha(0.7f)
+                    .background(ghostColor.copy(alpha = 0.18f), CircleShape)
+                    .border(1.5.dp, ghostColor.copy(alpha = 0.7f), CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                val ghostIcon = when (dragTowerType) {
+                    TowerType.BOLT      -> Icons.Default.Bolt
+                    TowerType.BLAST     -> Icons.Default.Whatshot
+                    TowerType.FROST     -> Icons.Default.AcUnit
+                    TowerType.PIERCE    -> Icons.Default.KeyboardDoubleArrowRight
+                    TowerType.CORE      -> Icons.Default.Shield
+                    TowerType.INFERNO   -> Icons.Default.LocalFireDepartment
+                    TowerType.TESLA     -> Icons.Default.FlashOn
+                    TowerType.NOVA      -> Icons.Default.WbSunny
+                    TowerType.SNIPER    -> Icons.Default.TrackChanges
+                    TowerType.ARTILLERY -> Icons.Default.Adjust
+                }
+                Icon(ghostIcon, contentDescription = null, tint = ghostColor, modifier = Modifier.size(22.dp))
+            }
+        }
     }
 }
 
@@ -386,6 +462,10 @@ private fun CombatHUD(
     onPause: () -> Unit,
     onToggleSpeed: () -> Unit = {},
     onShowNextWaveInfo: () -> Unit = {},
+    onAddTower: () -> Unit = {},
+    activeTowerCount: Int = 0,
+    maxTowerCount: Int = 5,
+    canAddTower: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -670,11 +750,21 @@ private fun CombatHUD(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    HudStatPill(LanguageManager.s("KILLS", "ÖLDÜRME"), "${state.enemyKills}", PathriftOrange, icon = Icons.Default.Bolt)
+                    // Tower counter pill — bottom-left (PATHRIFT-B7-004)
+                    TowerCounterPill(
+                        current = activeTowerCount,
+                        max = maxTowerCount,
+                        canAdd = canAddTower,
+                        onAdd = onAddTower
+                    )
                     Spacer(Modifier.weight(1f))
                     when {
                         state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
-                        state.phase != GamePhase.GAME_OVER -> SendWaveButton(wave = state.wave, onClick = onNextWave)
+                        state.phase != GamePhase.GAME_OVER -> SendWaveButton(
+                            wave = state.wave,
+                            onClick = onNextWave,
+                            interWaveSeconds = state.interWaveSecondsRemaining
+                        )
                     }
                 }
             }
@@ -767,19 +857,34 @@ private fun WaveProgressIndicator(cleared: Int, total: Int) {
 }
 
 // iOS parity: double chevron icon + gradient background, cornerRadius 18
+// BUILD7: supports inter-wave countdown display (PATHRIFT-B7-002)
 @Composable
-private fun SendWaveButton(wave: Int, onClick: () -> Unit) {
+private fun SendWaveButton(wave: Int, onClick: () -> Unit, interWaveSeconds: Int = 0) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
-    val scale by animateFloatAsState(
+
+    val isUrgent = interWaveSeconds in 1..5
+    val isCountdown = interWaveSeconds > 0
+
+    // Pulse animation for urgency state
+    val infiniteTransition = rememberInfiniteTransition(label = "urgencyPulse")
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 1f, targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(tween(450, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "pulseScale"
+    )
+
+    val baseScale by animateFloatAsState(
         targetValue = if (isPressed) 0.94f else 1.0f,
         animationSpec = spring(stiffness = 700f),
         label = "sendWaveScale"
     )
+    val effectiveScale = if (isUrgent) pulseScale * baseScale else baseScale
+
     Box(
         modifier = Modifier
             .height(36.dp)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .graphicsLayer { scaleX = effectiveScale; scaleY = effectiveScale }
     ) {
         Button(
             onClick = onClick,
@@ -793,25 +898,129 @@ private fun SendWaveButton(wave: Int, onClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .background(
-                        Brush.horizontalGradient(listOf(Color(0xFF00CCFF), Color(0xFF9966FF))),
+                        if (isCountdown) {
+                            if (isUrgent) Brush.horizontalGradient(listOf(PathriftDanger.copy(alpha = 0.18f), PathriftDanger.copy(alpha = 0.18f)))
+                            else Brush.horizontalGradient(listOf(PathriftNeonBlue.copy(alpha = 0.18f), PathriftNeonBlue.copy(alpha = 0.18f)))
+                        } else {
+                            Brush.horizontalGradient(listOf(Color(0xFF00CCFF), Color(0xFF9966FF)))
+                        },
                         RoundedCornerShape(18.dp)
+                    )
+                    .border(
+                        width = if (isCountdown) (if (isUrgent) 1.5.dp else 1.dp) else 0.dp,
+                        color = if (isUrgent) PathriftDanger.copy(alpha = 0.5f) else if (isCountdown) PathriftNeonBlue.copy(alpha = 0.35f) else Color.Transparent,
+                        shape = RoundedCornerShape(18.dp)
                     )
                     .padding(horizontal = 16.dp, vertical = 6.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(Icons.Default.KeyboardDoubleArrowRight, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
-                    Text(
-                        if (wave == 0) LanguageManager.s("START", "BAŞLA") else LanguageManager.s("NEXT WAVE", "SONRAKI DALGA"),
-                        color = Color.Black,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 0.5.sp
-                    )
+                if (isCountdown) {
+                    // Countdown display
+                    if (isUrgent) {
+                        // ≤5s: just the number in danger color
+                        Text(
+                            "$interWaveSeconds",
+                            color = PathriftDanger,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Black,
+                            fontFamily = FontFamily.Monospace
+                        )
+                    } else {
+                        // 6..20s: clock icon + Xs format
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(5.dp)
+                        ) {
+                            Icon(Icons.Filled.Schedule, contentDescription = null,
+                                tint = PathriftTextSecondary, modifier = Modifier.size(14.dp))
+                            Text(
+                                "${interWaveSeconds}s",
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 16.sp, fontWeight = FontWeight.Black,
+                                color = PathriftTextPrimary
+                            )
+                        }
+                    }
+                } else {
+                    // Normal state
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(Icons.Default.KeyboardDoubleArrowRight, contentDescription = null, tint = Color.Black, modifier = Modifier.size(14.dp))
+                        Text(
+                            if (wave == 0) LanguageManager.s("START", "BAŞLA") else LanguageManager.s("NEXT WAVE", "SONRAKI DALGA"),
+                            color = Color.Black,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
                 }
             }
+        }
+    }
+}
+
+// ==============================
+// Tower Counter Pill (PATHRIFT-B7-004)
+// ==============================
+
+@Composable
+private fun TowerCounterPill(
+    current: Int,
+    max: Int,
+    canAdd: Boolean,
+    onAdd: () -> Unit
+) {
+    val isFull = current >= max
+    Row(
+        modifier = Modifier
+            .height(36.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(PathriftBackground.copy(alpha = 0.88f))
+            .border(1.dp, PathriftNeonBlue.copy(alpha = 0.25f), RoundedCornerShape(18.dp))
+            .padding(start = 10.dp, end = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Icon(
+            Icons.Filled.GridView, contentDescription = null,
+            tint = PathriftNeonBlue, modifier = Modifier.size(14.dp)
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                "$current",
+                fontFamily = FontFamily.Monospace,
+                fontSize = 17.sp, fontWeight = FontWeight.Black,
+                color = PathriftTextPrimary
+            )
+            Text("/", fontFamily = FontFamily.Monospace, fontSize = 13.sp, color = PathriftTextSecondary)
+            Text(
+                "$max",
+                fontFamily = FontFamily.Monospace,
+                fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                color = PathriftTextSecondary
+            )
+        }
+        Spacer(Modifier.width(2.dp))
+        Box(
+            modifier = Modifier
+                .size(26.dp)
+                .clip(CircleShape)
+                .background(if (isFull) Color.White.copy(0.05f) else PathriftNeonBlue.copy(0.18f))
+                .border(1.dp, if (isFull) PathriftTextSecondary.copy(0.2f) else PathriftNeonBlue.copy(0.5f), CircleShape)
+                .alpha(if (isFull) 0.45f else 1f)
+                .clickable(enabled = canAdd, onClick = onAdd),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Filled.Add, contentDescription = "Add Tower",
+                tint = if (isFull) PathriftTextSecondary else PathriftNeonBlue,
+                modifier = Modifier.size(13.dp)
+            )
         }
     }
 }
@@ -931,11 +1140,14 @@ private fun PauseOverlay(onResume: () -> Unit, onQuit: () -> Unit) {
 private fun TowerInfoBottomPanel(
     info: TowerInfo,
     gold: Int,
+    isWaveActive: Boolean = false,
     onUpgrade: () -> Unit,
     onSell: () -> Unit,
+    onMove: () -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val canAffordUpgrade = gold >= info.upgradeCost
+    val canAffordMove = gold >= info.moveCost
     val towerColor = towerDisplayColor(info.type)
 
     Box(
@@ -1074,6 +1286,48 @@ private fun TowerInfoBottomPanel(
                         Text("SELL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PathriftDanger, maxLines = 1)
                         Text("+${info.sellValue}g", fontSize = 8.sp, color = PathriftDanger.copy(0.8f),
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                // MOVE button — only shown between waves (PATHRIFT-B7-005)
+                AnimatedVisibility(
+                    visible = !isWaveActive,
+                    enter = fadeIn() + scaleIn(initialScale = 0.85f),
+                    exit = fadeOut() + scaleOut()
+                ) {
+                    val moveInteraction = remember { MutableInteractionSource() }
+                    val movePressed by moveInteraction.collectIsPressedAsState()
+                    val moveScale by animateFloatAsState(if (movePressed) 0.94f else 1f, spring(stiffness = 700f), label = "moveScale")
+                    Box(
+                        modifier = Modifier.width(52.dp).height(38.dp)
+                            .graphicsLayer { scaleX = moveScale; scaleY = moveScale }
+                            .background(
+                                if (canAffordMove) PathriftGold.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.06f),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .border(
+                                1.dp,
+                                if (canAffordMove) PathriftGold.copy(alpha = 0.40f) else PathriftTextSecondary.copy(alpha = 0.25f),
+                                RoundedCornerShape(10.dp)
+                            )
+                            .clickable(enabled = canAffordMove, interactionSource = moveInteraction, indication = null, onClick = onMove),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(
+                                Icons.Filled.OpenWith, contentDescription = "Move",
+                                tint = if (canAffordMove) PathriftGold else PathriftTextSecondary,
+                                modifier = Modifier.size(12.dp)
+                            )
+                            Text(
+                                "${info.moveCost}g",
+                                fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                                fontFamily = FontFamily.Monospace,
+                                color = if (canAffordMove) PathriftGold else PathriftTextSecondary
+                            )
+                        }
                     }
                 }
                 // Dismiss button with scale animation
@@ -1723,14 +1977,14 @@ private fun towerDisplayColor(type: TowerType): Color = when (type) {
 }
 
 private fun towerGoldCost(type: TowerType): Int = when (type) {
-    TowerType.BOLT      -> 50
-    TowerType.BLAST     -> 70
-    TowerType.FROST     -> 60
-    TowerType.PIERCE    -> 130
-    TowerType.CORE      -> 180
-    TowerType.INFERNO   -> 200
+    TowerType.BOLT      -> 80    // BUILD7: corrected from 50
+    TowerType.BLAST     -> 100   // BUILD7: was 70/130
+    TowerType.FROST     -> 100   // BUILD7: corrected from 60
+    TowerType.PIERCE    -> 140   // BUILD7: was 130
+    TowerType.CORE      -> 170   // BUILD7: was 180
+    TowerType.INFERNO   -> 210   // BUILD7: was 200
     TowerType.TESLA     -> 300
     TowerType.NOVA      -> 500
-    TowerType.SNIPER    -> 220
+    TowerType.SNIPER    -> 190   // BUILD7: was 220
     TowerType.ARTILLERY -> 160
 }

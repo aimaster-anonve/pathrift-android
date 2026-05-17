@@ -26,4 +26,6 @@ interface GameBridge {
     fun onStateRestored(wave: Int, lives: Int, gold: Int, kills: Int)
     /** Called each time a tower fires — drives the projectile visual effect. */
     fun onProjectileFired(from: PointF, to: PointF, type: TowerType) {}
+    /** Called each second during inter-wave countdown. 0 = countdown over / wave started. */
+    fun onInterWaveTimerChanged(secondsRemaining: Int) {}
 }

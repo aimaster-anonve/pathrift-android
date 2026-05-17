@@ -32,6 +32,7 @@ import com.pathrift.anonve.android.game.towers.TowerType
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -40,6 +41,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlin.math.ceil
 import kotlin.math.pow
 
 // ---- One-shot UI events ----
@@ -109,8 +111,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
 
     fun startNextWave() {
         if (_state.value.phase == GamePhase.WAVE_ACTIVE) return
-        game.startNextWave()
-        _state.update { it.copy(phase = GamePhase.WAVE_ACTIVE) }
+        game.startNextWave()  // internally cancels countdown before starting
+        _state.update { it.copy(phase = GamePhase.WAVE_ACTIVE, interWaveSecondsRemaining = 0) }
     }
 
     fun placeTower(slotId: Int, type: TowerType) {
@@ -170,6 +172,59 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
 
     fun clearTowerSelection() {
         _state.update { it.copy(selectedTowerSlotId = null, selectedTowerInfo = null) }
+    }
+
+    // ---- Drag-and-Drop (PATHRIFT-B7-004) ----
+
+    fun startDragPlacement(type: TowerType) {
+        _state.update { it.copy(isDraggingTower = true, dragTowerType = type, isMovingTower = false, movingFromSlotId = null, moveCost = 0) }
+    }
+
+    fun updateDragPosition(x: Float, y: Float) {
+        val hit = game.nearestValidSlot(x, y)
+        _state.update { it.copy(dragPosition = Offset(x, y), dragValidSlotId = hit?.slotId) }
+    }
+
+    fun dropTower(x: Float, y: Float) {
+        val s = _state.value
+        if (s.isMovingTower) {
+            val fromSlot = s.movingFromSlotId ?: run { cancelDrag(); return }
+            val hit = game.nearestValidSlot(x, y)
+            if (hit != null && hit.slotId != fromSlot) {
+                val success = game.moveTower(fromSlot, hit.slotId, s.moveCost)
+                if (success) syncTowerSlots()
+            }
+        } else {
+            val type = s.dragTowerType ?: run { cancelDrag(); return }
+            val hit = game.nearestValidSlot(x, y) ?: run { cancelDrag(); return }
+            placeTower(hit.slotId, type)
+        }
+        _state.update { it.copy(isDraggingTower = false, dragTowerType = null, dragValidSlotId = null, isMovingTower = false, movingFromSlotId = null, moveCost = 0) }
+    }
+
+    fun cancelDrag() {
+        _state.update { it.copy(isDraggingTower = false, dragTowerType = null, dragValidSlotId = null, isMovingTower = false, movingFromSlotId = null, moveCost = 0) }
+    }
+
+    fun beginMoveMode(slotId: Int) {
+        val inst = game.towerInstance(slotId) ?: return
+        val moveCost = ceil(inst.totalInvested * 0.30).toInt()
+        _state.update { it.copy(
+            isDraggingTower = true,
+            isMovingTower = true,
+            movingFromSlotId = slotId,
+            moveCost = moveCost,
+            dragTowerType = inst.tower.type,
+            selectedTowerSlotId = null,
+            selectedTowerInfo = null
+        )}
+    }
+
+    val activeTowerCount: Int get() = game.towers.size
+    fun maxTowerCount(wave: Int): Int = game.activeSlotCount(wave)
+    val canAddTower: Boolean get() {
+        val s = _state.value
+        return s.phase != GamePhase.WAVE_ACTIVE && activeTowerCount < maxTowerCount(s.wave)
     }
 
     fun restartGame() {
@@ -340,6 +395,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
         val sellValue = (totalInvested * EconomyConstants.SELL_REFUND_PERCENT).toInt()
         // F2: show effective attack speed per level
         val effectiveAttackSpeed = tower.attacksPerSecond * (1f + 0.08f * (level - 1))
+        val moveCost = ceil(totalInvested * 0.30).toInt()
         return TowerInfo(
             slotId = slotId,
             type = type,
@@ -348,20 +404,22 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
             range = tower.rangeTiles.toFloat(),
             attackSpeed = effectiveAttackSpeed,
             sellValue = sellValue,
-            upgradeCost = upgradeCost
+            upgradeCost = upgradeCost,
+            moveCost = moveCost,
+            totalInvested = totalInvested
         )
     }
 
     private fun getCost(type: TowerType): Int = when (type) {
         TowerType.BOLT      -> EconomyConstants.TowerCost.BOLT
-        TowerType.BLAST     -> EconomyConstants.TowerCost.BLAST
+        TowerType.BLAST     -> EconomyConstants.TowerCost.BLAST  // BUILD7: 100
         TowerType.FROST     -> EconomyConstants.TowerCost.FROST
-        TowerType.PIERCE    -> 130
-        TowerType.CORE      -> 180
-        TowerType.INFERNO   -> 200
+        TowerType.PIERCE    -> 140   // BUILD7: was 130
+        TowerType.CORE      -> 170   // BUILD7: was 180
+        TowerType.INFERNO   -> 210   // BUILD7: was 200
         TowerType.TESLA     -> 300
         TowerType.NOVA      -> 500
-        TowerType.SNIPER    -> 220
+        TowerType.SNIPER    -> 190   // BUILD7: was 220
         TowerType.ARTILLERY -> 160
     }
 
@@ -405,6 +463,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     }
 
     // ---- New GameBridge callbacks ----
+
+    override fun onInterWaveTimerChanged(secondsRemaining: Int) {
+        _state.update { it.copy(interWaveSecondsRemaining = secondsRemaining) }
+    }
 
     override fun onSpeedChanged(multiplier: Float) {
         // State already updated by toggleSpeed; no additional action needed

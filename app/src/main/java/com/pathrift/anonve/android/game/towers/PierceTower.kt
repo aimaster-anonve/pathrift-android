@@ -7,7 +7,7 @@ package com.pathrift.anonve.android.game.towers
 class PierceTower : Tower() {
     override val type = TowerType.PIERCE
     override val displayName = "Pierce"
-    override val cost = 130
+    override val cost = 140   // BUILD7: was 130
     override val damagePerHit = 25
     override val attacksPerSecond = 1.0f
     override val rangeTiles = 2.4f

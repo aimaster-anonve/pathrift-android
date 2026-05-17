@@ -1,6 +1,7 @@
 package com.pathrift.anonve.android.game
 
 import android.graphics.PointF
+import androidx.compose.ui.geometry.Offset
 import com.pathrift.anonve.android.core.engine.EconomyConstants
 import com.pathrift.anonve.android.game.towers.TowerType
 
@@ -54,7 +55,9 @@ data class TowerInfo(
     val range: Float,
     val attackSpeed: Float,
     val sellValue: Int,
-    val upgradeCost: Int
+    val upgradeCost: Int,
+    val moveCost: Int = 0,        // BUILD7: ceil(totalInvested * 0.30)
+    val totalInvested: Int = 0    // BUILD7: needed for moveCost display
 )
 
 /**
@@ -80,4 +83,14 @@ data class GameState(
     val showRevivePrompt: Boolean = false,
     val reviveCountdown: Int = 5,
     val layoutVersion: Int = 0,  // incremented on initLayout → forces slot recomposition
+    // Inter-wave countdown (PATHRIFT-B7-002)
+    val interWaveSecondsRemaining: Int = 0,
+    // Drag-and-drop state (PATHRIFT-B7-004)
+    val isDraggingTower: Boolean = false,
+    val dragTowerType: TowerType? = null,
+    val dragPosition: Offset = Offset.Zero,
+    val dragValidSlotId: Int? = null,
+    val isMovingTower: Boolean = false,
+    val movingFromSlotId: Int? = null,
+    val moveCost: Int = 0,
 )

@@ -41,6 +41,8 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     @Volatile var riftShiftActive: Boolean = false
     /** Path waypoints — set from Compose on every layout change, guarantees renderer sees new path */
     @Volatile var pathWaypoints: List<PointF> = emptyList()
+    /** During drag-and-drop, the slot ID nearest to the finger that would receive the tower. */
+    @Volatile var dragValidSlotId: Int? = null
 
     // ---- Projectile system — simple fire effect, iOS parity ----
     data class Projectile(
@@ -88,6 +90,9 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private val slotCrossNewPaint     = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(51, 0, 200, 255);  style = Paint.Style.FILL }
     private val slotDotNewPaint       = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(204, 0, 200, 255); style = Paint.Style.FILL }
     private val slotRect              = RectF()
+    // Drag-and-drop valid slot highlight paints (pathriftSuccess = #30D158)
+    private val slotDragValidFillPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(46, 48, 209, 88); style = Paint.Style.FILL }  // 0.18 alpha
+    private val slotDragValidStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(179, 48, 209, 88); style = Paint.Style.STROKE; strokeWidth = 4f }  // 0.70 alpha
     // Legacy slot paints (kept for compatibility)
     private val slotEmptyPaint = Paint().apply { color = Color.parseColor("#0D2640"); style = Paint.Style.FILL; alpha = 216 }
     private val slotBorderPaint = Paint().apply { color = Color.parseColor("#00C7FF"); style = Paint.Style.STROKE; strokeWidth = 1.5f; alpha = 153 }
@@ -639,10 +644,13 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         val pulseT     = ((System.currentTimeMillis() % 2400L) / 2400f).toFloat()
         val pulseAlpha = (0.40f + 0.25f * sin(pulseT * 2 * PI.toFloat())).coerceIn(0.40f, 0.65f)
 
+        val validSlotId = dragValidSlotId  // snapshot to avoid race
+
         for ((idx, pos) in slotPositions.withIndex()) {
             if (slotOccupied[idx] == true) continue
             val cx = pos.x; val cy = pos.y
             val isSelected = selectedSlotId == idx
+            val isDragValid = validSlotId != null && validSlotId == idx
 
             slotRect.set(cx - halfSize, cy - halfSize, cx + halfSize, cy + halfSize)
 
@@ -650,11 +658,18 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
             canvas.drawRoundRect(slotRect, cornerR, cornerR,
                 if (isSelected) slotFillSelectedPaint else slotFillPaint)
 
-            // Border — set alpha on pre-allocated paint (no new object)
-            val strokePaint = if (isSelected) slotStrokeSelectedPaint else slotStrokePaint
-            strokePaint.strokeWidth = if (isSelected) dp(2f) else dp(1f)
-            if (!isSelected) slotStrokePaint.alpha = (pulseAlpha * 255).toInt().coerceIn(0, 255)
-            canvas.drawRoundRect(slotRect, cornerR, cornerR, strokePaint)
+            if (isDragValid) {
+                // Green valid highlight
+                canvas.drawRoundRect(slotRect, cornerR, cornerR, slotDragValidFillPaint)
+                slotDragValidStrokePaint.strokeWidth = dp(1.5f)
+                canvas.drawRoundRect(slotRect, cornerR, cornerR, slotDragValidStrokePaint)
+            } else {
+                // Border — set alpha on pre-allocated paint (no new object)
+                val strokePaint = if (isSelected) slotStrokeSelectedPaint else slotStrokePaint
+                strokePaint.strokeWidth = if (isSelected) dp(2f) else dp(1f)
+                if (!isSelected) slotStrokePaint.alpha = (pulseAlpha * 255).toInt().coerceIn(0, 255)
+                canvas.drawRoundRect(slotRect, cornerR, cornerR, strokePaint)
+            }
 
             // Inner cross — reuse pre-allocated paint
             canvas.drawRect(cx - crossW/2, cy - crossH/2, cx + crossW/2, cy + crossH/2, slotCrossNewPaint)

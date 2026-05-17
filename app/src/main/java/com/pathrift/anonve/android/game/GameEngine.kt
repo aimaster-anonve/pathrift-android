@@ -93,6 +93,7 @@ class GameEngine(
     // Wave spawn state
     private var waveJob: Job? = null
     private var simulationJob: Job? = null
+    private var interWaveCountdownJob: Job? = null
     private var gameScope: CoroutineScope? = null
 
     private var isWaveActive: Boolean = false
@@ -125,12 +126,14 @@ class GameEngine(
     fun stop() {
         waveJob?.cancel()
         simulationJob?.cancel()
+        interWaveCountdownJob?.cancel()
         gameScope = null
     }
 
     fun reset() {
         waveJob?.cancel()
         simulationJob?.cancel()
+        interWaveCountdownJob?.cancel()
         synchronized(_enemies) { _enemies.clear() }
         _projectiles.clear()
         _towers.clear()
@@ -213,6 +216,12 @@ class GameEngine(
     // ---- Wave Management ----
 
     fun startNextWave() {
+        cancelInterWaveCountdown()
+        startWave()
+    }
+
+    /** Internal wave start — call after cancelling countdown. */
+    private fun startWave() {
         if (isWaveActive || lives <= 0) return
         currentWave++
         val waveDef = waveSystem.getWaveDefinition(currentWave)
@@ -234,6 +243,28 @@ class GameEngine(
                 }
             }
         }
+    }
+
+    // ---- Inter-wave Countdown (PATHRIFT-B7-002) ----
+
+    private fun startInterWaveCountdown() {
+        interWaveCountdownJob?.cancel()
+        interWaveCountdownJob = gameScope?.launch(Dispatchers.Default) {
+            for (i in 20 downTo 1) {
+                if (!isActive) return@launch
+                bridge.onInterWaveTimerChanged(i)
+                delay((1000L / speedMultiplier).toLong())
+            }
+            bridge.onInterWaveTimerChanged(0)
+            // Auto-start next wave
+            if (isActive) startWave()
+        }
+    }
+
+    fun cancelInterWaveCountdown() {
+        interWaveCountdownJob?.cancel()
+        interWaveCountdownJob = null
+        bridge.onInterWaveTimerChanged(0)
     }
 
     // ---- Tower Placement ----
@@ -289,6 +320,53 @@ class GameEngine(
     }
 
     fun towerInstance(slotId: Int): TowerInstance? = _towers[slotId]
+
+    // ---- Active Slot Count (BUILD7 — DEC-030, PO_SPEC §4) ----
+
+    fun activeSlotCount(wave: Int): Int = waveSystem.activeSlotCount(wave)
+
+    // ---- Drag-and-Drop: Nearest Valid Slot (PATHRIFT-B7-004) ----
+
+    data class SlotHit(val slotId: Int, val position: android.graphics.PointF, val isValid: Boolean)
+
+    fun nearestValidSlot(x: Float, y: Float): SlotHit? {
+        val density = Resources.getSystem().displayMetrics.density
+        val threshold = 80f * density
+        var bestHit: SlotHit? = null
+        var bestDist = Float.MAX_VALUE
+        for (slot in grid.slots) {
+            if (slot.state.isOccupied) continue
+            val dx = slot.position.x - x
+            val dy = slot.position.y - y
+            val dist = sqrt(dx * dx + dy * dy)
+            if (dist < threshold && dist < bestDist) {
+                bestDist = dist
+                bestHit = SlotHit(slot.id, slot.position, true)
+            }
+        }
+        return bestHit
+    }
+
+    /** Move a tower from one slot to another, deducting moveCost gold. Returns true on success. */
+    fun moveTower(fromSlot: Int, toSlot: Int, moveCost: Int): Boolean {
+        val inst = _towers[fromSlot] ?: return false
+        val targetSlotState = grid.slot(toSlot) ?: return false
+        if (targetSlotState.state.isOccupied) return false
+        if (gold < moveCost) return false
+
+        // Remove from old slot
+        _towers.remove(fromSlot)
+        grid.removeTower(fromSlot)
+
+        // Place at new slot
+        val newPos = targetSlotState.position
+        grid.placeTower(inst.tower.type, toSlot, inst.totalInvested)
+        _towers[toSlot] = inst.copy(slotId = toSlot, position = newPos)
+
+        gold -= moveCost
+        bridge.onGoldChanged(gold)
+        return true
+    }
 
     // ---- Simulation Loop ----
 
@@ -750,6 +828,7 @@ class GameEngine(
             score += reward.toLong() * 5
             bridge.onWaveCompleted(currentWave, reward)
             bridge.onGoldChanged(gold)
+            startInterWaveCountdown()
 
             // F10: Diamond reward every 10 waves
             if (currentWave % 10 == 0) {

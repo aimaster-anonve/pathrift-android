@@ -160,11 +160,13 @@ class WaveSystem {
 
     fun goldRewardForWave(wave: Int): Int = EconomyConstants.goldRewardForWave(wave)
 
-    // PATHRIFT-156: Updated slot count thresholds
+    // BUILD7: Extended slot count thresholds (DEC-030, PO_SPEC section 4)
     fun activeSlotCount(wave: Int): Int = when {
         wave < 5  -> 5
         wave < 10 -> 7
         wave < 20 -> 9
-        else      -> 11
+        wave < 30 -> 11
+        wave < 50 -> 13
+        else      -> 15
     }
 }

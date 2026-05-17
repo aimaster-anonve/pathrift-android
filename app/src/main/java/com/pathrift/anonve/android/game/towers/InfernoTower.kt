@@ -7,7 +7,7 @@ package com.pathrift.anonve.android.game.towers
 class InfernoTower : Tower() {
     override val type = TowerType.INFERNO
     override val displayName = "Inferno"
-    override val cost = 200
+    override val cost = 210   // BUILD7: was 200
     override val damagePerHit = 18
     override val attacksPerSecond = 1.5f
     override val rangeTiles = 2.0f

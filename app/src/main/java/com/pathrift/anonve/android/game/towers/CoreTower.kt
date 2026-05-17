@@ -7,7 +7,7 @@ package com.pathrift.anonve.android.game.towers
 class CoreTower : Tower() {
     override val type = TowerType.CORE
     override val displayName = "Core"
-    override val cost = 180
+    override val cost = 170   // BUILD7: was 180
     override val damagePerHit = 45
     override val attacksPerSecond = 0.7f
     override val rangeTiles = 2.0f

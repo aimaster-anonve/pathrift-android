@@ -27,7 +27,7 @@ object EconomyConstants {
 
     object TowerCost {
         const val BOLT = 80
-        const val BLAST = 130
+        const val BLAST = 100   // BUILD7: was 130
         const val FROST = 100
     }
 
