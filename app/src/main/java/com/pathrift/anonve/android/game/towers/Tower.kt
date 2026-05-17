@@ -43,17 +43,26 @@ enum class TowerType {
     }
 
     val diamondCost: Int get() = when (this) {
-        TowerType.BOLT      -> 0
-        TowerType.BLAST     -> 10
-        TowerType.FROST     -> 15
-        TowerType.PIERCE    -> 30
-        TowerType.CORE      -> 50
-        TowerType.INFERNO   -> 80
-        TowerType.TESLA     -> 150
-        TowerType.NOVA      -> 300
-        TowerType.SNIPER    -> 0
-        TowerType.ARTILLERY -> 20   // BUILD7: Artillery moved to BASIC (was 0)
+        TowerType.BOLT      -> 0     // FREE
+        TowerType.BLAST     -> 0     // FREE
+        TowerType.FROST     -> 0     // FREE
+        TowerType.PIERCE    -> 80
+        TowerType.ARTILLERY -> 80
+        TowerType.SNIPER    -> 100
+        TowerType.CORE      -> 120
+        TowerType.INFERNO   -> 200
+        TowerType.TESLA     -> 600   // OR $2.99 IAP
+        TowerType.NOVA      -> 1000  // OR $4.99 IAP
     }
+
+    /** Real-money IAP price string, null = diamond-only. */
+    val iapPrice: String? get() = when (this) {
+        TowerType.TESLA -> "$2.99"
+        TowerType.NOVA  -> "$4.99"
+        else            -> null
+    }
+
+    val isIAPTower: Boolean get() = iapPrice != null
 
     val tier: Int get() = when (this) {
         TowerType.BOLT, TowerType.BLAST, TowerType.FROST       -> 1
