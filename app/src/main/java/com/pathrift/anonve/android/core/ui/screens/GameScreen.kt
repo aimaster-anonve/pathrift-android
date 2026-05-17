@@ -973,14 +973,17 @@ private fun TowerInfoBottomPanel(
                 )
                 Spacer(Modifier.width(12.dp))
 
-                // Identity — fixed 88dp (fits "ARTILLERY" at 12sp bold + level badge)
-                Column(modifier = Modifier.width(88.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                // Identity — width(96.dp) comfortably fits "ARTILLERY" at 12sp bold + Lv badge
+                Column(modifier = Modifier.width(96.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Text(
                             info.type.displayName.uppercase(),
                             fontSize = 12.sp, fontWeight = FontWeight.Black, color = PathriftTextPrimary,
-                            maxLines = 1, overflow = TextOverflow.Clip,
-                            modifier = Modifier.weight(1f, fill = false)
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
                         )
                         Spacer(Modifier.width(3.dp))
                         Box(modifier = Modifier
@@ -993,7 +996,8 @@ private fun TowerInfoBottomPanel(
                     }
                     info.type.typeAdvantageHint?.let { hint ->
                         Text("⚡ $hint", fontSize = 7.sp, color = PathriftGold,
-                            fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth())
                     }
                     val modeLabel = when (info.type.targetingMode) {
                         TargetingMode.ALL_LAYERS  -> "ALL LAYERS"
@@ -1002,7 +1006,8 @@ private fun TowerInfoBottomPanel(
                     }
                     modeLabel?.let { label ->
                         Text(label, fontSize = 7.sp, color = Color(0xFF00CCFF).copy(alpha = 0.7f),
-                            fontFamily = FontFamily.Monospace, maxLines = 1)
+                            fontFamily = FontFamily.Monospace, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth())
                     }
                 }
 

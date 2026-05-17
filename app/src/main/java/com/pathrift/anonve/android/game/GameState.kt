@@ -1,7 +1,27 @@
 package com.pathrift.anonve.android.game
 
+import android.graphics.PointF
 import com.pathrift.anonve.android.core.engine.EconomyConstants
 import com.pathrift.anonve.android.game.towers.TowerType
+
+/**
+ * In-flight projectile — tracks a fired projectile from tower to enemy.
+ * Damage is applied only when the projectile arrives (PATHRIFT-B7-F001).
+ */
+data class InFlightProjectile(
+    val id: Long = System.currentTimeMillis() + (Math.random() * 1000).toLong(),
+    val fromPos: PointF,
+    val toPos: PointF,
+    val towerType: TowerType,
+    val targetEnemyId: Long,
+    val rawDamage: Int,
+    val bypassShield: Boolean = false,
+    val penetration: Float = 0f,
+    val isAoe: Boolean = false,
+    val aoeRadius: Float = 0f,
+    val chainTargets: List<Pair<Long, Int>> = emptyList(), // enemyId → damage
+    val spawnTimeMs: Long = System.currentTimeMillis()
+)
 
 /**
  * Game phase — mirrors iOS GamePhase.

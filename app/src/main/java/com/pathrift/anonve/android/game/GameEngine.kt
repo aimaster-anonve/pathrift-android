@@ -38,6 +38,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.Collections
 import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.max
@@ -73,6 +74,10 @@ class GameEngine(
 
     private val _enemies = mutableListOf<EnemyInstance>()
     val enemies: List<EnemyInstance> get() = synchronized(_enemies) { _enemies.toList() }
+
+    // In-flight projectiles — damage deferred until arrival (PATHRIFT-B7-F001)
+    private val _projectiles = Collections.synchronizedList(mutableListOf<InFlightProjectile>())
+    val projectiles: List<InFlightProjectile> get() = _projectiles.toList()
 
     var currentWave: Int = 0
         private set
@@ -127,6 +132,7 @@ class GameEngine(
         waveJob?.cancel()
         simulationJob?.cancel()
         synchronized(_enemies) { _enemies.clear() }
+        _projectiles.clear()
         _towers.clear()
         grid.updateSlots(emptyList())
         currentWave = 0
@@ -383,6 +389,7 @@ class GameEngine(
         tickHealerAuras(now)
 
         applyTowerAttacks(delta, nowSec)
+        updateProjectiles(adjustedDelta)
         checkWaveCompletion()
     }
 
@@ -452,7 +459,12 @@ class GameEngine(
                         for (e in inRange) {
                             val typeMult = tower.type.damageMultiplier(e.type)
                             val finalDamage = (damage * typeMult).toInt()
-                            applyDamage(e.id, finalDamage, bypassShield = true)
+                            val ePos = PathSystem.positionAt(e.pathProgress)
+                            spawnProjectile(
+                                from = inst.position, to = ePos,
+                                towerType = tower.type, targetId = e.id,
+                                rawDamage = finalDamage, bypassShield = true
+                            )
                         }
                     }
 
@@ -463,10 +475,9 @@ class GameEngine(
                         targetFacingAngle = atan2(primaryPos.y - inst.position.y, primaryPos.x - inst.position.x)
                         val typeMult = tower.type.damageMultiplier(primary.type)
                         val primaryDamage = (damage * typeMult).toInt()
-                        applyDamage(primary.id, primaryDamage, isAoe = true)  // Tesla is chain = AoE bypass
 
-                        // Chain to 2 nearest other enemies within 150px of primary
-                        val chainTargets = inRange
+                        // Chain to 2 nearest other enemies within range of primary
+                        val nearbyChain = inRange
                             .filter { it.id != primary.id && it.isAlive }
                             .sortedBy { e ->
                                 val ePos = PathSystem.positionAt(e.pathProgress)
@@ -476,28 +487,29 @@ class GameEngine(
                             }
                             .take(2)
                         val chainDamage = (18f * levelMult).toInt()
-                        for (chainTarget in chainTargets) {
+                        val chainPairs = nearbyChain.map { chainTarget ->
                             val chainMult = tower.type.damageMultiplier(chainTarget.type)
-                            applyDamage(chainTarget.id, (chainDamage * chainMult).toInt(), isAoe = true)
+                            Pair(chainTarget.id, (chainDamage * chainMult).toInt())
                         }
+                        spawnProjectile(
+                            from = inst.position, to = primaryPos,
+                            towerType = tower.type, targetId = primary.id,
+                            rawDamage = primaryDamage, isAoe = true,
+                            chainTargets = chainPairs
+                        )
                     }
 
                     // AoE towers (Blast, Nova): damage all in splash radius — always bypass Phantom dodge
                     tower.aoeRadius > 0f -> {
-                        val aoePixels = tower.aoeRadius * GridSystem.TILE_SIZE_DP
                         val primary = inRange.maxByOrNull { it.pathProgress } ?: continue
                         val primaryPos = PathSystem.positionAt(primary.pathProgress)
                         targetFacingAngle = atan2(primaryPos.y - inst.position.y, primaryPos.x - inst.position.x)
-                        for (e in inRange) {
-                            val ePos = PathSystem.positionAt(e.pathProgress)
-                            val dx = ePos.x - primaryPos.x
-                            val dy = ePos.y - primaryPos.y
-                            if (sqrt(dx * dx + dy * dy) <= aoePixels) {
-                                val typeMult = tower.type.damageMultiplier(e.type)
-                                val finalDamage = (damage * typeMult).toInt()
-                                applyDamage(e.id, finalDamage, isAoe = true)
-                            }
-                        }
+                        spawnProjectile(
+                            from = inst.position, to = primaryPos,
+                            towerType = tower.type, targetId = primary.id,
+                            rawDamage = (damage * tower.type.damageMultiplier(primary.type)).toInt(),
+                            isAoe = true, aoeRadius = tower.aoeRadius
+                        )
                     }
 
                     // Frost: single target + slow
@@ -507,7 +519,12 @@ class GameEngine(
                         targetFacingAngle = atan2(tPos.y - inst.position.y, tPos.x - inst.position.x)
                         val typeMult = tower.type.damageMultiplier(target.type)
                         val finalDamage = (damage * typeMult).toInt()
-                        applyDamage(target.id, finalDamage)
+                        spawnProjectile(
+                            from = inst.position, to = tPos,
+                            towerType = tower.type, targetId = target.id,
+                            rawDamage = finalDamage
+                        )
+                        // Apply slow immediately on fire (visual + gameplay parity with iOS)
                         applySlow(target.id, tower.slowFactor, durationMs = 2000L)
                     }
 
@@ -519,7 +536,11 @@ class GameEngine(
                         val typeMult = tower.type.damageMultiplier(target.type)
                         val penetration = if (tower.type == TowerType.CORE) 0.5f else 0f
                         val finalDamage = (damage * typeMult).toInt()
-                        applyDamage(target.id, finalDamage, penetration = penetration)
+                        spawnProjectile(
+                            from = inst.position, to = tPos,
+                            towerType = tower.type, targetId = target.id,
+                            rawDamage = finalDamage, penetration = penetration
+                        )
                     }
                 }
 
@@ -533,6 +554,92 @@ class GameEngine(
                 }
             }
         }
+    }
+
+    // ---- In-flight Projectile System (PATHRIFT-B7-F001) ----
+
+    private fun spawnProjectile(
+        from: android.graphics.PointF,
+        to: android.graphics.PointF,
+        towerType: TowerType,
+        targetId: Long,
+        rawDamage: Int,
+        bypassShield: Boolean = false,
+        penetration: Float = 0f,
+        isAoe: Boolean = false,
+        aoeRadius: Float = 0f,
+        chainTargets: List<Pair<Long, Int>> = emptyList()
+    ) {
+        _projectiles.add(InFlightProjectile(
+            fromPos = android.graphics.PointF(from.x, from.y),
+            toPos = android.graphics.PointF(to.x, to.y),
+            towerType = towerType,
+            targetEnemyId = targetId,
+            rawDamage = rawDamage,
+            bypassShield = bypassShield,
+            penetration = penetration,
+            isAoe = isAoe,
+            aoeRadius = aoeRadius,
+            chainTargets = chainTargets
+        ))
+    }
+
+    private fun updateProjectiles(delta: Float) {
+        val SPEED = 700f // px/sec
+        val ARRIVAL_THRESHOLD = 12f
+        val toRemove = mutableListOf<InFlightProjectile>()
+
+        // Snapshot to iterate (list is synchronized, but we modify during iteration via index)
+        val snapshot = _projectiles.toList()
+
+        for (proj in snapshot) {
+            val dx = proj.toPos.x - proj.fromPos.x
+            val dy = proj.toPos.y - proj.fromPos.y
+            val dist = sqrt(dx * dx + dy * dy)
+            val traveled = SPEED * delta
+
+            if (traveled >= dist - ARRIVAL_THRESHOLD || dist < ARRIVAL_THRESHOLD) {
+                // Arrived — apply damage
+                if (proj.isAoe && proj.aoeRadius > 0f) {
+                    // AoE: damage all enemies in radius around toPos
+                    val density = Resources.getSystem().displayMetrics.density
+                    val aoePixels = proj.aoeRadius * GridSystem.TILE_SIZE_DP * density
+                    synchronized(_enemies) {
+                        for (e in _enemies.filter { it.isAlive }) {
+                            val ePos = PathSystem.positionAt(e.pathProgress)
+                            val edx = ePos.x - proj.toPos.x
+                            val edy = ePos.y - proj.toPos.y
+                            if (sqrt(edx * edx + edy * edy) <= aoePixels) {
+                                val typeMult = proj.towerType.damageMultiplier(e.type)
+                                applyDamage(e.id, (proj.rawDamage * typeMult).toInt(), isAoe = true)
+                            }
+                        }
+                    }
+                } else {
+                    // Single target
+                    val enemy = synchronized(_enemies) { _enemies.firstOrNull { it.id == proj.targetEnemyId && it.isAlive } }
+                    if (enemy != null) {
+                        applyDamage(proj.targetEnemyId, proj.rawDamage, bypassShield = proj.bypassShield, penetration = proj.penetration)
+                    }
+                }
+                // Chain targets (Tesla) — apply on primary arrival
+                for ((chainId, chainDmg) in proj.chainTargets) {
+                    val chainEnemy = synchronized(_enemies) { _enemies.firstOrNull { it.id == chainId && it.isAlive } }
+                    if (chainEnemy != null) applyDamage(chainId, chainDmg, isAoe = true)
+                }
+                toRemove.add(proj)
+            } else {
+                // Advance projectile toward target
+                val ratio = traveled / dist
+                val newFromX = proj.fromPos.x + dx * ratio
+                val newFromY = proj.fromPos.y + dy * ratio
+                val idx = _projectiles.indexOf(proj)
+                if (idx >= 0) {
+                    _projectiles[idx] = proj.copy(fromPos = android.graphics.PointF(newFromX, newFromY))
+                }
+            }
+        }
+        _projectiles.removeAll(toRemove)
     }
 
     /**
