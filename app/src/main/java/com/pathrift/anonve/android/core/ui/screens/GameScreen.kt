@@ -820,7 +820,7 @@ private fun CombatHUD(
                 // Build 16: FIX 5 — show progress if active OR transitioning (avoids "NEXT WAVE" flash)
                 when {
                     state.phase == GamePhase.WAVE_ACTIVE || state.isTransitioningToWave ->
-                        WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal, state.wave)
+                        WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
                     state.phase != GamePhase.GAME_OVER ->
                         SendWaveButton(wave = state.wave, onClick = onNextWave)
                 }
@@ -849,7 +849,7 @@ private fun CombatHUD(
                     // Build 16: FIX 5 — show progress if active OR transitioning (avoids "NEXT WAVE" flash)
                     when {
                         state.phase == GamePhase.WAVE_ACTIVE || state.isTransitioningToWave ->
-                            WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal, state.wave)
+                            WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
                         state.phase != GamePhase.GAME_OVER -> SendWaveButton(
                             wave = state.wave,
                             onClick = onNextWave,
@@ -921,7 +921,7 @@ private fun WaveProgressStrip(progress: Double) {
 }
 
 @Composable
-private fun WaveProgressIndicator(cleared: Int, total: Int, wave: Int = 0) {
+private fun WaveProgressIndicator(cleared: Int, total: Int) {
     val progress = if (total > 0) cleared.toFloat() / total else 0f
     Row(
         modifier = Modifier
@@ -932,17 +932,7 @@ private fun WaveProgressIndicator(cleared: Int, total: Int, wave: Int = 0) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Build 16: FIX 5 — show wave number in progress indicator
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                "WAVE", fontSize = 7.sp, color = Color.White.copy(0.5f),
-                fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp
-            )
-            Text(
-                if (wave > 0) "$wave" else "...",
-                fontSize = 14.sp, fontWeight = FontWeight.Black, color = PathriftNeonBlue
-            )
-        }
+        // WAVE label removed
         Box(
             modifier = Modifier.width(80.dp).height(5.dp)
                 .clip(RoundedCornerShape(2.5.dp))

@@ -894,14 +894,71 @@ class GameEngine(
         _towers.clear()
         grid.clear()
 
-        // Re-place survivors at their existing positions (positions stay valid — layout only changes path)
+        // Re-place survivors at their existing positions, relocating off path if needed (DEC-032)
         for (snap in survivors) {
-            val pos = snap.position
+            var pos = snap.position
+
+            // Relocate if tower now overlaps new path (DEC-032)
+            if (!isValidPlacement(pos.x, pos.y)) {
+                val relocated = relocateTowerOffPath(pos.x, pos.y)
+                // Accept only if relocated position is actually valid
+                if (isValidPlacement(relocated.x, relocated.y)) {
+                    pos = relocated
+                }
+                // else: keep original (best effort)
+            }
+
             val towerId = grid.addTower(snap.tower.type, pos)
             _towers[towerId] = snap.copy(slotId = towerId, position = pos)
         }
 
         bridge.onRiftShift()
+    }
+
+    /**
+     * Pushes [x,y] off the current path using perpendicular projection.
+     * Returns a point that is ~44dp outside the path clearance zone.
+     */
+    private fun relocateTowerOffPath(x: Float, y: Float): android.graphics.PointF {
+        val pts = PathSystem.waypoints
+        if (pts.size < 2) return android.graphics.PointF(x, y)
+
+        val density = android.content.res.Resources.getSystem().displayMetrics.density
+        var minDist = Float.MAX_VALUE
+        var nearestX = x; var nearestY = y
+        var perpDx = 0f; var perpDy = 1f
+
+        for (i in 1 until pts.size) {
+            val ax = pts[i-1].x; val ay = pts[i-1].y
+            val bx = pts[i].x;   val by = pts[i].y
+            val dx = bx - ax;    val dy = by - ay
+            val len2 = dx * dx + dy * dy
+            if (len2 == 0f) continue
+            val t = ((x - ax) * dx + (y - ay) * dy) / len2
+            val tc = t.coerceIn(0f, 1f)
+            val cx = ax + tc * dx; val cy = ay + tc * dy
+            val dist = kotlin.math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy))
+            if (dist < minDist) {
+                minDist = dist
+                nearestX = cx; nearestY = cy
+                if (dist > 0.5f) {
+                    perpDx = (x - cx) / dist
+                    perpDy = (y - cy) / dist
+                } else {
+                    val segLen = kotlin.math.sqrt(len2)
+                    perpDx = -dy / segLen   // 90° normal
+                    perpDy =  dx / segLen
+                }
+            }
+        }
+
+        val pushDist = 44f * density
+        val newX = (nearestX + perpDx * pushDist)
+            .coerceIn(15f * density, screenWidth - 15f * density)
+        val newY = (nearestY + perpDy * pushDist)
+            .coerceIn(PathSystem.hudTopInset + 15f * density, screenHeight - PathSystem.hudBottomInset - 15f * density)
+
+        return android.graphics.PointF(newX, newY)
     }
 
     // ---- Boss Abilities (PATHRIFT-155) ----
