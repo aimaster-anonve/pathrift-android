@@ -4,7 +4,7 @@ import android.graphics.PointF
 import com.pathrift.anonve.android.game.towers.TowerType
 
 /**
- * Represents a position on the legacy grid (kept for backward compatibility).
+ * Represents a position on the legacy grid (kept for background rendering).
  */
 data class TileCoordinate(val col: Int, val row: Int)
 
@@ -23,84 +23,67 @@ enum class TileType {
 }
 
 /**
- * Tower slot state — mirrors iOS TowerSlotState.
+ * PlacedRecord — tracks a placed tower by unique ID, position, and type.
+ * Replaces slot-based system (Build 15 / DEC-032).
  */
-sealed class TowerSlotState {
-    object Empty : TowerSlotState()
-    data class Occupied(val towerType: TowerType, val level: Int = 1, val totalInvested: Int = 0) : TowerSlotState()
-    object Locked : TowerSlotState()
-
-    val isOccupied: Boolean get() = this is Occupied
-    val occupiedTowerType: TowerType? get() = (this as? Occupied)?.towerType
-}
-
-/**
- * A tower slot — position-based, not tile-based (mirrors iOS TowerSlot).
- */
-data class TowerSlot(
-    val id: Int,
+data class PlacedRecord(
+    val towerId: Int,
     val position: PointF,
-    val state: TowerSlotState = TowerSlotState.Empty
+    val type: TowerType
 )
 
 /**
- * GridSystem — manages tower slot positions derived from PathSystem layout.
- * Also keeps the legacy tile grid for background rendering.
+ * GridSystem — Build 15: repurposed as placed-tower tracker only.
+ * No predefined slot positions. Free-form placement support.
  *
- * iOS parity: updateSlots(), placeTower(), removeTower(), slot(at:).
+ * Legacy TILE_SIZE_DP kept for range pixel calculation in GameEngine/GameRenderer.
  */
 class GridSystem {
 
     companion object {
-        const val COLS = 16   // was 12 (Build 5.3 scale reduction)
-        const val ROWS = 26   // was 20 (Build 5.3 scale reduction)
+        const val COLS = 16
+        const val ROWS = 26
         const val TILE_SIZE_DP = 64
     }
 
-    private var _slots: MutableList<TowerSlot> = mutableListOf()
-    val slots: List<TowerSlot> get() = _slots.toList()
+    private val _placed = mutableMapOf<Int, PlacedRecord>()
+    val placed: Map<Int, PlacedRecord> get() = _placed.toMap()
+    private var nextId = 0
 
-    // ---- Slot API (mirrors iOS GridSystem) ----
+    val count: Int get() = _placed.size
 
-    /** Replace all slots with positions derived from PathSystem layout. */
-    fun updateSlots(positions: List<PointF>) {
-        _slots = positions.mapIndexed { idx, pos ->
-            TowerSlot(id = idx, position = pos, state = TowerSlotState.Empty)
-        }.toMutableList()
+    fun addTower(type: TowerType, position: PointF): Int {
+        val id = nextId++
+        _placed[id] = PlacedRecord(id, PointF(position.x, position.y), type)
+        return id
     }
 
-    fun slot(at: Int): TowerSlot? = _slots.firstOrNull { it.id == at }
-
-    private fun slotIndex(id: Int): Int = _slots.indexOfFirst { it.id == id }
-
-    fun placeTower(type: TowerType, at: Int, cost: Int = 0): Boolean {
-        val idx = slotIndex(at)
-        if (idx < 0) return false
-        if (_slots[idx].state.isOccupied) return false
-        _slots[idx] = _slots[idx].copy(state = TowerSlotState.Occupied(type, level = 1, totalInvested = cost))
-        return true
+    fun removeTower(id: Int) {
+        _placed.remove(id)
     }
 
-    fun removeTower(at: Int) {
-        val idx = slotIndex(at)
-        if (idx < 0) return
-        _slots[idx] = _slots[idx].copy(state = TowerSlotState.Empty)
+    fun moveTower(id: Int, to: PointF) {
+        _placed[id]?.let { _placed[id] = it.copy(position = PointF(to.x, to.y)) }
     }
 
-    fun upgradeTower(at: Int, upgradeCost: Int) {
-        val idx = slotIndex(at)
-        if (idx < 0) return
-        val cur = _slots[idx].state as? TowerSlotState.Occupied ?: return
-        _slots[idx] = _slots[idx].copy(
-            state = cur.copy(
-                level = cur.level + 1,
-                totalInvested = cur.totalInvested + upgradeCost
-            )
-        )
+    fun record(id: Int): PlacedRecord? = _placed[id]
+
+    fun clear() {
+        _placed.clear()
+        nextId = 0
     }
 
-    fun availableSlots(): List<TowerSlot> = _slots.filter { it.state == TowerSlotState.Empty }
-    fun occupiedSlots(): List<TowerSlot> = _slots.filter { it.state.isOccupied }
+    /** Min distance from point to any placed tower center, optionally excluding one tower. */
+    fun minDistanceToTower(x: Float, y: Float, excludeId: Int? = null): Float {
+        return _placed.values
+            .filter { it.towerId != excludeId }
+            .map { r ->
+                val dx = r.position.x - x
+                val dy = r.position.y - y
+                kotlin.math.sqrt(dx * dx + dy * dy)
+            }
+            .minOrNull() ?: Float.MAX_VALUE
+    }
 
     // ---- Legacy background tile grid (for renderer) ----
 

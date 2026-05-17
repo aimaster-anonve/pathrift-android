@@ -160,6 +160,32 @@ object PathSystem {
         }
     }
 
+    /**
+     * Min perpendicular distance from point (x,y) to any path segment (pixels).
+     * Used by GameEngine.isValidPlacement() for free-form tower placement (Build 15 / DEC-032).
+     */
+    fun minDistanceToPath(x: Float, y: Float): Float {
+        val pts = waypoints
+        if (pts.size < 2) return Float.MAX_VALUE
+        var minDist = Float.MAX_VALUE
+        for (i in 1 until pts.size) {
+            val ax = pts[i - 1].x; val ay = pts[i - 1].y
+            val bx = pts[i].x;     val by = pts[i].y
+            val dx = bx - ax;      val dy = by - ay
+            val len2 = dx * dx + dy * dy
+            val dist = if (len2 == 0f) {
+                kotlin.math.sqrt((x - ax) * (x - ax) + (y - ay) * (y - ay))
+            } else {
+                val t = ((x - ax) * dx + (y - ay) * dy) / len2
+                val tc = t.coerceIn(0f, 1f)
+                val cx = ax + tc * dx; val cy = ay + tc * dy
+                kotlin.math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy))
+            }
+            if (dist < minDist) minDist = dist
+        }
+        return minDist
+    }
+
     fun totalPathLength(): Float {
         var len = 0f
         for (i in 1 until waypoints.size) {

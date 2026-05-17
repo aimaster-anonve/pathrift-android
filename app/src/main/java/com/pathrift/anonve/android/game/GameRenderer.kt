@@ -634,53 +634,12 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     }
 
     // Tower slot backgrounds — iOS parity: 32×32pt rounded square, cornerRadius 5, cross 13×2 + 2×13, 4 corner dots at 15pt offset (45°/135°/225°/315°)
+    /**
+     * Build 15: Slot circles removed — free-form placement, no predefined slots on map (DEC-032).
+     * Ghost and confirm button are rendered in Compose (GameScreen.kt).
+     */
     private fun drawTowerSlots(canvas: Canvas) {
-        val slotSize = dp(32f)
-        val cornerR  = dp(5f)
-        val halfSize = slotSize / 2f
-        val crossW   = dp(13f); val crossH = dp(2f)
-        val dotR     = dp(1.5f); val dotOffset = dp(15f)
-
-        val pulseT     = ((System.currentTimeMillis() % 2400L) / 2400f).toFloat()
-        val pulseAlpha = (0.40f + 0.25f * sin(pulseT * 2 * PI.toFloat())).coerceIn(0.40f, 0.65f)
-
-        val validSlotId = dragValidSlotId  // snapshot to avoid race
-
-        for ((idx, pos) in slotPositions.withIndex()) {
-            if (slotOccupied[idx] == true) continue
-            val cx = pos.x; val cy = pos.y
-            val isSelected = selectedSlotId == idx
-            val isDragValid = validSlotId != null && validSlotId == idx
-
-            slotRect.set(cx - halfSize, cy - halfSize, cx + halfSize, cy + halfSize)
-
-            // Fill — reuse pre-allocated paint
-            canvas.drawRoundRect(slotRect, cornerR, cornerR,
-                if (isSelected) slotFillSelectedPaint else slotFillPaint)
-
-            if (isDragValid) {
-                // Green valid highlight
-                canvas.drawRoundRect(slotRect, cornerR, cornerR, slotDragValidFillPaint)
-                slotDragValidStrokePaint.strokeWidth = dp(1.5f)
-                canvas.drawRoundRect(slotRect, cornerR, cornerR, slotDragValidStrokePaint)
-            } else {
-                // Border — set alpha on pre-allocated paint (no new object)
-                val strokePaint = if (isSelected) slotStrokeSelectedPaint else slotStrokePaint
-                strokePaint.strokeWidth = if (isSelected) dp(2f) else dp(1f)
-                if (!isSelected) slotStrokePaint.alpha = (pulseAlpha * 255).toInt().coerceIn(0, 255)
-                canvas.drawRoundRect(slotRect, cornerR, cornerR, strokePaint)
-            }
-
-            // Inner cross — reuse pre-allocated paint
-            canvas.drawRect(cx - crossW/2, cy - crossH/2, cx + crossW/2, cy + crossH/2, slotCrossNewPaint)
-            canvas.drawRect(cx - crossH/2, cy - crossW/2, cx + crossH/2, cy + crossW/2, slotCrossNewPaint)
-
-            // Corner dots — reuse pre-allocated paint
-            for (angleDeg in listOf(45f, 135f, 225f, 315f)) {
-                val rad = angleDeg * PI.toFloat() / 180f
-                canvas.drawCircle(cx + cos(rad) * dotOffset, cy + sin(rad) * dotOffset, dotR, slotDotNewPaint)
-            }
-        }
+        // No-op: slot ring rendering removed in Build 15 (DEC-032 free-form placement)
     }
 
     // Towers with unique shapes per DESIGN_SPEC_BUILD5 Section 2 (PATHRIFT-162)

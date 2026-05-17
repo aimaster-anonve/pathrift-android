@@ -51,6 +51,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Adjust
 import androidx.compose.material.icons.filled.Bolt
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Diamond
 import androidx.compose.material.icons.filled.Close
@@ -92,6 +93,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -115,6 +117,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.unit.IntOffset
 import kotlin.math.roundToInt
 import com.pathrift.anonve.android.core.engine.EconomyConstants
@@ -138,6 +141,7 @@ import com.pathrift.anonve.android.core.ui.PathriftDanger
 import com.pathrift.anonve.android.core.ui.PathriftNeonBlue
 import com.pathrift.anonve.android.core.ui.PathriftOrange
 import com.pathrift.anonve.android.core.ui.PathriftPurple
+import com.pathrift.anonve.android.core.ui.PathriftSuccess
 import com.pathrift.anonve.android.core.ui.PathriftSurface
 import com.pathrift.anonve.android.core.ui.PathriftTextPrimary
 import com.pathrift.anonve.android.core.ui.PathriftTextSecondary
@@ -189,6 +193,9 @@ fun GameScreen(
             modifier = Modifier.fillMaxSize()
         )
 
+        // Build 15: tower selection state — show sheet when + is tapped
+        var showTowerSelectionSheet by remember { mutableStateOf(false) }
+
         CombatHUD(
             state = state,
             nextWaveDefinition = gameViewModel.nextWaveDefinition,
@@ -196,18 +203,25 @@ fun GameScreen(
             onPause = { isPaused = true },
             onToggleSpeed = gameViewModel::toggleSpeed,
             onShowNextWaveInfo = { gameViewModel.showNextWaveInfo = true },
-            onAddTower = {
-                // Trigger tower selection via a dummy empty-slot tap on the first available slot
-                val firstEmpty = gameViewModel.game.grid.slots.firstOrNull { !it.state.isOccupied }
-                if (firstEmpty != null) {
-                    gameViewModel.tapTowerSlot(firstEmpty.id)
-                }
-            },
+            onAddTower = { showTowerSelectionSheet = true },
             activeTowerCount = gameViewModel.activeTowerCount,
             maxTowerCount = gameViewModel.maxTowerCount(state.wave),
             canAddTower = gameViewModel.canAddTower,
             modifier = Modifier.fillMaxSize()
         )
+
+        // Tower selection sheet — Build 15: select type then drag to place
+        if (showTowerSelectionSheet) {
+            TowerSelectionPanel(
+                state = state,
+                viewModel = gameViewModel,
+                onDismiss = { showTowerSelectionSheet = false },
+                onStartDrag = { type ->
+                    showTowerSelectionSheet = false
+                    gameViewModel.startDragPlacement(type)
+                }
+            )
+        }
 
         state.selectedTowerInfo?.let { info ->
             TowerInfoBottomPanel(
@@ -230,15 +244,8 @@ fun GameScreen(
             )
         }
 
-        val emptySelectedSlot = state.selectedTowerSlotId
-        if (emptySelectedSlot != null && state.selectedTowerInfo == null) {
-            TowerSelectionPanel(
-                state = state,
-                slotId = emptySelectedSlot,
-                viewModel = gameViewModel,
-                onDismiss = { gameViewModel.clearTowerSelection() }
-            )
-        }
+        // Build 15: TowerSelectionPanel now triggered from showTowerSelectionSheet above (free-form flow)
+        // Legacy slot-based selection removed.
 
         // Rift Shift animated overlay — iOS parity: pulsing purple full-screen flash + banner
         if (state.riftShiftActive) {
@@ -338,19 +345,20 @@ private fun GameCanvasView(
 
     gameSurface.enemies = enemies
     gameSurface.towerInstances = gameViewModel.game.towers
-    gameSurface.slotPositions = gameViewModel.game.grid.slots.map { it.position }
-    gameSurface.slotOccupied = gameViewModel.game.grid.slots.associate { it.id to it.state.isOccupied }
+    // Build 15: no predefined slot positions — renderer draws nothing in drawTowerSlots()
+    gameSurface.slotPositions = emptyList()
+    gameSurface.slotOccupied = emptyMap()
     gameSurface.selectedSlotId = state.selectedTowerSlotId
     gameSurface.riftShiftActive = state.riftShiftActive
     // KEY FIX: propagate path waypoints through Compose state (not thread-direct) so renderer
     // always sees new path after Rift Shift. layoutVersion forces recomposition on layout change.
     gameSurface.pathWaypoints = PathSystem.waypoints
-    // Drag-and-drop: propagate valid slot highlight to renderer (PATHRIFT-B7-004)
-    gameSurface.dragValidSlotId = state.dragValidSlotId
+    gameSurface.dragValidSlotId = null  // Build 15: no slot highlight — ghost color handles validity
 
     val isDragging = state.isDraggingTower
     val dragPosition = state.dragPosition
     val dragTowerType = state.dragTowerType
+    val isDragPositionValid = state.isDragPositionValid
 
     Box(
         modifier = modifier
@@ -370,17 +378,16 @@ private fun GameCanvasView(
             }
             .pointerInput(isDragging) {
                 if (isDragging) {
+                    // Build 15: drag updates position; confirm button required to place
                     detectDragGestures(
                         onDrag = { change, _ ->
                             gameViewModel.updateDragPosition(change.position.x, change.position.y)
                         },
-                        onDragEnd = {
-                            val pos = state.dragPosition
-                            gameViewModel.dropTower(pos.x, pos.y)
-                        },
+                        onDragEnd = { /* no auto-place — user must tap confirm button */ },
                         onDragCancel = { gameViewModel.cancelDrag() }
                     )
                 } else {
+                    // Not dragging: tap on towers to open info panel
                     awaitPointerEventScope {
                         while (true) {
                             val event = awaitPointerEvent()
@@ -388,17 +395,18 @@ private fun GameCanvasView(
                             if (change.pressed && !change.previousPressed) {
                                 val tapX = change.position.x
                                 val tapY = change.position.y
-                                val slots = gameViewModel.game.grid.slots
+                                // Build 15: tap on placed tower positions to select them
+                                val towerInstances = gameViewModel.game.towers
                                 val tapRadiusPx = 48f * density.density  // 48dp → pixels
                                 var closestId: Int? = null
                                 var closestDist = Float.MAX_VALUE
-                                for (slot in slots) {
-                                    val dx = slot.position.x - tapX
-                                    val dy = slot.position.y - tapY
+                                for ((id, inst) in towerInstances) {
+                                    val dx = inst.position.x - tapX
+                                    val dy = inst.position.y - tapY
                                     val dist = sqrt(dx * dx + dy * dy)
                                     if (dist < tapRadiusPx && dist < closestDist) {
                                         closestDist = dist
-                                        closestId = slot.id
+                                        closestId = id
                                     }
                                 }
                                 if (closestId != null) {
@@ -418,33 +426,103 @@ private fun GameCanvasView(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Drag ghost overlay (PATHRIFT-B7-004)
+        // Build 15: Drag ghost overlay with validity-based color (DEC-032)
         if (isDragging && dragTowerType != null) {
-            val ghostColor = towerDisplayColor(dragTowerType)
-            val ghostOffsetX = with(density) { (dragPosition.x - 22.dp.toPx()).toDp() }
-            val ghostOffsetY = with(density) { (dragPosition.y - 22.dp.toPx()).toDp() }
+            val ghostColor = if (isDragPositionValid) PathriftSuccess else PathriftDanger
+            val ghostOffsetX = with(density) { (dragPosition.x - 28.dp.toPx()).toDp() }
+            val ghostOffsetY = with(density) { (dragPosition.y - 28.dp.toPx()).toDp() }
             Box(
                 modifier = Modifier
-                    .padding(start = ghostOffsetX, top = ghostOffsetY)
-                    .size(44.dp)
-                    .alpha(0.7f)
-                    .background(ghostColor.copy(alpha = 0.18f), CircleShape)
-                    .border(1.5.dp, ghostColor.copy(alpha = 0.7f), CircleShape),
+                    .offset { IntOffset(
+                        (dragPosition.x - with(density) { 28.dp.toPx() }).roundToInt(),
+                        (dragPosition.y - with(density) { 28.dp.toPx() }).roundToInt()
+                    )}
+                    .size(56.dp),
                 contentAlignment = Alignment.Center
             ) {
-                val ghostIcon = when (dragTowerType) {
-                    TowerType.BOLT      -> Icons.Default.Bolt
-                    TowerType.BLAST     -> Icons.Default.Whatshot
-                    TowerType.FROST     -> Icons.Default.AcUnit
-                    TowerType.PIERCE    -> Icons.Default.KeyboardDoubleArrowRight
-                    TowerType.CORE      -> Icons.Default.Shield
-                    TowerType.INFERNO   -> Icons.Default.LocalFireDepartment
-                    TowerType.TESLA     -> Icons.Default.FlashOn
-                    TowerType.NOVA      -> Icons.Default.WbSunny
-                    TowerType.SNIPER    -> Icons.Default.TrackChanges
-                    TowerType.ARTILLERY -> Icons.Default.Adjust
+                // Background glow
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .background(ghostColor.copy(alpha = 0.25f))
+                        .blur(8.dp)
+                )
+                // Tower icon
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .background(ghostColor.copy(alpha = 0.18f), CircleShape)
+                        .border(1.5.dp, ghostColor.copy(alpha = 0.7f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val ghostIcon = when (dragTowerType) {
+                        TowerType.BOLT      -> Icons.Default.Bolt
+                        TowerType.BLAST     -> Icons.Default.Whatshot
+                        TowerType.FROST     -> Icons.Default.AcUnit
+                        TowerType.PIERCE    -> Icons.Default.KeyboardDoubleArrowRight
+                        TowerType.CORE      -> Icons.Default.Shield
+                        TowerType.INFERNO   -> Icons.Default.LocalFireDepartment
+                        TowerType.TESLA     -> Icons.Default.FlashOn
+                        TowerType.NOVA      -> Icons.Default.WbSunny
+                        TowerType.SNIPER    -> Icons.Default.TrackChanges
+                        TowerType.ARTILLERY -> Icons.Default.Adjust
+                    }
+                    Icon(ghostIcon, contentDescription = null, tint = ghostColor, modifier = Modifier.size(22.dp))
                 }
-                Icon(ghostIcon, contentDescription = null, tint = ghostColor, modifier = Modifier.size(22.dp))
+                // Color overlay
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(CircleShape)
+                        .background(ghostColor.copy(alpha = 0.2f))
+                )
+            }
+        }
+
+        // Build 15: Confirm placement button — fixed bottom-center, visible only when drag position is valid
+        AnimatedVisibility(
+            visible = isDragging && isDragPositionValid,
+            enter = scaleIn() + fadeIn(),
+            exit = scaleOut() + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 100.dp)
+        ) {
+            Button(
+                onClick = { gameViewModel.confirmPlacement() },
+                modifier = Modifier.size(64.dp),
+                shape = CircleShape,
+                colors = ButtonDefaults.buttonColors(containerColor = PathriftSuccess),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Icon(
+                    Icons.Default.Check,
+                    contentDescription = "Confirm placement",
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+
+        // Cancel drag — X button when dragging (top-right area)
+        AnimatedVisibility(
+            visible = isDragging,
+            enter = scaleIn() + fadeIn(),
+            exit = scaleOut() + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 80.dp, end = 16.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(Color.White.copy(alpha = 0.1f), CircleShape)
+                    .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
+                    .clickable { gameViewModel.cancelDrag() },
+                contentAlignment = Alignment.Center
+            ) {
+                Text("✕", fontSize = 16.sp, color = Color.White.copy(alpha = 0.8f))
             }
         }
     }
@@ -1369,13 +1447,18 @@ private fun TowerStatItem(label: String, value: String, color: Color, modifier: 
 // Tower Selection Panel
 // ==============================
 
+/**
+ * Build 15: Tower selection panel — select type then start drag to place free-form.
+ * onStartDrag(type) is called when BUILD is tapped; panel closes and drag begins.
+ */
 @Composable
 private fun TowerSelectionPanel(
     state: GameState,
-    slotId: Int,
     viewModel: GameViewModel,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onStartDrag: (TowerType) -> Unit = {}
 ) {
+    val slotId = -1  // unused in Build 15 free-form flow
     var selectedType by remember { mutableStateOf<TowerType?>(null) }
 
     // GAP-024: Overlay opacity 0.4
@@ -1543,11 +1626,11 @@ private fun TowerSelectionPanel(
                         }
                     }
                 } else {
+                    // Build 15: BUILD starts drag, user drops tower anywhere valid on map
                     Button(
                         onClick = {
                             if (canAffordGold) {
-                                viewModel.placeTower(slotId, sel)
-                                onDismiss()
+                                onStartDrag(sel)
                             }
                         },
                         enabled = canAffordGold,
@@ -1572,7 +1655,7 @@ private fun TowerSelectionPanel(
                                 tint = if (canAffordGold) PathriftBackground else PathriftTextSecondary
                             )
                             Text(
-                                text = if (canAffordGold) "BUILD ${sel.displayName.uppercase()} — ${towerGoldCost(sel)}g"
+                                text = if (canAffordGold) "DRAG TO PLACE ${sel.displayName.uppercase()} — ${towerGoldCost(sel)}g"
                                        else "NOT ENOUGH GOLD",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,

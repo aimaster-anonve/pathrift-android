@@ -85,7 +85,7 @@ data class GameState(
     val layoutVersion: Int = 0,  // incremented on initLayout → forces slot recomposition
     // Inter-wave countdown (PATHRIFT-B7-002)
     val interWaveSecondsRemaining: Int = 0,
-    // Drag-and-drop state (PATHRIFT-B7-004)
+    // Drag-and-drop state (PATHRIFT-B7-004, Build 15: free-form)
     val isDraggingTower: Boolean = false,
     val dragTowerType: TowerType? = null,
     val dragPosition: Offset = Offset.Zero,
@@ -93,4 +93,8 @@ data class GameState(
     val isMovingTower: Boolean = false,
     val movingFromSlotId: Int? = null,
     val moveCost: Int = 0,
+    // Build 15: free-form placement validity (DEC-032)
+    val isDragPositionValid: Boolean = false,
+    val lastValidDragX: Float = 0f,
+    val lastValidDragY: Float = 0f,
 )

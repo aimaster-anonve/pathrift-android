@@ -3,7 +3,6 @@ package com.pathrift.anonve.android.game
 import android.content.res.Resources
 import android.graphics.PointF
 import com.pathrift.anonve.android.core.engine.EconomyConstants
-import com.pathrift.anonve.android.game.PathLayer
 import com.pathrift.anonve.android.core.storage.ArsenalStore
 import com.pathrift.anonve.android.core.storage.DiamondStore
 import com.pathrift.anonve.android.core.storage.PremiumStore
@@ -48,15 +47,11 @@ import kotlin.math.sqrt
 /**
  * GameEngine — full iOS GameScene.swift parity + Phase 2 features.
  *
- * Phase 2 additions:
- * - 5 new tower types: Pierce, Core, Inferno, Tesla, Nova
- * - Attack speed scaling per upgrade level (+8% per level)
- * - Tower type advantage multipliers
- * - Pierce shield bypass + Core armor penetration
- * - Tesla chain lightning
- * - DiamondStore integration: +2/3/4 per 10-wave milestone
- * - Splitter enemy (splits into 2 Swarm on death)
- * - Jumper enemy (teleports forward every 3s)
+ * Build 15: Free-form tower placement (DEC-032).
+ * - Slot system removed. GridSystem is now a placed-tower tracker only.
+ * - isValidPlacement() checks path clearance + tower overlap + screen bounds.
+ * - placeTowerFreeform() / moveTowerFreeform() replace slot-based placement.
+ * - applyRestore() uses xFrac/yFrac instead of slotId.
  */
 class GameEngine(
     private val bridge: GameBridge,
@@ -68,7 +63,7 @@ class GameEngine(
     val grid = GridSystem()
     val waveSystem = WaveSystem()   // internal — exposed for ViewModel preview (PATHRIFT-157)
 
-    // Active tower instances keyed by slotId
+    // Active tower instances keyed by towerId (= grid PlacedRecord.towerId)
     private val _towers = mutableMapOf<Int, TowerInstance>()
     val towers: Map<Int, TowerInstance> get() = _towers.toMap()
 
@@ -116,6 +111,28 @@ class GameEngine(
     var screenWidth: Float = 0f
     var screenHeight: Float = 0f
 
+    // ---- Free-form placement constants (Build 15 / DEC-032) ----
+
+    private val PATH_CLEARANCE_PX = 38f   // dp units, multiplied by density below
+    private val TOWER_CLEARANCE_PX = 22f  // dp units
+
+    /**
+     * Returns true if the given screen position is a valid tower placement location.
+     * Checks: screen bounds, path clearance, tower overlap.
+     * @param excludeTowerId When moving a tower, exclude it from the overlap check.
+     */
+    fun isValidPlacement(x: Float, y: Float, excludeTowerId: Int? = null): Boolean {
+        val density = Resources.getSystem().displayMetrics.density
+        val hudTop = PathSystem.hudTopInset
+        val hudBot = PathSystem.hudBottomInset
+        val margin = 15f * density
+        if (x < margin || x > screenWidth - margin) return false
+        if (y < hudTop + margin || y > screenHeight - hudBot - margin) return false
+        val pathOk = PathSystem.minDistanceToPath(x, y) > PATH_CLEARANCE_PX * density
+        val towerOk = grid.minDistanceToTower(x, y, excludeId = excludeTowerId) > TOWER_CLEARANCE_PX * density
+        return pathOk && towerOk
+    }
+
     // ---- Lifecycle ----
 
     fun start(scope: CoroutineScope) {
@@ -137,7 +154,7 @@ class GameEngine(
         synchronized(_enemies) { _enemies.clear() }
         _projectiles.clear()
         _towers.clear()
-        grid.updateSlots(emptyList())
+        grid.clear()
         currentWave = 0
         lives = EconomyConstants.STARTING_LIVES
         gold = EconomyConstants.STARTING_GOLD
@@ -174,7 +191,7 @@ class GameEngine(
         PathSystem.screenDensity = density  // Build 8: density-aware path clearance (PATHRIFT-160 fix)
         val layoutIdx = pendingSave?.layoutIndex ?: -1
         PathSystem.buildLayout(width, height, currentWave = 0, layoutIndex = layoutIdx)
-        grid.updateSlots(PathSystem.slotPositions)
+        // Build 15: no slot positions to update — grid is a tracker only
         pendingSave?.let { applyRestore(it) }
         pendingSave = null
     }
@@ -187,26 +204,19 @@ class GameEngine(
         totalEnemiesKilled = save.enemyKills
         score = 0L
 
+        // Build 15: restore using xFrac/yFrac position fractions (version 2 saves)
         for (t in save.towers) {
             val type = TowerType.values().firstOrNull { it.name == t.type } ?: continue
-            val slot = grid.slot(t.slotId) ?: continue
-            if (slot.state.isOccupied) continue
-            val tower = when (type) {
-                TowerType.BOLT      -> com.pathrift.anonve.android.game.towers.BoltTower()
-                TowerType.BLAST     -> com.pathrift.anonve.android.game.towers.BlastTower()
-                TowerType.FROST     -> com.pathrift.anonve.android.game.towers.FrostTower()
-                TowerType.PIERCE    -> com.pathrift.anonve.android.game.towers.PierceTower()
-                TowerType.CORE      -> com.pathrift.anonve.android.game.towers.CoreTower()
-                TowerType.INFERNO   -> com.pathrift.anonve.android.game.towers.InfernoTower()
-                TowerType.TESLA     -> com.pathrift.anonve.android.game.towers.TeslaTower()
-                TowerType.NOVA      -> com.pathrift.anonve.android.game.towers.NovaTower()
-                TowerType.SNIPER    -> com.pathrift.anonve.android.game.towers.SniperTower()
-                TowerType.ARTILLERY -> com.pathrift.anonve.android.game.towers.ArtilleryTower()
-            }
-            grid.placeTower(type, t.slotId, t.totalInvested)
-            _towers[t.slotId] = TowerInstance(
-                slotId = t.slotId, tower = tower, position = slot.position,
-                level = t.level, totalInvested = t.totalInvested
+            val x = t.xFrac.toFloat() * screenWidth
+            val y = t.yFrac.toFloat() * screenHeight
+            val tower = buildTower(type)
+            val pos = PointF(x, y)
+            val towerId = grid.addTower(type, pos)
+            val permDmgBonus = arsenalStore.permDamageBonus(type)
+            _towers[towerId] = TowerInstance(
+                slotId = towerId, tower = tower, position = pos,
+                level = t.level, totalInvested = t.totalInvested,
+                lastAttackTime = 0L, facingAngle = 0f
             )
         }
         bridge.onGoldChanged(gold)
@@ -267,34 +277,41 @@ class GameEngine(
         bridge.onInterWaveTimerChanged(0)
     }
 
-    // ---- Tower Placement ----
+    // ---- Tower Placement (Build 15: free-form) ----
 
-    fun placeTower(slotId: Int, type: TowerType): Boolean {
-        val tower = when (type) {
-            TowerType.BOLT      -> BoltTower()
-            TowerType.BLAST     -> BlastTower()
-            TowerType.FROST     -> FrostTower()
-            TowerType.PIERCE    -> PierceTower()
-            TowerType.CORE      -> CoreTower()
-            TowerType.INFERNO   -> InfernoTower()
-            TowerType.TESLA     -> TeslaTower()
-            TowerType.NOVA      -> NovaTower()
-            TowerType.SNIPER    -> SniperTower()
-            TowerType.ARTILLERY -> ArtilleryTower()
-        }
-        if (gold < tower.cost) return false
-        val slot = grid.slot(slotId) ?: return false
-        if (slot.state.isOccupied) return false
+    /** Build 15: place a tower at exact screen coordinates. Returns towerId or null on failure. */
+    fun placeTowerFreeform(type: TowerType, x: Float, y: Float): Int? {
+        if (!isValidPlacement(x, y)) return null
+        val cost = towerCostFor(type)
+        if (gold < cost) return null
+        if (grid.count >= activeSlotCount(currentWave)) return null
 
-        gold -= tower.cost
-        grid.placeTower(type, slotId, tower.cost)
-        _towers[slotId] = TowerInstance(
-            slotId = slotId,
+        val position = PointF(x, y)
+        val tower = buildTower(type)
+        val towerId = grid.addTower(type, position)
+        _towers[towerId] = TowerInstance(
+            slotId = towerId,
             tower = tower,
-            position = slot.position,
+            position = position,
             level = 1,
-            totalInvested = tower.cost
+            totalInvested = cost,
+            lastAttackTime = 0L,
+            facingAngle = 0f
         )
+        gold -= cost
+        bridge.onGoldChanged(gold)
+        return towerId
+    }
+
+    /** Build 15: move an existing tower to new free-form coordinates. */
+    fun moveTowerFreeform(towerId: Int, toX: Float, toY: Float, goldCost: Int): Boolean {
+        val inst = _towers[towerId] ?: return false
+        if (!isValidPlacement(toX, toY, excludeTowerId = towerId)) return false
+        if (gold < goldCost) return false
+        val newPos = PointF(toX, toY)
+        grid.moveTower(towerId, newPos)
+        _towers[towerId] = inst.copy(position = newPos)
+        gold -= goldCost
         bridge.onGoldChanged(gold)
         return true
     }
@@ -315,57 +332,43 @@ class GameEngine(
         if (gold < upgradeCost) return
         gold -= upgradeCost
         _towers[slotId] = inst.copy(level = inst.level + 1, totalInvested = inst.totalInvested + upgradeCost)
-        grid.upgradeTower(slotId, upgradeCost)
         bridge.onGoldChanged(gold)
     }
 
     fun towerInstance(slotId: Int): TowerInstance? = _towers[slotId]
 
-    // ---- Active Slot Count (BUILD7 — DEC-030, PO_SPEC §4) ----
+    // ---- Active Tower Count (DEC-032 — wave-based maximum) ----
 
     fun activeSlotCount(wave: Int): Int = waveSystem.activeSlotCount(wave)
 
-    // ---- Drag-and-Drop: Nearest Valid Slot (PATHRIFT-B7-004) ----
+    // ---- Tower cost lookup ----
 
-    data class SlotHit(val slotId: Int, val position: android.graphics.PointF, val isValid: Boolean)
-
-    fun nearestValidSlot(x: Float, y: Float): SlotHit? {
-        val density = Resources.getSystem().displayMetrics.density
-        val threshold = 80f * density
-        var bestHit: SlotHit? = null
-        var bestDist = Float.MAX_VALUE
-        for (slot in grid.slots) {
-            if (slot.state.isOccupied) continue
-            val dx = slot.position.x - x
-            val dy = slot.position.y - y
-            val dist = sqrt(dx * dx + dy * dy)
-            if (dist < threshold && dist < bestDist) {
-                bestDist = dist
-                bestHit = SlotHit(slot.id, slot.position, true)
-            }
-        }
-        return bestHit
+    private fun towerCostFor(type: TowerType): Int = when (type) {
+        TowerType.BOLT      -> 80
+        TowerType.BLAST     -> 100
+        TowerType.FROST     -> 100
+        TowerType.PIERCE    -> 140
+        TowerType.CORE      -> 170
+        TowerType.SNIPER    -> 190
+        TowerType.ARTILLERY -> 150
+        TowerType.INFERNO   -> 210
+        TowerType.TESLA     -> 300
+        TowerType.NOVA      -> 500
     }
 
-    /** Move a tower from one slot to another, deducting moveCost gold. Returns true on success. */
-    fun moveTower(fromSlot: Int, toSlot: Int, moveCost: Int): Boolean {
-        val inst = _towers[fromSlot] ?: return false
-        val targetSlotState = grid.slot(toSlot) ?: return false
-        if (targetSlotState.state.isOccupied) return false
-        if (gold < moveCost) return false
+    // ---- Tower factory ----
 
-        // Remove from old slot
-        _towers.remove(fromSlot)
-        grid.removeTower(fromSlot)
-
-        // Place at new slot
-        val newPos = targetSlotState.position
-        grid.placeTower(inst.tower.type, toSlot, inst.totalInvested)
-        _towers[toSlot] = inst.copy(slotId = toSlot, position = newPos)
-
-        gold -= moveCost
-        bridge.onGoldChanged(gold)
-        return true
+    fun buildTower(type: TowerType): Tower = when (type) {
+        TowerType.BOLT      -> BoltTower()
+        TowerType.BLAST     -> BlastTower()
+        TowerType.FROST     -> FrostTower()
+        TowerType.PIERCE    -> PierceTower()
+        TowerType.CORE      -> CoreTower()
+        TowerType.INFERNO   -> InfernoTower()
+        TowerType.TESLA     -> TeslaTower()
+        TowerType.NOVA      -> NovaTower()
+        TowerType.SNIPER    -> SniperTower()
+        TowerType.ARTILLERY -> ArtilleryTower()
     }
 
     // ---- Simulation Loop ----
@@ -848,7 +851,7 @@ class GameEngine(
         }
     }
 
-    // ---- Rift Shift ----
+    // ---- Rift Shift (Build 15: free-form survivor placement) ----
 
     private fun performRiftShift() {
         if (screenWidth <= 0f || screenHeight <= 0f) return
@@ -863,10 +866,8 @@ class GameEngine(
         // Snapshot surviving towers before layout change
         val towerSnapshot = _towers.values.toList()
 
-        // Build new path + slots — density already set in initLayout
+        // Build new path — density already set in initLayout
         PathSystem.buildLayout(screenWidth, screenHeight, currentWave, newIndex)
-        val newSlotPositions = PathSystem.slotPositions
-        grid.updateSlots(newSlotPositions)
 
         // Determine survivors: 65% survive, min 2 (or all if ≤2), mirrors iOS
         val n = towerSnapshot.size
@@ -884,22 +885,15 @@ class GameEngine(
         }
         bridge.onGoldChanged(gold)
 
-        // Clear old tower-slot assignments — grid was reset by updateSlots
+        // Clear all tower-grid assignments
         _towers.clear()
+        grid.clear()
 
-        // Assign survivors to new shuffled slot IDs
-        val availableSlotIds = newSlotPositions.indices.toMutableList().also { it.shuffle() }
-        for ((i, snap) in survivors.withIndex()) {
-            val targetSlotId = if (i < availableSlotIds.size) availableSlotIds[i] else i
-            val newSlot = grid.slot(targetSlotId) ?: continue
-            val newPos = newSlot.position
-
-            // Re-place in grid
-            grid.placeTower(snap.tower.type, targetSlotId, snap.totalInvested)
-
-            // Update tower instance with new slotId and position
-            val updatedInst = snap.copy(slotId = targetSlotId, position = newPos)
-            _towers[targetSlotId] = updatedInst
+        // Re-place survivors at their existing positions (positions stay valid — layout only changes path)
+        for (snap in survivors) {
+            val pos = snap.position
+            val towerId = grid.addTower(snap.tower.type, pos)
+            _towers[towerId] = snap.copy(slotId = towerId, position = pos)
         }
 
         bridge.onRiftShift()
@@ -1008,8 +1002,6 @@ class GameEngine(
     /** Gravity Well: disable all towers and clear in-flight conceptual projectiles for duration. */
     fun triggerGravityWell(nowSec: Double, duration: Double) {
         gravityWellEndTime = nowSec + duration
-        // In the engine we have no projectile list — tower attacks simply miss during this window.
-        // Tower disable is handled in applyTowerAttacks via gravityWellEndTime check.
     }
 
     // ---- Healer Aura Tick (PATHRIFT-159) ----
@@ -1116,10 +1108,12 @@ class GameEngine(
             )
             EnemyType.PHANTOM -> EnemyInstance(
                 id = id, type = type,
-                maxHp = PhantomEnemy.HP * hpMult, currentHp = PhantomEnemy.HP * hpMult,
-                baseSpeed = PhantomEnemy.SPEED, currentSpeed = PhantomEnemy.SPEED,
-                goldReward = PhantomEnemy.GOLD_REWARD,
-                armorReduction = PhantomEnemy.ARMOR_REDUCTION
+                maxHp = com.pathrift.anonve.android.game.enemies.PhantomEnemy.HP * hpMult,
+                currentHp = com.pathrift.anonve.android.game.enemies.PhantomEnemy.HP * hpMult,
+                baseSpeed = com.pathrift.anonve.android.game.enemies.PhantomEnemy.SPEED,
+                currentSpeed = com.pathrift.anonve.android.game.enemies.PhantomEnemy.SPEED,
+                goldReward = com.pathrift.anonve.android.game.enemies.PhantomEnemy.GOLD_REWARD,
+                armorReduction = com.pathrift.anonve.android.game.enemies.PhantomEnemy.ARMOR_REDUCTION
             )
         }
         synchronized(_enemies) { _enemies.add(instance) }
@@ -1166,6 +1160,7 @@ class GameEngine(
 
 /**
  * Tower instance in the engine — tracks runtime mutable state alongside immutable Tower definition.
+ * slotId is now the unique tower ID from GridSystem (Build 15: free-form placement).
  */
 data class TowerInstance(
     val slotId: Int,

@@ -116,26 +116,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     }
 
     fun placeTower(slotId: Int, type: TowerType) {
-        // Check premium tower lock
-        if (type.isPremium && !diamondStore.isUnlocked(type)) {
-            viewModelScope.launch {
-                _events.emit(GameEvent.ShowMessage("${type.displayName} locked! Unlock for ${type.diamondCost}♦"))
-            }
-            return
-        }
-        val success = game.placeTower(slotId, type)
-        if (!success) {
-            viewModelScope.launch {
-                val reason = when {
-                    game.gold < getCost(type) -> "Not enough gold!"
-                    game.grid.slot(slotId)?.state?.isOccupied == true -> "Slot already occupied."
-                    else -> "Cannot place tower here."
-                }
-                _events.emit(GameEvent.ShowMessage(reason))
-            }
-        } else {
-            syncTowerSlots()
-        }
+        // Legacy: not used in Build 15 free-form flow — kept for compile compat
     }
 
     fun sellSelectedTower() {
@@ -161,49 +142,79 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     }
 
     fun tapTowerSlot(slotId: Int) {
-        val slot = game.grid.slot(slotId) ?: return
-        if (slot.state.isOccupied) {
-            bridge.onTowerTapped(slotId)
-        } else {
-            // Show tower selection panel for empty slot
-            _state.update { it.copy(selectedTowerSlotId = slotId, selectedTowerInfo = null) }
-        }
+        // Build 15: tap on an existing tower shows info panel
+        val inst = game.towerInstance(slotId) ?: return
+        bridge.onTowerTapped(slotId)
     }
 
     fun clearTowerSelection() {
         _state.update { it.copy(selectedTowerSlotId = null, selectedTowerInfo = null) }
     }
 
-    // ---- Drag-and-Drop (PATHRIFT-B7-004) ----
+    // ---- Drag-and-Drop Build 15: free-form placement (DEC-032) ----
 
     fun startDragPlacement(type: TowerType) {
-        _state.update { it.copy(isDraggingTower = true, dragTowerType = type, isMovingTower = false, movingFromSlotId = null, moveCost = 0) }
+        _state.update { it.copy(
+            isDraggingTower = true, dragTowerType = type,
+            isMovingTower = false, movingFromSlotId = null, moveCost = 0,
+            isDragPositionValid = false, lastValidDragX = 0f, lastValidDragY = 0f
+        )}
     }
 
     fun updateDragPosition(x: Float, y: Float) {
-        val hit = game.nearestValidSlot(x, y)
-        _state.update { it.copy(dragPosition = Offset(x, y), dragValidSlotId = hit?.slotId) }
+        val excludeId: Int? = if (_state.value.isMovingTower) _state.value.movingFromSlotId else null
+        val valid = game.isValidPlacement(x, y, excludeTowerId = excludeId)
+        _state.update { cur ->
+            cur.copy(
+                dragPosition = Offset(x, y),
+                isDragPositionValid = valid,
+                lastValidDragX = if (valid) x else cur.lastValidDragX,
+                lastValidDragY = if (valid) y else cur.lastValidDragY
+            )
+        }
     }
 
-    fun dropTower(x: Float, y: Float) {
+    /** Build 15: confirm placement at last valid drag position. */
+    fun confirmPlacement() {
         val s = _state.value
+        val x = s.lastValidDragX
+        val y = s.lastValidDragY
         if (s.isMovingTower) {
-            val fromSlot = s.movingFromSlotId ?: run { cancelDrag(); return }
-            val hit = game.nearestValidSlot(x, y)
-            if (hit != null && hit.slotId != fromSlot) {
-                val success = game.moveTower(fromSlot, hit.slotId, s.moveCost)
-                if (success) syncTowerSlots()
-            }
+            val fromId = s.movingFromSlotId ?: run { cancelDrag(); return }
+            val success = game.moveTowerFreeform(fromId, x, y, s.moveCost)
+            if (success) syncTowerSlots()
         } else {
             val type = s.dragTowerType ?: run { cancelDrag(); return }
-            val hit = game.nearestValidSlot(x, y) ?: run { cancelDrag(); return }
-            placeTower(hit.slotId, type)
+            val unlocked = premiumStore.isPremium || diamondStore.isUnlocked(type)
+            if (!unlocked) {
+                viewModelScope.launch {
+                    _events.emit(GameEvent.ShowMessage("${type.displayName} locked! Unlock for ${type.diamondCost}♦"))
+                }
+                cancelDrag()
+                return
+            }
+            val towerId = game.placeTowerFreeform(type, x, y)
+            if (towerId != null) {
+                syncTowerSlots()
+            } else {
+                viewModelScope.launch {
+                    val reason = when {
+                        game.gold < getCost(type) -> "Not enough gold!"
+                        game.grid.count >= game.activeSlotCount(game.currentWave) -> "Tower limit reached!"
+                        else -> "Cannot place tower here."
+                    }
+                    _events.emit(GameEvent.ShowMessage(reason))
+                }
+            }
         }
-        _state.update { it.copy(isDraggingTower = false, dragTowerType = null, dragValidSlotId = null, isMovingTower = false, movingFromSlotId = null, moveCost = 0) }
+        cancelDrag()
     }
 
     fun cancelDrag() {
-        _state.update { it.copy(isDraggingTower = false, dragTowerType = null, dragValidSlotId = null, isMovingTower = false, movingFromSlotId = null, moveCost = 0) }
+        _state.update { it.copy(
+            isDraggingTower = false, dragTowerType = null, dragValidSlotId = null,
+            isDragPositionValid = false, isMovingTower = false, movingFromSlotId = null, moveCost = 0
+        )}
     }
 
     fun beginMoveMode(slotId: Int) {
@@ -216,7 +227,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
             moveCost = moveCost,
             dragTowerType = inst.tower.type,
             selectedTowerSlotId = null,
-            selectedTowerInfo = null
+            selectedTowerInfo = null,
+            isDragPositionValid = false,
+            lastValidDragX = inst.position.x,
+            lastValidDragY = inst.position.y
         )}
     }
 
@@ -224,7 +238,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     fun maxTowerCount(wave: Int): Int = game.activeSlotCount(wave)
     val canAddTower: Boolean get() {
         val s = _state.value
-        return s.phase != GamePhase.WAVE_ACTIVE && activeTowerCount < maxTowerCount(s.wave)
+        return s.phase != GamePhase.WAVE_ACTIVE && activeTowerCount < maxTowerCount(s.wave) && !s.isDraggingTower
     }
 
     fun restartGame() {
@@ -282,10 +296,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
             kotlinx.coroutines.delay(2000L)
             _state.update { it.copy(waveCompleteMessage = null) }
         }
-        // Save game state after each wave
+        // Save game state after each wave — Build 15: xFrac/yFrac position format
+        val screenW = game.screenWidth.takeIf { it > 0f } ?: 1f
+        val screenH = game.screenHeight.takeIf { it > 0f } ?: 1f
         val savedTowers = game.towers.values.map { t ->
             com.pathrift.anonve.android.core.storage.SavedTower(
-                slotId = t.slotId, type = t.tower.type.name, level = t.level, totalInvested = t.totalInvested
+                xFrac = (t.position.x / screenW).toDouble(),
+                yFrac = (t.position.y / screenH).toDouble(),
+                type = t.tower.type.name,
+                level = t.level,
+                totalInvested = t.totalInvested
             )
         }
         gameSaveStore.save(
