@@ -154,10 +154,17 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     // ---- Drag-and-Drop Build 15: free-form placement (DEC-032) ----
 
     fun startDragPlacement(type: TowerType) {
+        // Build 16: FIX 1 — ghost starts at screen center
+        val cx = game.screenWidth / 2
+        val cy = game.screenHeight / 2
+        val valid = game.isValidPlacement(cx, cy)
         _state.update { it.copy(
             isDraggingTower = true, dragTowerType = type,
             isMovingTower = false, movingFromSlotId = null, moveCost = 0,
-            isDragPositionValid = false, lastValidDragX = 0f, lastValidDragY = 0f
+            isDragPositionValid = valid,
+            dragPosition = Offset(cx, cy),
+            lastValidDragX = if (valid) cx else 0f,
+            lastValidDragY = if (valid) cy else 0f
         )}
     }
 
@@ -220,6 +227,11 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     fun beginMoveMode(slotId: Int) {
         val inst = game.towerInstance(slotId) ?: return
         val moveCost = ceil(inst.totalInvested * 0.30).toInt()
+        // Build 16: FIX 2 — ghost starts at the tower's current screen position
+        val pos = game.towerScreenPosition(slotId)
+        val tx = pos?.x ?: (game.screenWidth / 2)
+        val ty = pos?.y ?: (game.screenHeight / 2)
+        val valid = game.isValidPlacement(tx, ty, excludeTowerId = slotId)
         _state.update { it.copy(
             isDraggingTower = true,
             isMovingTower = true,
@@ -228,9 +240,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
             dragTowerType = inst.tower.type,
             selectedTowerSlotId = null,
             selectedTowerInfo = null,
-            isDragPositionValid = false,
-            lastValidDragX = inst.position.x,
-            lastValidDragY = inst.position.y
+            dragPosition = Offset(tx, ty),
+            isDragPositionValid = valid,
+            lastValidDragX = tx,
+            lastValidDragY = ty
         )}
     }
 
@@ -275,7 +288,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     private val bridge: GameBridge get() = this   // self-reference for readability
 
     override fun onWaveStarted(wave: Int, totalEnemies: Int) {
-        _state.update { it.copy(wave = wave, phase = GamePhase.WAVE_ACTIVE, waveEnemyTotal = maxOf(1, totalEnemies), waveEnemiesCleared = 0) }
+        _state.update { it.copy(
+            wave = wave,
+            phase = GamePhase.WAVE_ACTIVE,
+            waveEnemyTotal = maxOf(1, totalEnemies),
+            waveEnemiesCleared = 0,
+            isGameOver = false,
+            isTransitioningToWave = false  // Build 16: FIX 5 — clear transition flag
+        )}
         viewModelScope.launch { _events.emit(GameEvent.WaveStarted) }
     }
 
@@ -485,7 +505,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     // ---- New GameBridge callbacks ----
 
     override fun onInterWaveTimerChanged(secondsRemaining: Int) {
-        _state.update { it.copy(interWaveSecondsRemaining = secondsRemaining) }
+        _state.update { cur ->
+            cur.copy(
+                interWaveSecondsRemaining = secondsRemaining,
+                // Build 16: FIX 5 — flag transition so wave progress shows immediately
+                isTransitioningToWave = if (secondsRemaining == 0) true else cur.isTransitioningToWave
+            )
+        }
     }
 
     override fun onSpeedChanged(multiplier: Float) {

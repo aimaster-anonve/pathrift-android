@@ -426,18 +426,23 @@ private fun GameCanvasView(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Build 15: Drag ghost overlay with validity-based color (DEC-032)
+        // Build 16: FIX 3 — Ghost + Cancel/OK buttons below ghost, all together
         if (isDragging && dragTowerType != null) {
             val ghostColor = if (isDragPositionValid) PathriftSuccess else PathriftDanger
-            val ghostOffsetX = with(density) { (dragPosition.x - 28.dp.toPx()).toDp() }
-            val ghostOffsetY = with(density) { (dragPosition.y - 28.dp.toPx()).toDp() }
+            val ghostX = dragPosition.x
+            val ghostY = dragPosition.y
+            // Ghost radius 36dp → offset by 36dp to center it
+            val ghostHalfPx = with(density) { 36.dp.toPx() }
+            val btnRowHalfPx = with(density) { 56.dp.toPx() } // 2×52dp + 16dp gap ÷ 2 ≈ 60dp total width
+
+            // Ghost circle
             Box(
                 modifier = Modifier
                     .offset { IntOffset(
-                        (dragPosition.x - with(density) { 28.dp.toPx() }).roundToInt(),
-                        (dragPosition.y - with(density) { 28.dp.toPx() }).roundToInt()
+                        (ghostX - ghostHalfPx).roundToInt(),
+                        (ghostY - ghostHalfPx).roundToInt()
                     )}
-                    .size(56.dp),
+                    .size(72.dp),
                 contentAlignment = Alignment.Center
             ) {
                 // Background glow
@@ -445,13 +450,13 @@ private fun GameCanvasView(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(CircleShape)
-                        .background(ghostColor.copy(alpha = 0.25f))
+                        .background(ghostColor.copy(alpha = 0.18f))
                         .blur(8.dp)
                 )
                 // Tower icon
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(52.dp)
                         .background(ghostColor.copy(alpha = 0.18f), CircleShape)
                         .border(1.5.dp, ghostColor.copy(alpha = 0.7f), CircleShape),
                     contentAlignment = Alignment.Center
@@ -468,61 +473,63 @@ private fun GameCanvasView(
                         TowerType.SNIPER    -> Icons.Default.TrackChanges
                         TowerType.ARTILLERY -> Icons.Default.Adjust
                     }
-                    Icon(ghostIcon, contentDescription = null, tint = ghostColor, modifier = Modifier.size(22.dp))
+                    Icon(ghostIcon, contentDescription = null, tint = ghostColor, modifier = Modifier.size(26.dp))
                 }
-                // Color overlay
+            }
+
+            // Cancel + OK buttons — ghost's bottom + 8dp gap, clamp so buttons don't go offscreen
+            val btnY = ghostY + ghostHalfPx + with(density) { 8.dp.toPx() }
+            val screenH = gameViewModel.game.screenHeight.takeIf { it > 0f } ?: 1200f
+            val clampedBtnY = btnY.coerceAtMost(screenH - with(density) { 60.dp.toPx() })
+            Row(
+                modifier = Modifier
+                    .offset { IntOffset(
+                        (ghostX - btnRowHalfPx).roundToInt(),
+                        clampedBtnY.roundToInt()
+                    )},
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Cancel — always visible
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .size(52.dp)
                         .clip(CircleShape)
-                        .background(ghostColor.copy(alpha = 0.2f))
-                )
-            }
-        }
-
-        // Build 15: Confirm placement button — fixed bottom-center, visible only when drag position is valid
-        AnimatedVisibility(
-            visible = isDragging && isDragPositionValid,
-            enter = scaleIn() + fadeIn(),
-            exit = scaleOut() + fadeOut(),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 100.dp)
-        ) {
-            Button(
-                onClick = { gameViewModel.confirmPlacement() },
-                modifier = Modifier.size(64.dp),
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(containerColor = PathriftSuccess),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                Icon(
-                    Icons.Default.Check,
-                    contentDescription = "Confirm placement",
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
-
-        // Cancel drag — X button when dragging (top-right area)
-        AnimatedVisibility(
-            visible = isDragging,
-            enter = scaleIn() + fadeIn(),
-            exit = scaleOut() + fadeOut(),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 80.dp, end = 16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(Color.White.copy(alpha = 0.1f), CircleShape)
-                    .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape)
-                    .clickable { gameViewModel.cancelDrag() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text("✕", fontSize = 16.sp, color = Color.White.copy(alpha = 0.8f))
+                        .background(PathriftDanger.copy(alpha = 0.20f))
+                        .border(1.dp, PathriftDanger.copy(alpha = 0.5f), CircleShape)
+                        .clickable { gameViewModel.cancelDrag() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.Close, contentDescription = "Cancel",
+                        tint = PathriftDanger, modifier = Modifier.size(24.dp))
+                }
+                // OK — enabled only at valid position
+                if (isDragPositionValid) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(PathriftSuccess.copy(alpha = 0.25f))
+                            .border(1.dp, PathriftSuccess.copy(alpha = 0.6f), CircleShape)
+                            .clickable { gameViewModel.confirmPlacement() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = "Confirm",
+                            tint = PathriftSuccess, modifier = Modifier.size(24.dp))
+                    }
+                } else {
+                    // Disabled placeholder
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.05f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Check, contentDescription = null,
+                            tint = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(24.dp))
+                    }
+                }
             }
         }
     }
@@ -810,9 +817,12 @@ private fun CombatHUD(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Spacer(Modifier.weight(1f))
+                // Build 16: FIX 5 — show progress if active OR transitioning (avoids "NEXT WAVE" flash)
                 when {
-                    state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
-                    state.phase != GamePhase.GAME_OVER -> SendWaveButton(wave = state.wave, onClick = onNextWave)
+                    state.phase == GamePhase.WAVE_ACTIVE || state.isTransitioningToWave ->
+                        WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal, state.wave)
+                    state.phase != GamePhase.GAME_OVER ->
+                        SendWaveButton(wave = state.wave, onClick = onNextWave)
                 }
             }
         } else {
@@ -836,8 +846,10 @@ private fun CombatHUD(
                         onAdd = onAddTower
                     )
                     Spacer(Modifier.weight(1f))
+                    // Build 16: FIX 5 — show progress if active OR transitioning (avoids "NEXT WAVE" flash)
                     when {
-                        state.phase == GamePhase.WAVE_ACTIVE -> WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
+                        state.phase == GamePhase.WAVE_ACTIVE || state.isTransitioningToWave ->
+                            WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal, state.wave)
                         state.phase != GamePhase.GAME_OVER -> SendWaveButton(
                             wave = state.wave,
                             onClick = onNextWave,
@@ -909,27 +921,46 @@ private fun WaveProgressStrip(progress: Double) {
 }
 
 @Composable
-private fun WaveProgressIndicator(cleared: Int, total: Int) {
+private fun WaveProgressIndicator(cleared: Int, total: Int, wave: Int = 0) {
+    val progress = if (total > 0) cleared.toFloat() / total else 0f
     Row(
         modifier = Modifier
-            .background(Color.White.copy(alpha = 0.07f), RoundedCornerShape(12.dp))
+            .height(36.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Color.White.copy(alpha = 0.07f))
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Build 16: FIX 5 — show wave number in progress indicator
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                "WAVE", fontSize = 7.sp, color = Color.White.copy(0.5f),
+                fontFamily = FontFamily.Monospace, letterSpacing = 1.5.sp
+            )
+            Text(
+                if (wave > 0) "$wave" else "...",
+                fontSize = 14.sp, fontWeight = FontWeight.Black, color = PathriftNeonBlue
+            )
+        }
+        Box(
+            modifier = Modifier.width(80.dp).height(5.dp)
+                .clip(RoundedCornerShape(2.5.dp))
+                .background(Color.White.copy(0.1f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress)
+                    .clip(RoundedCornerShape(2.5.dp))
+                    .background(
+                        Brush.horizontalGradient(listOf(PathriftNeonBlue, PathriftPurple))
+                    )
+            )
+        }
         Text(
-            "$cleared/$total",
-            color = PathriftTextSecondary,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
+            "$cleared/$total", fontSize = 9.sp, color = Color.White.copy(0.5f),
             fontFamily = FontFamily.Monospace
-        )
-        // GAP-018: Wave progress bar width 100dp
-        LinearProgressIndicator(
-            progress = { if (total > 0) cleared.toFloat() / total else 0f },
-            modifier = Modifier.width(100.dp).height(5.dp).clip(RoundedCornerShape(3.dp)),
-            color = Color(0xFF00CCFF),
-            trackColor = Color.White.copy(alpha = 0.1f)
         )
     }
 }
@@ -1396,14 +1427,20 @@ private fun TowerInfoBottomPanel(
                         ) {
                             Icon(
                                 Icons.Filled.OpenWith, contentDescription = "Move",
-                                tint = if (canAffordMove) PathriftGold else PathriftTextSecondary,
-                                modifier = Modifier.size(12.dp)
+                                tint = if (canAffordMove) PathriftGold else Color.White.copy(0.3f),
+                                modifier = Modifier.size(10.dp)
+                            )
+                            Text(
+                                "MOVE",
+                                fontSize = 6.sp, fontWeight = FontWeight.Black,
+                                color = if (canAffordMove) PathriftGold else Color.White.copy(0.3f),
+                                letterSpacing = 0.3.sp
                             )
                             Text(
                                 "${info.moveCost}g",
-                                fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                                fontSize = 7.sp, fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
-                                color = if (canAffordMove) PathriftGold else PathriftTextSecondary
+                                color = if (canAffordMove) PathriftGold else Color.White.copy(0.3f)
                             )
                         }
                     }

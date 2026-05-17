@@ -97,4 +97,6 @@ data class GameState(
     val isDragPositionValid: Boolean = false,
     val lastValidDragX: Float = 0f,
     val lastValidDragY: Float = 0f,
+    // Build 16: FIX 5 — prevents "NEXT WAVE" flash when timer hits 0
+    val isTransitioningToWave: Boolean = false,
 )

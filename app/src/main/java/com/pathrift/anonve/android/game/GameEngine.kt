@@ -337,6 +337,11 @@ class GameEngine(
 
     fun towerInstance(slotId: Int): TowerInstance? = _towers[slotId]
 
+    /** Build 16: FIX 2 — returns the screen position of a placed tower by id. */
+    fun towerScreenPosition(towerId: Int): android.graphics.PointF? {
+        return _towers[towerId]?.position
+    }
+
     // ---- Active Tower Count (DEC-032 — wave-based maximum) ----
 
     fun activeSlotCount(wave: Int): Int = waveSystem.activeSlotCount(wave)
