@@ -451,13 +451,13 @@ private fun GameCanvasView(
                         (ghostX - btnRowHalfPx).roundToInt(),
                         clampedBtnY.roundToInt()
                     )},
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Cancel — always visible
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(36.dp)
                         .clip(CircleShape)
                         .background(PathriftDanger.copy(alpha = 0.20f))
                         .border(1.dp, PathriftDanger.copy(alpha = 0.5f), CircleShape)
@@ -471,7 +471,7 @@ private fun GameCanvasView(
                 if (isDragPositionValid) {
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(PathriftSuccess.copy(alpha = 0.25f))
                             .border(1.dp, PathriftSuccess.copy(alpha = 0.6f), CircleShape)
@@ -485,7 +485,7 @@ private fun GameCanvasView(
                     // Disabled placeholder
                     Box(
                         modifier = Modifier
-                            .size(32.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.05f)),
                         contentAlignment = Alignment.Center
@@ -1361,7 +1361,7 @@ private fun TowerInfoBottomPanel(
                     val movePressed by moveInteraction.collectIsPressedAsState()
                     val moveScale by animateFloatAsState(if (movePressed) 0.94f else 1f, spring(stiffness = 700f), label = "moveScale")
                     Box(
-                        modifier = Modifier.width(64.dp).height(44.dp)
+                        modifier = Modifier.width(58.dp).height(40.dp)
                             .graphicsLayer { scaleX = moveScale; scaleY = moveScale }
                             .background(
                                 if (canAffordMove) PathriftGold.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.06f),
@@ -1386,7 +1386,7 @@ private fun TowerInfoBottomPanel(
                             )
                             Text(
                                 "MOVE",
-                                fontSize = 10.sp, fontWeight = FontWeight.Black,
+                                fontSize = 9.sp, fontWeight = FontWeight.Black,
                                 color = if (canAffordMove) PathriftGold else Color.White.copy(0.3f),
                                 letterSpacing = 0.3.sp
                             )
