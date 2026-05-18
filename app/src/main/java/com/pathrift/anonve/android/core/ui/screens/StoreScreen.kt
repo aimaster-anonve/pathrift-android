@@ -338,7 +338,7 @@ private fun TowersGrid(
     diamondStore: com.pathrift.anonve.android.core.storage.DiamondStore,
     onTap: (TowerType) -> Unit
 ) {
-    val towers = TowerType.values().toList()
+    val towers = TowerType.values().sortedBy { it.diamondCost }
     // Render as simple wrapped rows to avoid nested scroll
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         towers.chunked(2).forEach { rowItems ->
