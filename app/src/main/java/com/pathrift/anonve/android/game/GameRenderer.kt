@@ -44,6 +44,12 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     /** During drag-and-drop, the slot ID nearest to the finger that would receive the tower. */
     @Volatile var dragValidSlotId: Int? = null
 
+    // ---- Ghost tower drag-placement preview (FIX 2) ----
+    @Volatile var ghostTowerType: TowerType? = null
+    @Volatile var ghostX: Float = 0f
+    @Volatile var ghostY: Float = 0f
+    @Volatile var ghostIsValid: Boolean = false
+
     // ---- Projectile system — simple fire effect, iOS parity ----
     data class Projectile(
         val id: Long,
@@ -422,6 +428,9 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         if (riftShiftActive) {
             canvas.drawRect(0f, 0f, W, H, riftFlashPaint)
         }
+
+        // Ghost tower placement preview — drawn last so it appears on top of all layers
+        drawGhostTower(canvas)
     }
 
     // Checkerboard grid background
@@ -1390,6 +1399,38 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         TowerType.PIERCE    -> android.graphics.Color.parseColor("#66FF1A")
         TowerType.CORE      -> android.graphics.Color.parseColor("#FF590D")
         else                -> android.graphics.Color.WHITE
+    }
+
+    // ---- Ghost tower drag-placement preview (FIX 2) ----
+    private fun drawGhostTower(canvas: Canvas) {
+        val type = ghostTowerType ?: return
+        val cx = ghostX
+        val cy = ghostY
+        val validColor = if (ghostIsValid) Color.parseColor("#00FF4D") else Color.parseColor("#FF3311")
+
+        // Validity ring fill — translucent
+        val ringFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            color = validColor
+            alpha = (0.12f * 255).toInt()
+        }
+        // Validity ring stroke
+        val ringStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = validColor
+            strokeWidth = dp(2.5f)
+            alpha = (0.85f * 255).toInt()
+        }
+        canvas.drawCircle(cx, cy, dp(24f), ringFillPaint)
+        canvas.drawCircle(cx, cy, dp(24f), ringStrokePaint)
+
+        // Draw tower body with 70% alpha — save/restore canvas state for alpha layer
+        canvas.saveLayerAlpha(
+            cx - dp(30f), cy - dp(30f), cx + dp(30f), cy + dp(30f),
+            (0.70f * 255).toInt()
+        )
+        drawTowerBody(canvas, type, cx, cy)
+        canvas.restore()
     }
 
     inner class RenderThread(private val surfaceHolder: SurfaceHolder) : Thread("PathriftRenderThread") {

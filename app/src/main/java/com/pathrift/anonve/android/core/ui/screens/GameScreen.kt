@@ -426,74 +426,38 @@ private fun GameCanvasView(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Build 16: FIX 3 — Ghost + Cancel/OK buttons below ghost, all together
+        // FIX 2 — Sync ghost tower state to GameRenderer canvas (replaces Compose ghost overlay)
+        LaunchedEffect(isDragging, dragPosition, isDragPositionValid, dragTowerType) {
+            gameSurface.ghostTowerType = if (isDragging) dragTowerType else null
+            gameSurface.ghostX = dragPosition.x
+            gameSurface.ghostY = dragPosition.y
+            gameSurface.ghostIsValid = isDragPositionValid
+        }
+
+        // FIX 3 — Cancel/OK buttons (reduced size), shown only while dragging
         if (isDragging && dragTowerType != null) {
-            val ghostColor = if (isDragPositionValid) PathriftSuccess else PathriftDanger
+            val ghostHalfPx = with(density) { 24.dp.toPx() }  // matches ghost ring radius dp(24)
+            val btnRowHalfPx = with(density) { 38.dp.toPx() } // 2×32dp + 12dp gap ÷ 2 = 38dp total half
             val ghostX = dragPosition.x
             val ghostY = dragPosition.y
-            // Ghost radius 36dp → offset by 36dp to center it
-            val ghostHalfPx = with(density) { 36.dp.toPx() }
-            val btnRowHalfPx = with(density) { 56.dp.toPx() } // 2×52dp + 16dp gap ÷ 2 ≈ 60dp total width
-
-            // Ghost circle
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset(
-                        (ghostX - ghostHalfPx).roundToInt(),
-                        (ghostY - ghostHalfPx).roundToInt()
-                    )}
-                    .size(72.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                // Background glow
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .clip(CircleShape)
-                        .background(ghostColor.copy(alpha = 0.18f))
-                        .blur(8.dp)
-                )
-                // Tower icon
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .background(ghostColor.copy(alpha = 0.18f), CircleShape)
-                        .border(1.5.dp, ghostColor.copy(alpha = 0.7f), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val ghostIcon = when (dragTowerType) {
-                        TowerType.BOLT      -> Icons.Default.Bolt
-                        TowerType.BLAST     -> Icons.Default.Whatshot
-                        TowerType.FROST     -> Icons.Default.AcUnit
-                        TowerType.PIERCE    -> Icons.Default.KeyboardDoubleArrowRight
-                        TowerType.CORE      -> Icons.Default.Shield
-                        TowerType.INFERNO   -> Icons.Default.LocalFireDepartment
-                        TowerType.TESLA     -> Icons.Default.FlashOn
-                        TowerType.NOVA      -> Icons.Default.WbSunny
-                        TowerType.SNIPER    -> Icons.Default.TrackChanges
-                        TowerType.ARTILLERY -> Icons.Default.Adjust
-                    }
-                    Icon(ghostIcon, contentDescription = null, tint = ghostColor, modifier = Modifier.size(26.dp))
-                }
-            }
 
             // Cancel + OK buttons — ghost's bottom + 8dp gap, clamp so buttons don't go offscreen
             val btnY = ghostY + ghostHalfPx + with(density) { 8.dp.toPx() }
             val screenH = gameViewModel.game.screenHeight.takeIf { it > 0f } ?: 1200f
-            val clampedBtnY = btnY.coerceAtMost(screenH - with(density) { 60.dp.toPx() })
+            val clampedBtnY = btnY.coerceAtMost(screenH - with(density) { 44.dp.toPx() })
             Row(
                 modifier = Modifier
                     .offset { IntOffset(
                         (ghostX - btnRowHalfPx).roundToInt(),
                         clampedBtnY.roundToInt()
                     )},
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Cancel — always visible
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
+                        .size(32.dp)
                         .clip(CircleShape)
                         .background(PathriftDanger.copy(alpha = 0.20f))
                         .border(1.dp, PathriftDanger.copy(alpha = 0.5f), CircleShape)
@@ -501,13 +465,13 @@ private fun GameCanvasView(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(Icons.Default.Close, contentDescription = "Cancel",
-                        tint = PathriftDanger, modifier = Modifier.size(24.dp))
+                        tint = PathriftDanger, modifier = Modifier.size(14.dp))
                 }
                 // OK — enabled only at valid position
                 if (isDragPositionValid) {
                     Box(
                         modifier = Modifier
-                            .size(52.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
                             .background(PathriftSuccess.copy(alpha = 0.25f))
                             .border(1.dp, PathriftSuccess.copy(alpha = 0.6f), CircleShape)
@@ -515,19 +479,19 @@ private fun GameCanvasView(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Default.Check, contentDescription = "Confirm",
-                            tint = PathriftSuccess, modifier = Modifier.size(24.dp))
+                            tint = PathriftSuccess, modifier = Modifier.size(14.dp))
                     }
                 } else {
                     // Disabled placeholder
                     Box(
                         modifier = Modifier
-                            .size(52.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
                             .background(Color.White.copy(alpha = 0.05f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null,
-                            tint = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(24.dp))
+                            tint = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(14.dp))
                     }
                 }
             }
@@ -1397,7 +1361,7 @@ private fun TowerInfoBottomPanel(
                     val movePressed by moveInteraction.collectIsPressedAsState()
                     val moveScale by animateFloatAsState(if (movePressed) 0.94f else 1f, spring(stiffness = 700f), label = "moveScale")
                     Box(
-                        modifier = Modifier.width(52.dp).height(38.dp)
+                        modifier = Modifier.width(64.dp).height(44.dp)
                             .graphicsLayer { scaleX = moveScale; scaleY = moveScale }
                             .background(
                                 if (canAffordMove) PathriftGold.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.06f),
@@ -1418,17 +1382,17 @@ private fun TowerInfoBottomPanel(
                             Icon(
                                 Icons.Filled.OpenWith, contentDescription = "Move",
                                 tint = if (canAffordMove) PathriftGold else Color.White.copy(0.3f),
-                                modifier = Modifier.size(10.dp)
+                                modifier = Modifier.size(14.dp)
                             )
                             Text(
                                 "MOVE",
-                                fontSize = 6.sp, fontWeight = FontWeight.Black,
+                                fontSize = 10.sp, fontWeight = FontWeight.Black,
                                 color = if (canAffordMove) PathriftGold else Color.White.copy(0.3f),
                                 letterSpacing = 0.3.sp
                             )
                             Text(
                                 "${info.moveCost}g",
-                                fontSize = 7.sp, fontWeight = FontWeight.Bold,
+                                fontSize = 9.sp, fontWeight = FontWeight.Bold,
                                 fontFamily = FontFamily.Monospace,
                                 color = if (canAffordMove) PathriftGold else Color.White.copy(0.3f)
                             )
