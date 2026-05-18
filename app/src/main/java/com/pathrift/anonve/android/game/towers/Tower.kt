@@ -119,6 +119,19 @@ enum class TowerType {
     }
 }
 
+fun TowerType.defaultRangeTiles(): Float = when (this) {
+    TowerType.BOLT      -> 2.4f
+    TowerType.BLAST     -> 2.0f
+    TowerType.FROST     -> 2.4f
+    TowerType.PIERCE    -> 2.4f
+    TowerType.CORE      -> 2.0f
+    TowerType.INFERNO   -> 2.0f
+    TowerType.TESLA     -> 2.5f
+    TowerType.NOVA      -> 2.7f
+    TowerType.SNIPER    -> 3.2f
+    TowerType.ARTILLERY -> 2.5f
+}
+
 /**
  * Base class for all tower types.
  * Tower stats are immutable per type; state (e.g. attack cooldown) is managed by GameEngine.

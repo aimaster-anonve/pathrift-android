@@ -12,6 +12,7 @@ import android.view.SurfaceView
 import com.pathrift.anonve.android.game.enemies.EnemyInstance
 import com.pathrift.anonve.android.game.enemies.EnemyType
 import com.pathrift.anonve.android.game.towers.TowerType
+import com.pathrift.anonve.android.game.towers.defaultRangeTiles
 import com.pathrift.anonve.android.game.PathLayer
 import kotlin.math.PI
 import kotlin.math.abs
@@ -1431,6 +1432,38 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         )
         drawTowerBody(canvas, type, cx, cy)
         canvas.restore()
+
+        // Ghost range ring — shows attack radius for this tower type while dragging
+        val rangeTiles = type.defaultRangeTiles()
+        val rangePixels = rangeTiles * GridSystem.TILE_SIZE_DP * density
+
+        val ringColor = when (type) {
+            TowerType.BOLT      -> Color.parseColor("#00C8FF")
+            TowerType.BLAST     -> Color.parseColor("#FF7300")
+            TowerType.FROST     -> Color.parseColor("#8F2EFF")
+            TowerType.PIERCE    -> Color.parseColor("#66FF1A")
+            TowerType.CORE      -> Color.parseColor("#FF590D")
+            TowerType.INFERNO   -> Color.parseColor("#FF2E14")
+            TowerType.TESLA     -> Color.parseColor("#33A6FF")
+            TowerType.NOVA      -> Color.parseColor("#FFF27A")
+            TowerType.SNIPER    -> Color.parseColor("#66FFFF")
+            TowerType.ARTILLERY -> Color.parseColor("#CC8800")
+        }
+
+        val ghostRingFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            color = ringColor
+            alpha = (0.06f * 255).toInt()
+        }
+        val ghostRingStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            color = ringColor
+            alpha = (0.50f * 255).toInt()
+            strokeWidth = dp(1.5f)
+        }
+
+        canvas.drawCircle(cx, cy, rangePixels, ghostRingFillPaint)
+        canvas.drawCircle(cx, cy, rangePixels, ghostRingStrokePaint)
     }
 
     inner class RenderThread(private val surfaceHolder: SurfaceHolder) : Thread("PathriftRenderThread") {

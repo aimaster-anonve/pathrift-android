@@ -113,7 +113,7 @@ class GameEngine(
 
     // ---- Free-form placement constants (Build 15 / DEC-032) ----
 
-    private val PATH_CLEARANCE_PX = 38f   // dp units, multiplied by density below
+    private val PATH_CLEARANCE_PX = 24f   // dp units, multiplied by density below
     private val TOWER_CLEARANCE_PX = 22f  // dp units
 
     /**
