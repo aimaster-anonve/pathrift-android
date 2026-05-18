@@ -9,6 +9,7 @@ import com.pathrift.anonve.android.core.storage.ArsenalStore
 import com.pathrift.anonve.android.core.storage.DiamondStore
 import com.pathrift.anonve.android.core.storage.PremiumStore
 import android.graphics.PointF
+import com.pathrift.anonve.android.game.DeathParticle
 import com.pathrift.anonve.android.game.GameBridge
 import com.pathrift.anonve.android.game.GameEngine
 import com.pathrift.anonve.android.game.GamePhase
@@ -344,6 +345,29 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
                 enemyKills = game.totalEnemiesKilled
             )
         }
+    }
+
+    /** BUG 4: Add death particle to renderer at kill position. */
+    override fun onEnemyKilledAt(x: Float, y: Float, type: EnemyType) {
+        val color = enemyParticleColor(type)
+        renderer?.let { r ->
+            synchronized(r.deathParticles) {
+                r.deathParticles.add(DeathParticle(x = x, y = y, color = color))
+            }
+        }
+    }
+
+    private fun enemyParticleColor(type: EnemyType): Int = when (type) {
+        EnemyType.RUNNER   -> android.graphics.Color.parseColor("#FF2D55")
+        EnemyType.TANK     -> android.graphics.Color.parseColor("#FF6B00")
+        EnemyType.SHIELD   -> android.graphics.Color.parseColor("#3380E6")
+        EnemyType.SWARM    -> android.graphics.Color.parseColor("#FFBF00")
+        EnemyType.GHOST    -> android.graphics.Color.parseColor("#B3E6B3")
+        EnemyType.SPLITTER -> android.graphics.Color.parseColor("#FF66FF")
+        EnemyType.JUMPER   -> android.graphics.Color.parseColor("#00FF99")
+        EnemyType.HEALER   -> android.graphics.Color.parseColor("#2ECC71")
+        EnemyType.PHANTOM  -> android.graphics.Color.parseColor("#8B00FF")
+        EnemyType.BOSS     -> android.graphics.Color.parseColor("#9966FF")
     }
 
     override fun onEnemyEscaped() {

@@ -6,6 +6,17 @@ import com.pathrift.anonve.android.core.engine.EconomyConstants
 import com.pathrift.anonve.android.game.towers.TowerType
 
 /**
+ * Death particle — spawned at enemy kill position, drives the burst animation in GameRenderer.
+ */
+data class DeathParticle(
+    val x: Float,
+    val y: Float,
+    val color: Int,
+    val startTimeMs: Long = System.currentTimeMillis(),
+    val durationMs: Long = 300L
+)
+
+/**
  * In-flight projectile — tracks a fired projectile from tower to enemy.
  * Damage is applied only when the projectile arrives (PATHRIFT-B7-F001).
  */

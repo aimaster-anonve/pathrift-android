@@ -65,6 +65,9 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
 
     @Volatile var projectiles: List<Projectile> = emptyList()
 
+    // ---- Death particles — spawned on enemy kill (BUG 4) ----
+    @Volatile var deathParticles: MutableList<DeathParticle> = mutableListOf()
+
     // ---- Paints ----
     private val backgroundPaint = Paint().apply { color = Color.parseColor("#0A0A0F") }
 
@@ -129,6 +132,8 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
     private val blastBarrelPaint        = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FF7300"); style = Paint.Style.FILL }
     private val blastExhaustFillPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(255,38,15,0);    style = Paint.Style.FILL }
     private val blastExhaustStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FF7300"); style = Paint.Style.STROKE }
+    // BUG 3: Blast shell projectile — travelling orange dot before detonation
+    private val blastShellPaint         = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = Color.parseColor("#FF7300"); alpha = 220 }
     // FROST
     private val frostBodyFillPaint   = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(255,15,5,36);    style = Paint.Style.FILL }
     private val frostBodyStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#8F2EFF"); style = Paint.Style.STROKE }
@@ -429,6 +434,9 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         if (riftShiftActive) {
             canvas.drawRect(0f, 0f, W, H, riftFlashPaint)
         }
+
+        // Death particle burst effects — drawn above enemies, below ghost tower (BUG 4)
+        drawDeathParticles(canvas)
 
         // Ghost tower placement preview — drawn last so it appears on top of all layers
         drawGhostTower(canvas)
@@ -1271,8 +1279,36 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
                             }
                             canvas.drawCircle(p.toX, p.toY, radius * 0.5f, fillPaint)
                         }
+                        TowerType.BLAST -> {
+                            // BUG 3: Blast — shell travels to target (t < 0.65), then explodes (t >= 0.65)
+                            if (t < 0.65f) {
+                                // Shell phase: small filled orange circle moving from tower to target
+                                val cx = p.fromX + (p.toX - p.fromX) * (t / 0.65f)
+                                val cy = p.fromY + (p.toY - p.fromY) * (t / 0.65f)
+                                canvas.drawCircle(cx, cy, dp(6f), blastShellPaint)
+                            } else {
+                                // Explosion phase: expanding ring with fading alpha
+                                val progress = (t - 0.65f) / 0.35f   // 0→1
+                                val radius = dp(8f) + dp(28f) * progress
+                                val alpha = ((1f - progress) * 200).toInt().coerceIn(0, 255)
+                                val expPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                    style = Paint.Style.STROKE
+                                    color = Color.parseColor("#FF7300")
+                                    this.alpha = alpha
+                                    strokeWidth = dp(2.5f)
+                                }
+                                canvas.drawCircle(p.toX, p.toY, radius, expPaint)
+                                // Inner fill glow
+                                val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                    style = Paint.Style.FILL
+                                    color = Color.parseColor("#FF7300")
+                                    this.alpha = ((1f - progress) * 60).toInt().coerceIn(0, 255)
+                                }
+                                canvas.drawCircle(p.toX, p.toY, radius * 0.4f, fillPaint)
+                            }
+                        }
                         else -> {
-                            // Blast, Inferno: standard ring
+                            // Inferno: standard ring
                             val maxRadius = dp(28f)
                             val radius = maxRadius * t
                             val alpha = (baseAlpha * 220).toInt().coerceIn(0, 255)
@@ -1380,6 +1416,40 @@ class GameRenderer(context: Context) : SurfaceView(context), SurfaceHolder.Callb
         }
         // Update projectile list (drop expired ones)
         projectiles = alive
+    }
+
+    /**
+     * Draw enemy death burst particles — 6 radial dots that expand and fade out over 300ms.
+     * BUG 4 fix: provides visual feedback when an enemy is killed.
+     */
+    private fun drawDeathParticles(canvas: Canvas) {
+        val now = System.currentTimeMillis()
+        val particlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+        val iter = synchronized(deathParticles) { deathParticles.toMutableList() }.iterator()
+        val toRemove = mutableListOf<DeathParticle>()
+        val snapshot = synchronized(deathParticles) { deathParticles.toList() }
+        for (p in snapshot) {
+            val elapsed = now - p.startTimeMs
+            if (elapsed > p.durationMs) {
+                toRemove.add(p)
+                continue
+            }
+            val frac = elapsed / p.durationMs.toFloat()   // 0→1
+            val alpha = ((1f - frac) * 200).toInt().coerceIn(0, 255)
+            val radius = dp(3f) + dp(8f) * frac
+            particlePaint.color = p.color
+            particlePaint.alpha = alpha
+            for (i in 0 until 6) {
+                val angle = i * (Math.PI / 3).toFloat()
+                val dist = dp(6f) + dp(14f) * frac
+                val px = p.x + cos(angle) * dist
+                val py = p.y + sin(angle) * dist
+                canvas.drawCircle(px, py, radius, particlePaint)
+            }
+        }
+        if (toRemove.isNotEmpty()) {
+            synchronized(deathParticles) { deathParticles.removeAll(toRemove) }
+        }
     }
 
     private fun isAoeType(type: TowerType): Boolean = when (type) {

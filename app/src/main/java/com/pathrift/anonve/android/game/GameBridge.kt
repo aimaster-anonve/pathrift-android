@@ -28,4 +28,6 @@ interface GameBridge {
     fun onProjectileFired(from: PointF, to: PointF, type: TowerType) {}
     /** Called each second during inter-wave countdown. 0 = countdown over / wave started. */
     fun onInterWaveTimerChanged(secondsRemaining: Int) {}
+    /** Called when an enemy is killed, with screen position — drives death particle burst (BUG 4). */
+    fun onEnemyKilledAt(x: Float, y: Float, type: EnemyType) {}
 }

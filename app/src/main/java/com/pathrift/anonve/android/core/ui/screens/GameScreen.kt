@@ -797,7 +797,9 @@ private fun CombatHUD(
                         SendWaveButton(
                             wave = state.wave,
                             onClick = onNextWave,
-                            interWaveSeconds = state.interWaveSecondsRemaining
+                            interWaveSeconds = state.interWaveSecondsRemaining,
+                            isWaveActive = state.phase == GamePhase.WAVE_ACTIVE,
+                            isTransitioning = state.isTransitioningToWave
                         )
                 }
             }
@@ -829,7 +831,9 @@ private fun CombatHUD(
                         state.phase != GamePhase.GAME_OVER -> SendWaveButton(
                             wave = state.wave,
                             onClick = onNextWave,
-                            interWaveSeconds = state.interWaveSecondsRemaining
+                            interWaveSeconds = state.interWaveSecondsRemaining,
+                            isWaveActive = state.phase == GamePhase.WAVE_ACTIVE,
+                            isTransitioning = state.isTransitioningToWave
                         )
                     }
                 }
@@ -934,7 +938,13 @@ private fun WaveProgressIndicator(cleared: Int, total: Int) {
 // iOS parity: double chevron icon + gradient background, cornerRadius 18
 // BUILD7: supports inter-wave countdown display (PATHRIFT-B7-002)
 @Composable
-private fun SendWaveButton(wave: Int, onClick: () -> Unit, interWaveSeconds: Int = 0) {
+private fun SendWaveButton(
+    wave: Int,
+    onClick: () -> Unit,
+    interWaveSeconds: Int = 0,
+    isWaveActive: Boolean = false,
+    isTransitioning: Boolean = false
+) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
@@ -963,6 +973,7 @@ private fun SendWaveButton(wave: Int, onClick: () -> Unit, interWaveSeconds: Int
     ) {
         Button(
             onClick = onClick,
+            enabled = !isWaveActive && !isTransitioning,
             contentPadding = PaddingValues(horizontal = 0.dp, vertical = 0.dp),
             modifier = Modifier.height(36.dp),
             shape = RoundedCornerShape(18.dp),
@@ -1226,17 +1237,18 @@ private fun TowerInfoBottomPanel(
     val towerColor = towerDisplayColor(info.type)
 
     Box(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .fillMaxSize()
             .background(Color.Transparent)
-            .clickable(onClick = onDismiss)
-            .navigationBarsPadding(),
+            .clickable(onClick = onDismiss),
         contentAlignment = Alignment.BottomCenter
     ) {
-        // GAP-045: Panel height 58dp
-        Column(modifier = Modifier.fillMaxWidth().clickable(enabled = false) {}) {
+        // GAP-045: Panel height 58dp — navigationBarsPadding ensures panel sits above nav bar (BUG 1 fix)
+        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().clickable(enabled = false) {}) {
             // GAP-038: Top accent line
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(towerColor.copy(alpha = 0.4f)))
             // Single-row compact card — GAP-045: 58dp fixed height, GAP-037: frosted glass gradient overlay
+            // All content lives inside this 58dp Row (BUG 1 fix)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1298,28 +1310,28 @@ private fun TowerInfoBottomPanel(
                     }
                 }
 
-            // Stats block
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(horizontal = 8.dp)
-                    .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                MiniStatItem("DMG", String.format("%.0f", info.damage), PathriftOrange, Modifier.weight(1f))
-                Box(Modifier.size(1.dp, 22.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
-                MiniStatItem("RNG", String.format("%.0ft", info.range / 64f * 3f), PathriftNeonBlue, Modifier.weight(1f))
-                Box(Modifier.size(1.dp, 22.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
-                MiniStatItem("SPD", String.format("%.1f/s", info.attackSpeed), PathriftPurple, Modifier.weight(1f))
-            }
+                // Stats block — inside the 58dp Row (BUG 1 fix)
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp)
+                        .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    MiniStatItem("DMG", String.format("%.0f", info.damage), PathriftOrange, Modifier.weight(1f))
+                    Box(Modifier.size(1.dp, 22.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
+                    MiniStatItem("RNG", String.format("%.0ft", info.range / 64f * 3f), PathriftNeonBlue, Modifier.weight(1f))
+                    Box(Modifier.size(1.dp, 22.dp).background(PathriftTextSecondary.copy(alpha = 0.2f)))
+                    MiniStatItem("SPD", String.format("%.1f/s", info.attackSpeed), PathriftPurple, Modifier.weight(1f))
+                }
 
-            // Buttons with scale press animation — compact sizing to prevent overflow
-            Row(
-                modifier = Modifier.wrapContentSize().padding(end = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+                // Buttons — inside the 58dp Row (BUG 1 fix)
+                Row(
+                    modifier = Modifier.wrapContentSize().padding(end = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                 // UPGRADE button with scale animation
                 val upgradeInteraction = remember { MutableInteractionSource() }
                 val upgradePressed by upgradeInteraction.collectIsPressedAsState()

@@ -786,6 +786,9 @@ class GameEngine(
             score += scaledGold * 2L
             totalEnemiesKilled++
             waveEnemiesCleared++
+            // BUG 4: notify renderer of kill position for death particle burst
+            val killPos = PathSystem.positionAt(updated.pathProgress)
+            bridge.onEnemyKilledAt(killPos.x, killPos.y, updated.type)
             bridge.onEnemyKilled(updated.type, scaledGold)
             bridge.onGoldChanged(gold)
             bridge.onWaveProgress(waveEnemiesCleared, waveEnemyTotal)
