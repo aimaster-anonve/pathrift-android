@@ -2,7 +2,6 @@ package com.pathrift.anonve.android.core.ui.screens
 
 import android.content.res.Configuration
 import android.widget.FrameLayout
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -11,10 +10,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -1347,10 +1342,15 @@ private fun TowerInfoBottomPanel(
                     shape = RoundedCornerShape(10.dp),
                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
                         Text("UPGRADE", fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
                             color = if (canAffordUpgrade) PathriftBackground else PathriftTextSecondary)
                         Text("${info.upgradeCost}g", fontSize = 8.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
                             color = if (canAffordUpgrade) PathriftBackground.copy(0.7f) else PathriftTextSecondary.copy(0.5f))
                     }
                 }
@@ -1368,59 +1368,60 @@ private fun TowerInfoBottomPanel(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
                         modifier = Modifier.padding(horizontal = 3.dp)
                     ) {
-                        Text("SELL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PathriftDanger, maxLines = 1)
+                        Text("SELL", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = PathriftDanger,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("+${info.sellValue}g", fontSize = 8.sp, color = PathriftDanger.copy(0.8f),
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-                // MOVE button — only shown between waves (PATHRIFT-B7-005)
-                AnimatedVisibility(
-                    visible = !isWaveActive,
-                    enter = fadeIn() + scaleIn(initialScale = 0.85f),
-                    exit = fadeOut() + scaleOut()
+                // MOVE button — visible during wave too, gold cost applies (DEC-031 updated)
+                val moveInteraction = remember { MutableInteractionSource() }
+                val movePressed by moveInteraction.collectIsPressedAsState()
+                val moveScale by animateFloatAsState(if (movePressed) 0.94f else 1f, spring(stiffness = 700f), label = "moveScale")
+                Box(
+                    modifier = Modifier.width(58.dp).height(40.dp)
+                        .graphicsLayer { scaleX = moveScale; scaleY = moveScale }
+                        .background(
+                            if (canAffordMove) PathriftGold.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.06f),
+                            RoundedCornerShape(10.dp)
+                        )
+                        .border(
+                            1.dp,
+                            if (canAffordMove) PathriftGold.copy(alpha = 0.40f) else PathriftTextSecondary.copy(alpha = 0.25f),
+                            RoundedCornerShape(10.dp)
+                        )
+                        .clickable(enabled = canAffordMove, interactionSource = moveInteraction, indication = null, onClick = onMove),
+                    contentAlignment = Alignment.Center
                 ) {
-                    val moveInteraction = remember { MutableInteractionSource() }
-                    val movePressed by moveInteraction.collectIsPressedAsState()
-                    val moveScale by animateFloatAsState(if (movePressed) 0.94f else 1f, spring(stiffness = 700f), label = "moveScale")
-                    Box(
-                        modifier = Modifier.width(58.dp).height(40.dp)
-                            .graphicsLayer { scaleX = moveScale; scaleY = moveScale }
-                            .background(
-                                if (canAffordMove) PathriftGold.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.06f),
-                                RoundedCornerShape(10.dp)
-                            )
-                            .border(
-                                1.dp,
-                                if (canAffordMove) PathriftGold.copy(alpha = 0.40f) else PathriftTextSecondary.copy(alpha = 0.25f),
-                                RoundedCornerShape(10.dp)
-                            )
-                            .clickable(enabled = canAffordMove, interactionSource = moveInteraction, indication = null, onClick = onMove),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier.padding(horizontal = 3.dp)
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                Icons.Filled.OpenWith, contentDescription = "Move",
-                                tint = if (canAffordMove) PathriftGold else Color.White.copy(0.3f),
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Text(
-                                "MOVE",
-                                fontSize = 9.sp, fontWeight = FontWeight.Black,
-                                color = if (canAffordMove) PathriftGold else Color.White.copy(0.3f),
-                                letterSpacing = 0.3.sp
-                            )
-                            Text(
-                                "${info.moveCost}g",
-                                fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                                fontFamily = FontFamily.Monospace,
-                                color = if (canAffordMove) PathriftGold else Color.White.copy(0.3f)
-                            )
-                        }
+                        Icon(
+                            Icons.Filled.OpenWith, contentDescription = "Move",
+                            tint = if (canAffordMove) PathriftGold else Color.White.copy(0.3f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            "MOVE",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 9.sp, fontWeight = FontWeight.Black,
+                            color = if (canAffordMove) PathriftGold else Color.White.copy(0.3f),
+                            letterSpacing = 0.3.sp
+                        )
+                        Text(
+                            "${info.moveCost}g",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                            fontFamily = FontFamily.Monospace,
+                            color = if (canAffordMove) PathriftGold else Color.White.copy(0.3f)
+                        )
                     }
                 }
                 // Dismiss button with scale animation
