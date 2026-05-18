@@ -251,7 +251,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application), G
     fun maxTowerCount(wave: Int): Int = game.activeSlotCount(wave)
     val canAddTower: Boolean get() {
         val s = _state.value
-        return s.phase != GamePhase.WAVE_ACTIVE && activeTowerCount < maxTowerCount(s.wave) && !s.isDraggingTower
+        return activeTowerCount < maxTowerCount(s.wave) && !s.isDraggingTower
     }
 
     fun restartGame() {

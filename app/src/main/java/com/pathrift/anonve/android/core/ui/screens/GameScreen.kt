@@ -769,7 +769,7 @@ private fun CombatHUD(
         }
 
         if (isLandscape) {
-            // Landscape bottom bar: progress/send wave right
+            // Landscape bottom bar: tower counter left, progress/send wave right
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -780,13 +780,25 @@ private fun CombatHUD(
                     .padding(horizontal = 16.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Tower counter pill — left (iOS CombatHUDView parity)
+                TowerCounterPill(
+                    current = activeTowerCount,
+                    max = maxTowerCount,
+                    canAdd = canAddTower,
+                    onAdd = onAddTower
+                )
                 Spacer(Modifier.weight(1f))
+                // Wave progress / send wave button — right
                 // Build 16: FIX 5 — show progress if active OR transitioning (avoids "NEXT WAVE" flash)
                 when {
                     state.phase == GamePhase.WAVE_ACTIVE || state.isTransitioningToWave ->
                         WaveProgressIndicator(state.waveEnemiesCleared, state.waveEnemyTotal)
                     state.phase != GamePhase.GAME_OVER ->
-                        SendWaveButton(wave = state.wave, onClick = onNextWave)
+                        SendWaveButton(
+                            wave = state.wave,
+                            onClick = onNextWave,
+                            interWaveSeconds = state.interWaveSecondsRemaining
+                        )
                 }
             }
         } else {
