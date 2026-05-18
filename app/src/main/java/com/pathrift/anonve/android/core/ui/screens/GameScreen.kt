@@ -1354,80 +1354,66 @@ private fun TowerInfoBottomPanel(
                             color = if (canAffordUpgrade) PathriftBackground.copy(0.7f) else PathriftTextSecondary.copy(0.5f))
                     }
                 }
-                // SELL button
+                // SELL button — same Button composable as UPGRADE for consistent height
                 val sellInteraction = remember { MutableInteractionSource() }
                 val sellPressed by sellInteraction.collectIsPressedAsState()
                 val sellScale by animateFloatAsState(if (sellPressed) 0.94f else 1f, spring(stiffness = 700f), label = "sellScale")
-                Column(
-                    modifier = Modifier
-                        .width(60.dp)
-                        .graphicsLayer { scaleX = sellScale; scaleY = sellScale }
-                        .background(PathriftDanger.copy(alpha = 0.10f), RoundedCornerShape(10.dp))
-                        .border(1.dp, PathriftDanger.copy(alpha = 0.35f), RoundedCornerShape(10.dp))
-                        .clickable(interactionSource = sellInteraction, indication = null, onClick = onSell)
-                        .padding(vertical = 7.dp, horizontal = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                Button(
+                    onClick = onSell,
+                    interactionSource = sellInteraction,
+                    modifier = Modifier.width(58.dp).height(38.dp).graphicsLayer { scaleX = sellScale; scaleY = sellScale },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PathriftDanger.copy(alpha = 0.10f),
+                        disabledContainerColor = PathriftDanger.copy(alpha = 0.10f)
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, PathriftDanger.copy(alpha = 0.35f)),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                 ) {
-                    Text(
-                        text = "SELL",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PathriftDanger,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "+${info.sellValue}g",
-                        fontSize = 8.sp,
-                        fontWeight = FontWeight.Medium,
-                        fontFamily = FontFamily.Monospace,
-                        color = PathriftDanger.copy(alpha = 0.85f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text("SELL", fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            color = PathriftDanger)
+                        Text("+${info.sellValue}g", fontSize = 8.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            fontFamily = FontFamily.Monospace,
+                            color = PathriftDanger.copy(alpha = 0.80f))
+                    }
                 }
-                // MOVE button — visible during wave too, gold cost applies (DEC-031)
+                // MOVE button — same Button composable as UPGRADE for consistent height
                 val moveInteraction = remember { MutableInteractionSource() }
                 val movePressed by moveInteraction.collectIsPressedAsState()
                 val moveScale by animateFloatAsState(if (movePressed) 0.94f else 1f, spring(stiffness = 700f), label = "moveScale")
                 val moveColor = if (canAffordMove) PathriftGold else Color.White.copy(alpha = 0.30f)
-                Column(
-                    modifier = Modifier
-                        .width(62.dp)
-                        .graphicsLayer { scaleX = moveScale; scaleY = moveScale }
-                        .background(
-                            if (canAffordMove) PathriftGold.copy(alpha = 0.10f) else Color.White.copy(alpha = 0.06f),
-                            RoundedCornerShape(10.dp)
-                        )
-                        .border(
-                            1.dp,
-                            if (canAffordMove) PathriftGold.copy(alpha = 0.40f) else PathriftTextSecondary.copy(alpha = 0.25f),
-                            RoundedCornerShape(10.dp)
-                        )
-                        .clickable(enabled = canAffordMove, interactionSource = moveInteraction, indication = null, onClick = onMove)
-                        .padding(vertical = 7.dp, horizontal = 4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
+                Button(
+                    onClick = onMove,
+                    enabled = canAffordMove,
+                    interactionSource = moveInteraction,
+                    modifier = Modifier.width(58.dp).height(38.dp).graphicsLayer { scaleX = moveScale; scaleY = moveScale },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = PathriftGold.copy(alpha = 0.10f),
+                        disabledContainerColor = Color.White.copy(alpha = 0.06f)
+                    ),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, if (canAffordMove) PathriftGold.copy(alpha = 0.40f) else PathriftTextSecondary.copy(alpha = 0.25f)),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)
                 ) {
-                    Text(
-                        text = "MOVE",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        color = moveColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = "${info.moveCost}g",
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace,
-                        color = moveColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center
+                    ) {
+                        Text("MOVE", fontSize = 9.sp, fontWeight = FontWeight.Black,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            fontFamily = FontFamily.Monospace,
+                            color = moveColor)
+                        Text("${info.moveCost}g", fontSize = 8.sp,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            fontFamily = FontFamily.Monospace,
+                            color = moveColor)
+                    }
                 }
                 // Dismiss button with scale animation
                 val dismissInteraction = remember { MutableInteractionSource() }

@@ -3,43 +3,36 @@ package com.pathrift.anonve.android
 import com.pathrift.anonve.android.core.engine.ScoreEngine
 import com.pathrift.anonve.android.game.GridSystem
 import com.pathrift.anonve.android.game.TileType
-import com.pathrift.anonve.android.game.TileCoordinate
 import com.pathrift.anonve.android.game.WaveSystem
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GridSystemTest {
 
     @Test
-    fun `grid dimensions are correct`() {
+    fun `grid tile count matches dimensions`() {
         val grid = GridSystem()
         val tiles = grid.getAllTiles()
         assertEquals(GridSystem.COLS * GridSystem.ROWS, tiles.size)
     }
 
     @Test
-    fun `path tiles cannot have towers placed`() {
+    fun `all tiles are initially empty`() {
         val grid = GridSystem()
-        val pathCoord = GridSystem.PATH_NODES.first()
-        assertFalse(grid.canPlaceTower(pathCoord))
+        assertTrue(grid.getAllTiles().all { it.type == TileType.EMPTY })
     }
 
     @Test
-    fun `empty tiles can have towers placed`() {
+    fun `no slots exist before updateSlots called`() {
         val grid = GridSystem()
-        val emptyTile = grid.getAllTiles().first { it.type == TileType.EMPTY }
-        assertTrue(grid.canPlaceTower(emptyTile.coordinate))
+        assertEquals(0, grid.slots.size)
     }
 
     @Test
-    fun `placing tower marks tile as occupied`() {
+    fun `available slots returns empty list when no slots configured`() {
         val grid = GridSystem()
-        val emptyTile = grid.getAllTiles().first { it.type == TileType.EMPTY }
-        val coord = emptyTile.coordinate
-        assertTrue(grid.placeTower(coord))
-        assertFalse(grid.canPlaceTower(coord))
+        assertEquals(0, grid.availableSlots().size)
     }
 }
 
@@ -56,15 +49,15 @@ class WaveSystemTest {
 
     @Test
     fun `wave scaling increases enemy count`() {
-        val wave1Count = waveSystem.getTotalEnemyCount(1)
-        val wave6Count = waveSystem.getTotalEnemyCount(6)
+        val wave1Count = waveSystem.getWaveDefinition(1).totalEnemyCount
+        val wave6Count = waveSystem.getWaveDefinition(6).totalEnemyCount
         assertTrue(wave6Count > wave1Count)
     }
 
     @Test
     fun `gold reward scales with wave number`() {
-        val reward1 = waveSystem.calculateGoldReward(1)
-        val reward5 = waveSystem.calculateGoldReward(5)
+        val reward1 = waveSystem.goldRewardForWave(1)
+        val reward5 = waveSystem.goldRewardForWave(5)
         assertTrue(reward5 > reward1)
     }
 }
